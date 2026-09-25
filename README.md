@@ -7,6 +7,89 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+# School Management System
+
+One application replacing three separate platforms — admissions, results and
+school fees — for a single school. Built on Laravel 13, Tailwind CSS v4 and
+Alpine.js.
+
+## How the pipeline works
+
+1. **Register** — the school office registers each candidate (typed in, or a
+   spreadsheet of many at once) and they are given a permanent registration
+   number such as `SAC-00001`, in ascending order.
+2. **Examine** — candidates sit the paper-and-pencil entrance examination.
+   Marks are captured by hand, uploaded from a spreadsheet, or read off a scanned
+   scoresheet by AI, which always lands in a review queue for a human to approve.
+3. **Decide** — the exam officer sets a cutoff mark. Applicants at or above it are
+   transferred automatically into **both** the results portal and the fees portal,
+   receiving a year-scoped admission number such as `SAC/2026/001`, a portal
+   login, and their first fee invoice.
+4. **Resit** — a candidate who misses the cutoff can be entered for a resit, which
+   repeats only the papers they failed.
+
+Admission letters can be printed or downloaded as PDF, and text messages are sent
+to guardians at each stage (simulated until an SMS gateway key is configured).
+
+## Two number series
+
+| Number | Looks like | Issued | Scope |
+| --- | --- | --- | --- |
+| Registration number | `SAC-00001` | On application | Global, ascending forever |
+| Admission number | `SAC/2026/001` | On admission | Restarts each academic year |
+
+## Roles
+
+Super Admin, Exam Officer, Teacher, Student, Parent / Guardian, Bursar / Accounts,
+Admission Officer.
+
+## Setting it up
+
+Requires PHP 8.4+, Composer, Node and MySQL.
+
+```sh
+composer install
+npm install
+
+cp .env.example .env
+php artisan key:generate
+# then set DB_DATABASE, DB_USERNAME and DB_PASSWORD in .env
+
+php artisan migrate --seed
+npm run build
+
+# Required: applicant photographs and scanned documents are stored on the
+# `public` disk, and this symlink is not committed.
+php artisan storage:link
+```
+
+## Running it locally
+
+```sh
+php artisan serve
+npm run dev            # in a second terminal, while developing
+```
+
+## Tests
+
+```sh
+php artisan test
+```
+
+The suite runs against MySQL rather than SQLite, because several model scopes use
+MySQL functions. Point `DB_DATABASE` at a throwaway database (the default in
+`phpunit.xml` is `saci_all_test`) — it is migrated and rolled back per test.
+
+## Notes
+
+- Public self-registration is **off by default**: registration is done by the
+  school office. It can be reopened from *Settings → Admissions → Registration
+  open*, and the public pages change to match.
+- No queue worker is required. Text messages send inline, and anything queued can
+  be flushed from the messages screen.
+
+---
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
