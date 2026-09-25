@@ -1,0 +1,266 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../../vendor/livewire/livewire/**/*.blade.php';
+@source '../views/**/*.blade.php';
+
+/* =====================================================================
+   DESIGN TOKENS
+   Navy = authority and trust (school identity, admissions)
+   Gold = achievement and merit (results, awards, accents)
+   ===================================================================== */
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-display: 'Fraunces', ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+
+    /* Brand — deep academic navy */
+    --color-brand-50: #f1f5fd;
+    --color-brand-100: #e3ebfb;
+    --color-brand-200: #c9daf7;
+    --color-brand-300: #a3c0f0;
+    --color-brand-400: #769de6;
+    --color-brand-500: #537cdc;
+    --color-brand-600: #3d5fcd;
+    --color-brand-700: #334cbb;
+    --color-brand-800: #2d3f99;
+    --color-brand-900: #1e2c66;
+    --color-brand-950: #141d47;
+
+    /* Gold — merit and distinction */
+    --color-gold-50: #fdf9ed;
+    --color-gold-100: #f9efcc;
+    --color-gold-200: #f3dd99;
+    --color-gold-300: #ecc45c;
+    --color-gold-400: #e5ad33;
+    --color-gold-500: #d4941c;
+    --color-gold-600: #b87215;
+    --color-gold-700: #935114;
+    --color-gold-800: #7a4217;
+    --color-gold-900: #683817;
+    --color-gold-950: #3d1c08;
+
+    /* Elevation */
+    --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+    --shadow-lift: 0 10px 30px -12px rgb(15 23 42 / 0.18);
+    --shadow-float: 0 24px 60px -20px rgb(15 23 42 / 0.28);
+
+    --radius-xl: 0.875rem;
+    --radius-2xl: 1.125rem;
+    --radius-3xl: 1.5rem;
+}
+
+/* =====================================================================
+   BASE
+   ===================================================================== */
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-800 antialiased;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        @apply text-slate-900 tracking-tight;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-brand-500;
+    }
+
+    ::selection {
+        @apply bg-brand-600 text-white;
+    }
+}
+
+/* =====================================================================
+   COMPONENTS
+   ===================================================================== */
+@layer components {
+    /* ---------- Buttons ---------- */
+    .btn,
+    .btn-primary,
+    .btn-gold,
+    .btn-secondary,
+    .btn-ghost,
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+               text-sm font-semibold transition-all duration-150
+               focus-visible:outline-2 focus-visible:outline-offset-2
+               disabled:pointer-events-none disabled:opacity-50;
+    }
+
+    .btn-primary {
+        @apply bg-brand-900 text-white shadow-sm
+               hover:bg-brand-800 hover:shadow-md active:scale-[0.985];
+    }
+
+    .btn-gold {
+        @apply bg-gold-400 text-gold-950 shadow-sm
+               hover:bg-gold-300 hover:shadow-md active:scale-[0.985];
+    }
+
+    .btn-secondary {
+        @apply border border-slate-300 bg-white text-slate-700 shadow-sm
+               hover:border-slate-400 hover:bg-slate-50 active:scale-[0.985];
+    }
+
+    .btn-ghost {
+        @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+    }
+
+    .btn-danger {
+        @apply bg-rose-600 text-white shadow-sm hover:bg-rose-700;
+    }
+
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
+
+    .btn-lg {
+        @apply px-6 py-3 text-base;
+    }
+
+    /* ---------- Forms ---------- */
+    .label {
+        @apply block text-sm font-medium text-slate-700 mb-1.5;
+    }
+
+    .input {
+        @apply block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5
+               text-sm text-slate-900 shadow-sm transition
+               placeholder:text-slate-400
+               focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:outline-none
+               disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+    }
+
+    .input-error {
+        @apply border-rose-400 focus:border-rose-500 focus:ring-rose-500/10;
+    }
+
+    .hint {
+        @apply mt-1.5 text-xs text-slate-500;
+    }
+
+    .error-text {
+        @apply mt-1.5 text-xs font-medium text-rose-600;
+    }
+
+    select.input {
+        @apply appearance-none bg-no-repeat pr-10;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3e%3c/svg%3e");
+        background-position: right 0.75rem center;
+        background-size: 1.1rem;
+    }
+
+    /* ---------- Surfaces ---------- */
+    .card,
+    .card-pad {
+        @apply rounded-2xl border border-slate-200 bg-white shadow-card;
+    }
+
+    .card-pad {
+        @apply p-5 sm:p-6;
+    }
+
+    .panel-header {
+        @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4;
+    }
+
+    .panel-title {
+        @apply text-base font-semibold text-slate-900;
+    }
+
+    /* ---------- Badges ---------- */
+    .badge,
+    .badge-neutral {
+        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset;
+    }
+
+    .badge-neutral {
+        @apply bg-slate-100 text-slate-700 ring-slate-500/20;
+    }
+
+    /* ---------- Tables ---------- */
+    .table-wrap {
+        @apply overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-card;
+    }
+
+    .table {
+        @apply min-w-full divide-y divide-slate-200 text-sm;
+    }
+
+    .table thead th {
+        @apply bg-slate-50/80 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500;
+    }
+
+    .table tbody td {
+        @apply px-4 py-3 align-middle text-slate-700;
+    }
+
+    .table tbody tr {
+        @apply transition-colors hover:bg-slate-50/70;
+    }
+
+    /* ---------- Navigation ---------- */
+    .nav-link {
+        @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
+               text-slate-600 transition-colors hover:bg-white hover:text-brand-900;
+    }
+
+    .nav-link-active {
+        @apply bg-white text-brand-900 shadow-sm ring-1 ring-slate-200;
+    }
+
+    /* ---------- Public site ---------- */
+    .section {
+        @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+    }
+
+    .eyebrow {
+        @apply inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1
+               text-xs font-semibold uppercase tracking-widest text-brand-700 ring-1 ring-brand-600/10;
+    }
+
+    .display {
+        @apply font-display font-semibold tracking-tight text-slate-900;
+    }
+}
+
+/* =====================================================================
+   UTILITIES
+   ===================================================================== */
+@utility text-balance {
+    text-wrap: balance;
+}
+
+@utility hero-mesh {
+    background-image:
+        radial-gradient(at 12% 18%, rgb(61 95 205 / 0.28) 0px, transparent 55%),
+        radial-gradient(at 88% 8%, rgb(212 148 28 / 0.20) 0px, transparent 50%),
+        radial-gradient(at 70% 92%, rgb(30 44 102 / 0.32) 0px, transparent 55%);
+}
+
+@utility grid-lines {
+    background-image:
+        linear-gradient(to right, rgb(148 163 184 / 0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgb(148 163 184 / 0.12) 1px, transparent 1px);
+    background-size: 56px 56px;
+}
+
+/* Livewire progress bar, tinted to the brand */
+.livewire-progress-bar {
+    background-color: var(--color-gold-400);
+}
