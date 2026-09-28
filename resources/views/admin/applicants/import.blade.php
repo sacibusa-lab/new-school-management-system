@@ -50,8 +50,11 @@
     </summary>
 
     <p class="mt-3 text-sm text-slate-500">
-        Headings are matched loosely — “Surname”, “surname” and “Family Name” all work, and the order does
-        not matter. Any column it does not recognise is simply ignored.
+        The template carries only the columns that are actually required — the same ones the office
+        registration form insists on. Everything below them is optional: add a column and it will be read,
+        leave it out and nothing is lost. Headings are matched loosely, so “Surname”, “surname” and
+        “Family Name” all work and the order does not matter. Any column it does not recognise is simply
+        ignored.
     </p>
 
     <div class="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
@@ -186,8 +189,8 @@
                             <th>Class</th>
                             <th>Gender</th>
                             <th>Date of birth</th>
-                            <th>Phone</th>
                             <th>Parent / guardian</th>
+                            <th>Parent email</th>
                         </tr>
                     </thead>
 
@@ -205,8 +208,8 @@
                                 <td class="text-sm">{{ $row['class'] ?? '—' }}</td>
                                 <td class="text-sm">{{ $row['gender'] ?? '—' }}</td>
                                 <td class="text-sm">{{ $row['dob'] ?? '—' }}</td>
-                                <td class="text-sm">{{ $row['phone'] ?? '—' }}</td>
-                                <td class="text-sm">{{ $row['guardian'] ?? '—' }}</td>
+                                <td class="text-sm">{{ $row['parent'] ?? '—' }}</td>
+                                <td class="text-sm">{{ $row['parent_email'] ?? '—' }}</td>
                             </tr>
                         @empty
                             <tr>

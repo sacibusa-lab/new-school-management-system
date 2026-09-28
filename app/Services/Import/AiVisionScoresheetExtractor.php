@@ -30,6 +30,15 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
         return 'Read by AI from a photograph or scan of the marked sheet.';
     }
 
+    /**
+     * The AI reads whole rows, not columns, so there is no column it failed to
+     * place — anything it could not read simply does not come back as a row.
+     */
+    public function unreadHeadings(): array
+    {
+        return [];
+    }
+
     public function isConfigured(): bool
     {
         return $this->provider() !== null && filled(config('saci.ai.key'));

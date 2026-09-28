@@ -43,9 +43,17 @@ class ScoreImport extends Model
         return $this->belongsTo(ExamSubject::class);
     }
 
+    /**
+     * The parsed lines.
+     *
+     * Deliberately UNORDERED. An `orderBy` on the relation leaks into any
+     * aggregate built on top of it, and MySQL rejects `ORDER BY row_number` in a
+     * `GROUP BY status` count with "not in GROUP BY clause" — which took the whole
+     * review screen down. Whoever is displaying a list asks for the order itself.
+     */
     public function rows(): HasMany
     {
-        return $this->hasMany(ScoreImportRow::class)->orderBy('row_number');
+        return $this->hasMany(ScoreImportRow::class);
     }
 
     public function uploader(): BelongsTo

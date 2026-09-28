@@ -43,18 +43,34 @@ class ApplicantImportService
         'middle_name' => ['middle name', 'middlename'],
         'gender' => ['gender', 'sex'],
         'date_of_birth' => ['date of birth', 'dob', 'dateofbirth', 'birth date', 'birthday'],
-        'phone' => ['phone', 'phone number', 'phonenumber', 'mobile', 'mobile number', 'contact', 'telephone'],
-        'email' => ['email', 'e mail', 'email address'],
+        'nationality' => ['nationality', 'country'],
         'address' => ['address', 'residential address', 'home address', 'contact address'],
         'city' => ['city', 'town'],
         'state' => ['state', 'state of origin', 'state of residence'],
         'lga' => ['lga', 'local government', 'local govt', 'local government area'],
-        'previous_school' => ['previous school', 'last school', 'school attended', 'former school'],
         'level' => ['class', 'level', 'class applied for', 'applying for', 'applying for class', 'grade'],
         'guardian_name' => ['parent name', 'guardian', 'guardian name', 'parent guardian', 'parent or guardian', 'parent'],
         'guardian_relationship' => ['relationship', 'guardian relationship'],
         'guardian_phone' => ['parent phone', 'guardian phone', 'parent phone number', 'guardian phone number', 'parent mobile'],
-        'guardian_email' => ['parent email', 'guardian email'],
+        'guardian_email' => ['parent email', 'guardian email', 'parent email address', 'guardian email address'],
+    ];
+
+    /**
+     * Columns the reader looks for but the template does not print, in the order
+     * the office registration form asks for them. The guide on the import screen
+     * lists these so an office with the data already in a sheet keeps it.
+     */
+    private const COLUMN_NOTES = [
+        'middle_name' => 'Optional.',
+        'gender' => 'Male or Female (M/F also accepted).',
+        'date_of_birth' => 'Any date format Excel accepts.',
+        'nationality' => 'Optional.',
+        'guardian_name' => 'The parent or guardian.',
+        'guardian_relationship' => 'Father, Mother, Guardian…',
+        'address' => 'Home address.',
+        'city' => 'Optional.',
+        'state' => 'State of residence.',
+        'lga' => 'Local government area.',
     ];
 
     public function __construct(
@@ -65,29 +81,63 @@ class ApplicantImportService
     /**
      * The canonical template the office should fill in.
      *
+     * Exactly the columns the office registration form insists on, and nothing
+     * else, so nobody has to work out which of a dozen columns actually matter.
+     * Everything the reader understands beyond these is optional and listed
+     * separately by allColumns().
+     *
      * @return array<int,array{key:string,label:string,required:bool,note:string}>
      */
     public function columns(): array
     {
         return [
-            ['key' => 'surname', 'label' => 'Surname', 'required' => true, 'note' => 'Family name.'],
+            ['key' => 'last_name', 'label' => 'Surname', 'required' => true, 'note' => 'Family name.'],
             ['key' => 'first_name', 'label' => 'First name', 'required' => true, 'note' => 'Given name.'],
-            ['key' => 'middle_name', 'label' => 'Middle name', 'required' => false, 'note' => 'Optional.'],
-            ['key' => 'class', 'label' => 'Class', 'required' => true, 'note' => 'Must match a class on the Classes list, e.g. JSS1.'],
-            ['key' => 'gender', 'label' => 'Gender', 'required' => false, 'note' => 'Male or Female (M/F also accepted).'],
-            ['key' => 'date_of_birth', 'label' => 'Date of birth', 'required' => false, 'note' => 'Any date format Excel accepts.'],
-            ['key' => 'parent_name', 'label' => 'Parent name', 'required' => false, 'note' => 'Guardian or parent.'],
-            ['key' => 'parent_phone', 'label' => 'Parent phone', 'required' => false, 'note' => 'Used for text messages.'],
-            ['key' => 'relationship', 'label' => 'Relationship', 'required' => false, 'note' => 'Father, Mother, Guardian…'],
-            ['key' => 'phone', 'label' => 'Phone', 'required' => false, 'note' => 'The applicant\'s own number, if any.'],
-            ['key' => 'email', 'label' => 'Email', 'required' => false, 'note' => 'Optional.'],
-            ['key' => 'address', 'label' => 'Address', 'required' => false, 'note' => 'Home address.'],
-            ['key' => 'state', 'label' => 'State', 'required' => false, 'note' => 'State of residence.'],
-            ['key' => 'previous_school', 'label' => 'Previous school', 'required' => false, 'note' => 'Optional.'],
+            ['key' => 'level', 'label' => 'Class', 'required' => true, 'note' => 'Must match a class on the Classes list, e.g. JSS1.'],
+            ['key' => 'guardian_phone', 'label' => 'Parent phone', 'required' => true, 'note' => 'Needed to open the fee account, and used for text messages.'],
+            ['key' => 'guardian_email', 'label' => 'Parent email', 'required' => true, 'note' => 'Needed to open the fee account.'],
         ];
     }
 
-    /** The header row the downloaded template uses. */
+    /**
+     * Every column the reader understands, required and optional together.
+     *
+     * The optional ones are not printed in the template, but a sheet that has
+     * them is read rather than ignored, so an office can keep using the file it
+     * already keeps.
+     *
+     * @return array<int,array{key:string,label:string,required:bool,note:string}>
+     */
+    public function allColumns(): array
+    {
+        $required = $this->columns();
+
+        $optional = [
+            'middle_name' => 'Middle name',
+            'gender' => 'Gender',
+            'date_of_birth' => 'Date of birth',
+            'nationality' => 'Nationality',
+            'guardian_name' => 'Parent name',
+            'guardian_relationship' => 'Relationship',
+            'address' => 'Address',
+            'city' => 'City',
+            'state' => 'State',
+            'lga' => 'LGA',
+        ];
+
+        foreach ($optional as $key => $label) {
+            $required[] = [
+                'key' => $key,
+                'label' => $label,
+                'required' => false,
+                'note' => self::COLUMN_NOTES[$key] ?? 'Optional.',
+            ];
+        }
+
+        return $required;
+    }
+
+    /** The header row the downloaded template uses: the required columns only. */
     public function templateHeaders(): array
     {
         return array_column($this->columns(), 'label');
@@ -386,16 +436,30 @@ class ApplicantImportService
             }
         }
 
+        // The parent's phone and email are the only contact on the registration
+        // form, and the details the fee account is opened in, so a row without
+        // them cannot be taken any further — the same rule as the form.
+        $parentPhone = $values['guardian_phone'] ?? null;
+        $parentEmail = $values['guardian_email'] ?? null;
+
+        if ($parentPhone === null) {
+            $errors[] = 'Parent phone is missing.';
+        }
+
+        if ($parentEmail === null) {
+            $errors[] = 'Parent email is missing.';
+        } elseif ($this->emailProblem($parentEmail) !== null) {
+            $errors[] = $this->emailProblem($parentEmail);
+        }
+
         return [
             'line' => $line,
             'name' => trim(collect([$lastName, $firstName, $values['middle_name'] ?? null])->filter()->implode(' ')),
             'class' => $level?->name ?? $typedClass,
             'gender' => $gender ? ucfirst($gender) : null,
             'dob' => $dob?->format('j M Y'),
-            'phone' => $values['phone'] ?? null,
-            'guardian' => collect([$values['guardian_name'] ?? null, $values['guardian_phone'] ?? null])
-                ->filter()
-                ->implode(' · ') ?: null,
+            'parent' => collect([$values['guardian_name'] ?? null, $parentPhone])->filter()->implode(' · ') ?: null,
+            'parent_email' => $parentEmail,
             'errors' => $errors,
             'data' => [
                 'first_name' => $firstName,
@@ -403,20 +467,28 @@ class ApplicantImportService
                 'last_name' => $lastName,
                 'gender' => $gender,
                 'date_of_birth' => $dob?->toDateString(),
-                'phone' => $values['phone'] ?? null,
-                'email' => $values['email'] ?? null,
+                'nationality' => $values['nationality'] ?? null,
                 'address' => $values['address'] ?? null,
                 'city' => $values['city'] ?? null,
                 'state' => $values['state'] ?? null,
                 'lga' => $values['lga'] ?? null,
-                'previous_school' => $values['previous_school'] ?? null,
                 'level_applied_for_id' => $level?->id,
                 'guardian_name' => $values['guardian_name'] ?? null,
                 'guardian_relationship' => $values['guardian_relationship'] ?? null,
-                'guardian_phone' => $values['guardian_phone'] ?? null,
-                'guardian_email' => $values['guardian_email'] ?? null,
+                'guardian_phone' => $parentPhone,
+                'guardian_email' => $parentEmail,
+                // No applicant phone, email or previous school: the office form
+                // does not collect them, and the parent is the account holder.
             ],
         ];
+    }
+
+    /** A one-line reason the address will not do, or null when it is fine. */
+    private function emailProblem(string $email): ?string
+    {
+        return filter_var($email, FILTER_VALIDATE_EMAIL) === false
+            ? "Parent email \"{$email}\" does not look like an email address."
+            : null;
     }
 
     /* ------------------------------------------------------------------ */
@@ -496,11 +568,22 @@ class ApplicantImportService
         }
 
         // Fall back to a "contains" match so "Candidate Surname" still works.
+        //
+        // Longest alias first: "Parent Email" must land on the parent's email,
+        // not be swallowed by the shorter "email" alias for some other column.
+        $contains = [];
+
         foreach (self::COLUMN_ALIASES as $key => $aliases) {
             foreach ($aliases as $alias) {
-                if (Str::contains($normalised, $alias)) {
-                    return $key;
-                }
+                $contains[] = ['key' => $key, 'alias' => $alias];
+            }
+        }
+
+        usort($contains, fn ($a, $b) => strlen($b['alias']) <=> strlen($a['alias']));
+
+        foreach ($contains as $candidate) {
+            if (Str::contains($normalised, $candidate['alias'])) {
+                return $candidate['key'];
             }
         }
 

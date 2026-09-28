@@ -44,6 +44,22 @@
         <x-status-pill :status="$import->status" />
     </div>
 
+    @php $unread = $import->meta['unread_headings'] ?? []; @endphp
+
+    @if ($unread !== [])
+        {{-- A column the school filled in that we could not place. Naming it is
+             the only way anybody finds out those marks were not read. --}}
+        <div class="mt-5">
+            <x-alert tone="warning" title="Some columns were not read">
+                These headings were neither a student column nor a paper on this examination, so
+                nothing under them was read:
+                <span class="font-medium">{{ implode(', ', $unread) }}</span>.
+                If one of them is a paper, add the paper to the examination and upload the sheet
+                again; otherwise the marks under it have to be typed in by hand.
+            </x-alert>
+        </div>
+    @endif
+
     @if ($import->error)
         <div class="mt-5">
             <x-alert tone="danger" title="This file could not be read">{{ $import->error }}</x-alert>

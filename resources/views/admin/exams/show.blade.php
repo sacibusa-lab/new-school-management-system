@@ -126,6 +126,27 @@
                     </button>
                 </form>
             @endcan
+
+            @if ($candidateCount > 0 && $examSubjects->isNotEmpty() && auth()->user()?->can('scores.import'))
+                {{-- The same shape as the score entry grid: a row per candidate, a
+                     column per paper. Fill it in, upload it back, review, commit. --}}
+                <div class="mt-4 border-t border-slate-100 pt-4">
+                    <p class="text-xs text-slate-500">
+                        Marks already on paper? Download the sheet for
+                        {{ $examSubjects->count() }} subject(s), fill in the marks and upload it back —
+                        the candidates are already listed, and a blank cell is read as “not marked yet”.
+                    </p>
+
+                    <a href="{{ route('admin.exams.scoresheet-template', $exam) }}" class="btn-primary btn-sm mt-3 w-full">
+                        Download the scoresheet
+                    </a>
+
+                    <a href="{{ route('admin.imports.index', ['exam' => $exam->id]) }}"
+                       class="btn-ghost btn-sm mt-2 w-full">
+                        Upload a filled-in sheet
+                    </a>
+                </div>
+            @endif
         </div>
 
         <div class="card-pad">

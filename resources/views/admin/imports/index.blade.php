@@ -17,16 +17,25 @@
                 Nothing is saved to the examination until you review the reading and commit it.
             </p>
 
+            <div class="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600 ring-1 ring-slate-200">
+                <p class="font-medium text-slate-700">A sheet can carry every paper at once.</p>
+                <p class="mt-1">
+                    One row per candidate, one column per paper, each column headed with the paper's
+                    name — the same shape as the score entry grid. A blank cell means that paper has
+                    not been marked yet, which is not the same as an absence.
+                </p>
+            </div>
+
             <div class="mt-6 space-y-5">
                 <x-field name="exam_id" label="Examination" type="select" required
                          placeholder-option="Choose an examination"
                          :value="request('exam')"
                          :options="$exams->mapWithKeys(fn ($e) => [$e->id => $e->title . ' — ' . ($e->level?->name ?? 'All levels')])->all()" />
 
-                <x-field name="exam_subject_id" label="Subject" type="select"
-                         placeholder-option="Whole examination (the sheet names its own subject)"
-                         hint="Choose a subject if the sheet covers only one."
-                         :options="\App\Models\ExamSubject::query()->with('subject')->get()->mapWithKeys(fn ($es) => [$es->id => $es->subject?->name])->all()" />
+                <x-field name="exam_subject_id" label="Subject (optional)" type="select"
+                         placeholder-option="No — the sheet names its own papers"
+                         hint="Leave this alone if the sheet has a column for each paper, or a Subject column of its own. Choose a paper only when the whole sheet is that one paper and it never says so."
+                         :options="$subjectOptions" />
 
                 <x-field name="file" label="Scoresheet file" type="file" required
                          accept=".xlsx,.xls,.csv,.txt,.jpg,.jpeg,.png,.webp,.pdf"

@@ -8,6 +8,7 @@ use App\Exceptions\ScoresheetExtractionException;
 use App\Http\Controllers\Controller;
 use App\Models\Applicant;
 use App\Models\Exam;
+use App\Models\ExamSubject;
 use App\Models\ScoreImport;
 use App\Models\ScoreImportRow;
 use App\Services\Import\ScoreImportService;
@@ -30,6 +31,23 @@ class ScoreImportController extends Controller
     {
         $this->authorize('scores.import');
 
+        // A subject only makes sense for the examination it belongs to, so the
+        // list is scoped to the chosen examination. Without a choice, every paper
+        // is listed under its examination's name rather than as a bare name that
+        // could come from anywhere.
+        $selectedExam = $request->integer('exam');
+
+        $subjectOptions = ExamSubject::query()
+            ->with(['subject', 'exam'])
+            ->when($selectedExam, fn ($query) => $query->where('exam_id', $selectedExam))
+            ->get()
+            ->mapWithKeys(fn (ExamSubject $paper) => [
+                $paper->id => trim(
+                    ($selectedExam ? '' : ($paper->exam?->title . ' — ')) . ($paper->subject?->name ?? 'Subject'),
+                ),
+            ])
+            ->all();
+
         return view('admin.imports.index', [
             'imports' => ScoreImport::query()
                 ->with(['exam.level', 'examSubject.subject', 'uploader', 'committer'])
@@ -39,6 +57,7 @@ class ScoreImportController extends Controller
                 ->paginate(15)
                 ->withQueryString(),
             'exams' => Exam::query()->with('level')->orderByDesc('id')->get(),
+            'subjectOptions' => $subjectOptions,
             'drivers' => ImportDriver::options(),
             'aiConfigured' => app(\App\Services\Import\AiVisionScoresheetExtractor::class)->isConfigured(),
         ]);

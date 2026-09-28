@@ -119,6 +119,10 @@ Route::middleware(['auth'])
         Route::delete('exams/{exam}/subjects/{examSubject}', [ExamController::class, 'destroySubject'])->name('exams.subjects.destroy');
         Route::post('exams/{exam}/candidates', [ExamController::class, 'syncCandidates'])->name('exams.candidates.sync');
 
+        // A blank scoresheet laid out one column per paper, so the office can fill
+        // it in and upload it back rather than typing every mark.
+        Route::get('exams/{exam}/scoresheet', [ExamController::class, 'scoresheetTemplate'])->name('exams.scoresheet-template');
+
         /* ---------------- Score entry ---------------- */
         Route::get('scores', [ScoreEntryController::class, 'index'])->name('scores.index');
 

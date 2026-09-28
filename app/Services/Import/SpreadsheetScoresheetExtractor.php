@@ -4,6 +4,7 @@ namespace App\Services\Import;
 
 use App\Contracts\ScoresheetExtractor;
 use App\Enums\ImportDriver;
+use App\Support\SubjectName;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
@@ -30,6 +31,14 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
         return ImportDriver::Spreadsheet;
     }
 
+    /**
+     * Headings from the last read that were neither a column we know nor a paper
+     * on the examination.
+     *
+     * @var array<int,string>
+     */
+    private array $unread = [];
+
     public function describe(): string
     {
         return 'Read from the uploaded spreadsheet columns.';
@@ -51,10 +60,14 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
         $reader->setReadDataOnly(true);
         $spreadsheet = $reader->load($absolutePath);
 
+        // Reset per call: the service hands out one shared instance, so last
+        // year's leftovers must not be reported against this sheet.
+        $this->unread = [];
+
         $rows = [];
 
         foreach ($spreadsheet->getAllSheets() as $sheet) {
-            $rows = array_merge($rows, $this->extractSheet($sheet, count($rows)));
+            $rows = array_merge($rows, $this->extractSheet($sheet, count($rows), $context));
         }
 
         $spreadsheet->disconnectWorksheets();
@@ -62,10 +75,16 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
         return $rows;
     }
 
+    public function unreadHeadings(): array
+    {
+        return array_values(array_unique($this->unread));
+    }
+
     /**
+     * @param  array<string,mixed>  $context
      * @return array<int,array<string,mixed>>
      */
-    private function extractSheet(Worksheet $sheet, int $offset): array
+    private function extractSheet(Worksheet $sheet, int $offset, array $context = []): array
     {
         $grid = $sheet->toArray(null, true, false, false);
 
@@ -73,11 +92,13 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
             return [];
         }
 
-        [$headerRowIndex, $map] = $this->locateHeader($grid);
+        [$headerRowIndex, $map, $subjectColumns] = $this->locateHeader($grid, $context);
 
         if ($headerRowIndex === null) {
             return [];
         }
+
+        $this->collectUnread($grid[$headerRowIndex] ?? [], $map, $subjectColumns);
 
         $out = [];
         $rowNumber = 0;
@@ -102,14 +123,41 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
 
             $name = $this->value($line, $map['name'] ?? null);
             $identifier = $this->value($line, $map['identifier'] ?? null);
-            $score = $this->value($line, $map['score'] ?? null);
-            $subject = $this->value($line, $map['subject'] ?? null);
-            $absent = $this->value($line, $map['absent'] ?? null);
 
             // A line with neither a name nor a number is not a candidate.
             if ($this->blank($name) && $this->blank($identifier)) {
                 continue;
             }
+
+            if ($subjectColumns !== []) {
+                foreach ($subjectColumns as $columnIndex => $label) {
+                    $cell = $line[$columnIndex] ?? null;
+
+                    // A blank cell means that paper has not been marked. It is
+                    // NOT an absence, and writing it as one would mark a
+                    // candidate absent for a script nobody has looked at.
+                    if ($this->blank($cell)) {
+                        continue;
+                    }
+
+                    $out[] = [
+                        'row' => $offset + $rowNumber,
+                        'identifier' => $this->cleanIdentifier($identifier),
+                        'name' => $this->cleanName($name),
+                        'subject' => $label,
+                        'score' => $this->cleanScore($cell),
+                        'confidence' => null,
+                        'absent' => $this->isTruthy($cell),
+                        'raw' => $raw,
+                    ];
+                }
+
+                continue;
+            }
+
+            $score = $this->value($line, $map['score'] ?? null);
+            $subject = $this->value($line, $map['subject'] ?? null);
+            $absent = $this->value($line, $map['absent'] ?? null);
 
             $out[] = [
                 'row' => $offset + $rowNumber,
@@ -127,21 +175,102 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
     }
 
     /**
+     * Note the column headings that were neither a column we know nor a paper.
+     *
+     * @param  array<int,mixed>  $headerLine
+     * @param  array<string,int>  $map
+     * @param  array<int,string>  $subjectColumns
+     */
+    private function collectUnread(array $headerLine, array $map, array $subjectColumns): void
+    {
+        $read = array_values($map);
+
+        foreach ($headerLine as $columnIndex => $cell) {
+            $heading = trim((string) ($cell ?? ''));
+
+            if ($heading === '' || in_array($columnIndex, $read, true) || isset($subjectColumns[$columnIndex])) {
+                continue;
+            }
+
+            $this->unread[] = $heading;
+        }
+    }
+
+    /**
+     * Columns headed with the name or code of a paper on this examination.
+     *
+     * @param  array<int,mixed>  $headerLine
+     * @param  array<string,mixed>  $context
+     * @return array<int,string>  column index => the paper's name
+     */
+    private function subjectColumns(array $headerLine, array $context): array
+    {
+        $subjects = $context['subjects'] ?? [];
+
+        if (! is_array($subjects) || $subjects === []) {
+            return [];
+        }
+
+        $found = [];
+        $claimed = [];
+
+        foreach ($headerLine as $columnIndex => $cell) {
+            $header = $this->normalise((string) ($cell ?? ''));
+
+            if ($header === '') {
+                continue;
+            }
+
+            foreach ($subjects as $subject) {
+                if (! SubjectName::matches($header, $subject['name'] ?? null, $subject['code'] ?? null)) {
+                    continue;
+                }
+
+                // Two columns for the same paper is a sheet problem, not two sets
+                // of marks. The first wins and the other is reported as unread, so
+                // nobody has to guess which one the school meant.
+                if (! in_array($subject['name'], $claimed, true)) {
+                    $claimed[] = $subject['name'];
+                    $found[$columnIndex] = $subject['name'];
+                }
+
+                break;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
      * Find the header row by scoring the first 10 rows against our aliases.
      *
+     * Two layouts are accepted: one row per mark, with a Subject column or a
+     * single subject chosen at upload; and one row per candidate, with a column
+     * per paper named after the paper. The second is the shape of the score
+     * entry grid, so the school can hand back the sheet it already keeps.
+     *
      * @param  array<int,array<int,mixed>>  $grid
-     * @return array{0:?int,1:array<string,int>}
+     * @param  array<string,mixed>  $context
+     * @return array{0:?int,1:array<string,int>,2:array<int,string>}
      */
-    private function locateHeader(array $grid): array
+    private function locateHeader(array $grid, array $context = []): array
     {
         $bestIndex = null;
         $bestMap = [];
+        $bestSubjects = [];
         $bestScore = 0;
 
         foreach (array_slice($grid, 0, 10, true) as $index => $line) {
             $map = [];
 
+            // Columns headed with a paper's own name are scores, not metadata.
+            $subjectColumns = $this->subjectColumns($line, $context);
+
             foreach ($line as $columnIndex => $cell) {
+                if (isset($subjectColumns[$columnIndex])) {
+                    continue;
+                }
+
                 $normalised = $this->normalise((string) ($cell ?? ''));
 
                 if ($normalised === '') {
@@ -160,13 +289,18 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
                 }
             }
 
-            // A usable header must at least identify the student and the score.
-            $usable = isset($map['name']) || isset($map['identifier']);
+            // A usable header must identify the student, and must carry the
+            // marks either as a Score column or as one column per paper.
+            $usable = (isset($map['name']) || isset($map['identifier']))
+                && (isset($map['score']) || $subjectColumns !== []);
 
-            if ($usable && isset($map['score']) && count($map) > $bestScore) {
-                $bestScore = count($map);
+            $weight = count($map) + count($subjectColumns);
+
+            if ($usable && $weight > $bestScore) {
+                $bestScore = $weight;
                 $bestIndex = $index;
                 $bestMap = $map;
+                $bestSubjects = $subjectColumns;
             }
         }
 
@@ -174,12 +308,12 @@ class SpreadsheetScoresheetExtractor implements ScoresheetExtractor
         if ($bestIndex === null) {
             foreach (array_slice($grid, 0, 5, true) as $index => $line) {
                 if (count(array_filter($line, fn ($v) => $v !== null && $v !== '')) >= 2) {
-                    return [$index, ['name' => 0, 'score' => count($line) - 1]];
+                    return [$index, ['name' => 0, 'score' => count($line) - 1], []];
                 }
             }
         }
 
-        return [$bestIndex, $bestMap];
+        return [$bestIndex, $bestMap, $bestSubjects];
     }
 
     /** @param array<int,string> $aliases */

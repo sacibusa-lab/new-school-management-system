@@ -16,6 +16,7 @@ use App\Models\Score;
 use App\Models\ScoreImport;
 use App\Models\ScoreImportRow;
 use App\Models\User;
+use App\Support\SubjectName;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -96,6 +97,18 @@ class ScoreImportService
         $context = [
             'subject' => $import->examSubject?->subject?->name,
             'total_marks' => (float) ($import->examSubject?->total_marks ?? 100),
+            // A sheet may carry one column per paper, headed with the paper's own
+            // name, the same shape as the score entry grid. The extractor can only
+            // recognise those columns if it is told which papers exist.
+            'subjects' => $import->exam->examSubjects
+                ->map(fn (ExamSubject $paper) => [
+                    'name' => $paper->subject?->name,
+                    'code' => $paper->subject?->code,
+                    'total_marks' => (float) $paper->total_marks,
+                ])
+                ->filter(fn (array $paper) => $paper['name'] !== null)
+                ->values()
+                ->all(),
             'known_identifiers' => $this->knownIdentifiers($import->exam),
         ];
 
@@ -141,6 +154,9 @@ class ScoreImportService
                 'meta' => array_merge($import->meta ?? [], [
                     'driver' => $extractor->driver()->value,
                     'description' => $extractor->describe(),
+                    // Headings the reader could not place, so a column the school
+                    // filled in does not vanish without a word.
+                    'unread_headings' => $extractor->unreadHeadings(),
                     'processed_at' => now()->toIso8601String(),
                 ]),
             ])->save();
@@ -238,12 +254,28 @@ class ScoreImportService
         $import = $row->import;
 
         // ---- 1. the score itself must make sense -------------------------
-        $examSubject = $row->exam_subject_id
+        // A row that names its own paper wins. On a sheet laid out one column per
+        // subject every row names a paper, and letting the single subject chosen at
+        // upload overwrite that would file the whole sheet under one paper.
+        $labelled = $row->raw_subject
+            ? $this->subjectFromLabel($import->exam, (string) $row->raw_subject)
+            : null;
+
+        $fallback = $row->exam_subject_id
             ? ExamSubject::find($row->exam_subject_id)
             : $import->examSubject;
 
-        if (! $examSubject && $row->raw_subject) {
-            $examSubject = $this->subjectFromLabel($import->exam, (string) $row->raw_subject);
+        $examSubject = $labelled ?? $fallback;
+
+        if ($row->raw_subject && ! $examSubject) {
+            return $this->flag(
+                $row,
+                ScoreImportRowStatus::Unmatched,
+                sprintf(
+                    'This examination has no paper called “%s”. Check the column heading against the papers on the examination.',
+                    $row->raw_subject,
+                ),
+            );
         }
 
         $row->exam_subject_id = $examSubject?->id;
@@ -390,20 +422,14 @@ class ScoreImportService
 
     protected function subjectFromLabel(Exam $exam, string $label): ?ExamSubject
     {
-        $needle = strtolower(trim($label));
-
         return $exam->examSubjects()
             ->with('subject')
             ->get()
-            ->first(function (ExamSubject $examSubject) use ($needle) {
-                $name = strtolower($examSubject->subject?->name ?? '');
-                $code = strtolower($examSubject->subject?->code ?? '');
-
-                return $name === $needle
-                    || $code === $needle
-                    || ($name !== '' && str_contains($name, $needle))
-                    || ($needle !== '' && str_contains($needle, $name));
-            });
+            ->first(fn (ExamSubject $paper) => SubjectName::matches(
+                $label,
+                $paper->subject?->name,
+                $paper->subject?->code,
+            ));
     }
 
     protected function normaliseIdentifier(?string $value): string

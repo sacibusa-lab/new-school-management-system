@@ -15,12 +15,63 @@ use App\Models\Setting;
 use App\Models\Subject;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ExamController extends Controller
 {
+    /**
+     * A scoresheet for this examination, ready to be filled in and uploaded back.
+     *
+     * One row per registered candidate and one column per paper, headed with the
+     * paper's own name — the same shape as the score entry grid, and the shape the
+     * importer reads back. The candidates are pre-filled so nobody has to key the
+     * numbers in twice, and a blank cell is read as "not marked yet" rather than as
+     * an absence.
+     */
+    public function scoresheetTemplate(Exam $exam): Response
+    {
+        $this->authorize('scores.import');
+
+        $exam->load('academicSession');
+
+        $papers = $exam->examSubjects()->with('subject')->get();
+
+        $candidates = Applicant::query()
+            ->whereIn('id', Score::query()->where('exam_id', $exam->id)->select('applicant_id'))
+            ->orderBy('registration_number')
+            ->get();
+
+        $handle = fopen('php://temp', 'r+');
+
+        // A UTF-8 byte-order mark, or Excel mangles accented names.
+        fwrite($handle, "\xEF\xBB\xBF");
+
+        fputcsv($handle, array_merge(
+            ['Registration number', 'Name'],
+            $papers->map(fn (ExamSubject $paper) => $paper->subject?->name)?->all() ?? [],
+        ));
+
+        foreach ($candidates as $candidate) {
+            fputcsv($handle, array_merge(
+                [$candidate->registration_number, $candidate->full_name],
+                array_fill(0, $papers->count(), ''),
+            ));
+        }
+
+        rewind($handle);
+        $csv = (string) stream_get_contents($handle);
+        fclose($handle);
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="scoresheet-' . Str::slug($exam->title) . '.csv"',
+        ]);
+    }
+
     public function index(): View
     {
         $this->authorize('viewAny', Exam::class);

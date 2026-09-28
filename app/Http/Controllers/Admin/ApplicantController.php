@@ -285,7 +285,7 @@ class ApplicantController extends Controller
         $this->authorize('admissions.create');
 
         return view('admin.applicants.import', [
-            'columns' => $this->imports->columns(),
+            'columns' => $this->imports->allColumns(),
             'staged' => $request->session()->get(self::IMPORT_SESSION_KEY),
         ]);
     }
@@ -311,7 +311,7 @@ class ApplicantController extends Controller
 
         if ($parsed['rows'] === []) {
             return back()->withErrors([
-                'file' => 'No candidate rows were found in that file. Rows need at least a surname, a first name and a class.',
+                'file' => 'No candidate rows were found in that file. Rows need at least a surname, a first name, a class, and the parent\'s phone and email.',
             ]);
         }
 
@@ -386,17 +386,26 @@ class ApplicantController extends Controller
             ->with('status', $message . ' They now appear in the applicants list and can be added to an examination.');
     }
 
-    /** A ready-made CSV so the office does not have to guess the columns. */
+    /**
+     * A ready-made CSV so the office does not have to guess the columns.
+     *
+     * Only the columns the office registration form insists on, so the sheet is
+     * as quick to fill in as the form is to type: a name, a class, and the
+     * parent's phone and email.
+     */
     public function downloadTemplate(): Response
     {
         $this->authorize('admissions.create');
 
         $rows = [
             $this->imports->templateHeaders(),
-            ['Okafor', 'Chidera', 'Ada', 'JSS1', 'Female', '2013-03-12', 'Mrs. Ngozi Okafor', '08031234567', 'Mother', '', '', '1 School Road, Lagos', 'Lagos', 'St. Mary Primary School'],
+            ['Okafor', 'Chidera', 'JSS1', '08031234567', 'ngozi@example.com'],
         ];
 
         $handle = fopen('php://temp', 'r+');
+
+        // A UTF-8 byte-order mark, or Excel mangles accented names.
+        fwrite($handle, "\xEF\xBB\xBF");
 
         foreach ($rows as $row) {
             fputcsv($handle, $row);

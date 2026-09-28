@@ -12,6 +12,7 @@ use App\Models\SchoolLevel;
 use App\Models\Score;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\Admissions\ApplicantImportService;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -459,9 +460,9 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('admin.applicants.import.preview'), [
                 'file' => $this->csv(
-                    "Surname,First name,Class,Gender,Date of birth\n"
-                    . "Okafor,Chidera,JSS1,Female,2013-03-12\n"
-                    . "Bello,Aisha,SS1,M,12/03/2013\n",
+                    "Surname,First name,Class,Gender,Date of birth,Parent phone,Parent email\n"
+                    . "Okafor,Chidera,JSS1,Female,2013-03-12,08031234567,ngozi@example.com\n"
+                    . "Bello,Aisha,SS1,M,12/03/2013,08031234568,bello@example.com\n",
                 ),
             ])
             ->assertRedirect(route('admin.applicants.import'));
@@ -481,10 +482,10 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class\n"
-                . "Okafor,Chidera,JSS1\n"
-                . "Bello,Aisha,SS1\n"
-                . "Eze,Emeka,SS1\n",
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                . "Bello,Aisha,SS1,08031234568,bello@example.com\n"
+                . "Eze,Emeka,SS1,08031234569,eze@example.com\n",
             ),
         ]);
 
@@ -513,9 +514,9 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class\n"
-                . "Okafor,Chidera,JSS1\n"
-                . "Bello,Aisha,JSS9\n",
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                . "Bello,Aisha,JSS9,08031234568,bello@example.com\n",
             ),
         ]);
 
@@ -533,9 +534,9 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class\n"
-                . "Okafor,Chidera,JSS1\n"
-                . ",,JSS1\n",
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                . ",,JSS1,,\n",
             ),
         ]);
 
@@ -553,8 +554,8 @@ class AdminApplicantRegistrationTest extends TestCase
         // Different order, different spellings, and a column we do not know.
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Candidate Surname,Other Names,Class Applied For,Sex,Dob,Nickname\n"
-                . "Okafor,Chidera Ada,JSS 1,F,12/03/2013,Chi\n",
+                "Candidate Surname,Other Names,Class Applied For,Sex,Dob,Parent Phone,Parent Email,Nickname\n"
+                . "Okafor,Chidera Ada,JSS 1,F,12/03/2013,08031234567,ngozi@example.com,Chi\n",
             ),
         ]);
 
@@ -564,14 +565,19 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->assertSame('Female', $row['gender']);
         $this->assertSame('JSS1', $row['class']);
         $this->assertStringContainsString('2013', (string) $row['dob']);
+
+        // "Parent Email" must land on the parent, not be swallowed by the
+        // shorter "email" heading.
+        $this->assertSame('08031234567', $row['data']['guardian_phone']);
+        $this->assertSame('ngozi@example.com', $row['data']['guardian_email']);
     }
 
     public function test_a_gender_we_cannot_read_is_flagged(): void
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class,Gender\n"
-                . "Okafor,Chidera,JSS1,Unknown\n",
+                "Surname,First name,Class,Gender,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,Unknown,08031234567,ngozi@example.com\n",
             ),
         ]);
 
@@ -595,10 +601,10 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class\n"
-                . "Okafor,Chidera,JSS1\n"
-                . ",,\n"
-                . "Bello,Aisha,SS1\n",
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                . ",,,\n"
+                . "Bello,Aisha,SS1,08031234568,bello@example.com\n",
             ),
         ]);
 
@@ -624,7 +630,12 @@ class AdminApplicantRegistrationTest extends TestCase
 
         $this->assertStringContainsString('Surname', $response->getContent());
         $this->assertStringContainsString('Class', $response->getContent());
+        $this->assertStringContainsString('Parent phone', $response->getContent());
+        $this->assertStringContainsString('Parent email', $response->getContent());
         $this->assertStringContainsString('text/csv', (string) $response->headers->get('content-type'));
+
+        // A ready-made example row, so the office can see the shape at a glance.
+        $this->assertStringContainsString('ngozi@example.com', $response->getContent());
     }
 
     public function test_a_bulk_upload_does_not_try_to_send_a_text_message_per_row(): void
@@ -633,9 +644,9 @@ class AdminApplicantRegistrationTest extends TestCase
         // candidate; the office broadcasts from the text messages screen instead.
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class,Parent phone\n"
-                . "Okafor,Chidera,JSS1,08031234567\n"
-                . "Bello,Aisha,SS1,08031234568\n",
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                . "Bello,Aisha,SS1,08031234568,bello@example.com\n",
             ),
         ]);
 
@@ -651,8 +662,8 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
-                "Surname,First name,Class,Parent name,Parent phone,Relationship\n"
-                . "Okafor,Chidera,JSS1,Mrs. Ngozi Okafor,08031234567,Mother\n",
+                "Surname,First name,Class,Parent name,Parent phone,Relationship,Parent email\n"
+                . "Okafor,Chidera,JSS1,Mrs. Ngozi Okafor,08031234567,Mother,ngozi@example.com\n",
             ),
         ]);
 
@@ -664,7 +675,79 @@ class AdminApplicantRegistrationTest extends TestCase
 
         $this->assertSame('Mrs. Ngozi Okafor', $applicant->guardian_name);
         $this->assertSame('08031234567', $applicant->guardian_phone);
+        $this->assertSame('ngozi@example.com', $applicant->guardian_email);
         $this->assertSame('Mother', $applicant->guardian_relationship);
         $this->assertSame('JSS1', $applicant->levelAppliedFor->name);
+    }
+
+    /**
+     * The parent's phone and email are the details the fee account is opened in,
+     * so a row without them is not registerable — the same rule as the form.
+     */
+    public function test_a_row_without_the_parent_contact_is_flagged(): void
+    {
+        $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
+            'file' => $this->csv(
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,,\n"
+                . "Bello,Aisha,SS1,08031234568,not-an-email\n",
+            ),
+        ]);
+
+        $staged = session('applicant_import');
+
+        $this->assertSame(0, $staged['summary']['ok']);
+        $this->assertSame(2, $staged['summary']['errors']);
+
+        $this->assertStringContainsString('Parent phone is missing', implode(' ', $staged['rows'][0]['errors']));
+        $this->assertStringContainsString('does not look like an email', implode(' ', $staged['rows'][1]['errors']));
+    }
+
+    /**
+     * The registration form stopped collecting the applicant's own phone, email
+     * and previous school, so the importer must not quietly keep writing them.
+     */
+    public function test_columns_the_registration_form_dropped_are_no_longer_collected(): void
+    {
+        $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
+            'file' => $this->csv(
+                "Surname,First name,Class,Phone,Email,Previous school,Parent phone,Parent email\n"
+                . "Okafor,Chidera,JSS1,08099999999,chidera@example.com,St. Mary,08031234567,ngozi@example.com\n",
+            ),
+        ]);
+
+        $staged = session('applicant_import');
+
+        $this->assertSame([], $staged['rows'][0]['errors']);
+
+        $this->actingAs($this->admin)->post(route('admin.applicants.import.commit'), [
+            'lines' => collect($staged['rows'])->pluck('line')->all(),
+        ]);
+
+        $applicant = Applicant::query()->sole();
+
+        $this->assertNull($applicant->phone, 'the parent is the account holder, not the child');
+        $this->assertNull($applicant->email);
+        $this->assertNull($applicant->previous_school);
+        $this->assertSame('ngozi@example.com', $applicant->guardian_email);
+    }
+
+    /**
+     * The template is only the columns that are actually required, so the office
+     * can fill it in as quickly as it fills in the form.
+     */
+    public function test_the_template_carries_only_the_required_columns(): void
+    {
+        $headers = app(ApplicantImportService::class)->templateHeaders();
+
+        $this->assertSame(['Surname', 'First name', 'Class', 'Parent phone', 'Parent email'], $headers);
+
+        // Everything else is still understood — it is just not printed.
+        $guide = collect(app(ApplicantImportService::class)->allColumns());
+
+        $this->assertContains('Gender', $guide->pluck('label')->all());
+        $this->assertContains('Date of birth', $guide->pluck('label')->all());
+        $this->assertNotContains('Previous school', $guide->pluck('label')->all());
+        $this->assertNotContains('Phone', $guide->pluck('label')->all());
     }
 }
