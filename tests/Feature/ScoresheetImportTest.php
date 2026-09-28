@@ -407,6 +407,73 @@ class ScoresheetImportTest extends TestCase
         return array_map(fn (string $label) => trim(html_entity_decode($label)), $options[1]);
     }
 
+    public function test_the_upload_screen_offers_a_blank_sheet_to_start_from(): void
+    {
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.imports.index'))
+            ->assertOk();
+
+        // The panel sits next to the upload, so the office does not have to go
+        // hunting on the examination page for the layout.
+        $response->assertSee('Start from a blank sheet');
+        $response->assertSee('Choose an examination above first');
+
+        // The download itself follows the examination chosen on the form, so the
+        // link is built in the browser — but the examination list it uses has to
+        // be on the page.
+        $response->assertSee($this->exam->title);
+    }
+
+    public function test_the_blank_sheet_is_refused_to_somebody_who_cannot_import(): void
+    {
+        $student = User::factory()->create();
+        $student->assignRole('Student');
+
+        $this->actingAs($student)
+            ->get(route('admin.exams.scoresheet-template', $this->exam))
+            ->assertForbidden();
+    }
+
+    public function test_the_blank_sheet_lists_every_registered_candidate(): void
+    {
+        // A candidate who has not been registered for the examination has no score
+        // slot, so they are not on the sheet and not in the way.
+        $outsider = Applicant::create([
+            'registration_number' => 'SAC-00009',
+            'first_name' => 'Ngozi',
+            'last_name' => 'Adeyemi',
+            'guardian_phone' => '08031234567',
+            'guardian_email' => 'adeyemi@example.com',
+            'level_applied_for_id' => $this->level->id,
+            'academic_session_id' => $this->session->id,
+            'status' => ApplicantStatus::Registered,
+        ]);
+
+        $csv = $this->actingAs($this->officer)
+            ->get(route('admin.exams.scoresheet-template', $this->exam))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('SAC-00001', $csv);
+        $this->assertStringContainsString('SAC-00002', $csv);
+        $this->assertStringNotContainsString('SAC-00009', $csv);
+        $this->assertStringNotContainsString('Ngozi Adeyemi', $csv);
+
+        // Three papers means three empty columns after the two identity columns.
+        $lines = explode("\n", trim($csv));
+
+        // The byte-order mark has to go before parsing, or PHP treats it as part
+        // of the first field and leaves the surrounding quotes in place.
+        $lines[0] = trim($lines[0], "\xEF\xBB\xBF");
+
+        $this->assertSame(
+            ['Registration number', 'Name', 'Mathematics', 'English Language', 'General Paper'],
+            str_getcsv($lines[0]),
+        );
+
+        $this->assertNotNull($outsider->id);
+    }
+
     public function test_the_scoresheet_template_has_a_column_per_paper_and_lists_the_candidates(): void
     {
         $response = $this->actingAs($this->officer)->get(route('admin.exams.scoresheet-template', $this->exam));
@@ -437,10 +504,11 @@ class ScoresheetImportTest extends TestCase
             ->getContent();
 
         $lines = explode("\n", trim($csv));
-        $header = str_getcsv($lines[0]);
 
-        // Drop the byte-order mark, then write a mark into every paper column.
-        $header[0] = trim($header[0], "\xEF\xBB\xBF");
+        // Drop the byte-order mark before parsing, then write a mark into every
+        // paper column.
+        $lines[0] = trim($lines[0], "\xEF\xBB\xBF");
+        $header = str_getcsv($lines[0]);
 
         $filled = [implode(',', $header)];
 

@@ -8,7 +8,7 @@
 <div class="grid gap-6 lg:grid-cols-3">
 
     {{-- ================= Upload ================= --}}
-    <div class="lg:col-span-1">
+    <div class="lg:col-span-1" x-data="{ exam: '{{ request('exam') }}' }">
         <form method="POST" action="{{ route('admin.imports.store') }}" enctype="multipart/form-data" class="card-pad">
             @csrf
 
@@ -24,11 +24,18 @@
                     name — the same shape as the score entry grid. A blank cell means that paper has
                     not been marked yet, which is not the same as an absence.
                 </p>
+                <p class="mt-1.5">
+                    Not sure of the layout? Download the blank sheet below — it is already laid out
+                    that way, with the candidates' names on it.
+                </p>
             </div>
 
             <div class="mt-6 space-y-5">
+                {{-- The examination drives everything else on this form, including which
+                     blank sheet can be downloaded, so the download follows this choice. --}}
                 <x-field name="exam_id" label="Examination" type="select" required
                          placeholder-option="Choose an examination"
+                         x-model="exam"
                          :value="request('exam')"
                          :options="$exams->mapWithKeys(fn ($e) => [$e->id => $e->title . ' — ' . ($e->level?->name ?? 'All levels')])->all()" />
 
@@ -44,6 +51,33 @@
 
             <button type="submit" class="btn-primary mt-6 w-full">Upload &amp; read</button>
         </form>
+
+        {{-- ================= Blank sheet ================= --}}
+        {{-- Outside the upload form because it is not part of it: it is a GET, and
+             nesting forms is not allowed. It follows the examination chosen above. --}}
+        <div class="card-pad mt-6">
+            <h3 class="text-sm font-semibold text-slate-900">Start from a blank sheet</h3>
+
+            <p class="mt-1.5 text-sm text-slate-500">
+                A ready-made CSV for this examination: every registered candidate already listed, and
+                one column per paper. Fill in the marks and upload it back — a blank cell is read as
+                “not marked yet”.
+            </p>
+
+            <template x-if="exam">
+                <a x-bind:href="'{{ url('admin/exams') }}/' + exam + '/scoresheet'"
+                   class="btn-secondary btn-sm mt-4 w-full">
+                    Download the blank sheet
+                </a>
+            </template>
+
+            <template x-if="! exam">
+                <p class="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 ring-1 ring-slate-200">
+                    Choose an examination above first — the sheet needs to know which papers and which
+                    candidates it is for.
+                </p>
+            </template>
+        </div>
 
         {{-- ================= AI status ================= --}}
         <div @class([
