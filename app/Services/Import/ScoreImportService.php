@@ -493,9 +493,14 @@ class ScoreImportService
                         'source' => $import->driver->scoreSource(),
                         'confidence' => $row->confidence,
                         'entered_by' => $user->id,
-                        // Committing IS the human verification step.
-                        'verified_by' => $user->id,
-                        'verified_at' => now(),
+                        // Committing a spreadsheet IS the human check: the review
+                        // screen shows every row against the name before anything
+                        // is written. A machine-read sheet is different — the
+                        // numbers were guessed from a photograph, so they stay
+                        // unverified until somebody with scores.verify signs them
+                        // off on the verification screen.
+                        'verified_by' => $import->driver->isImageBased() ? null : $user->id,
+                        'verified_at' => $import->driver->isImageBased() ? null : now(),
                         'notes' => 'Imported from ' . $import->original_name,
                     ],
                 );

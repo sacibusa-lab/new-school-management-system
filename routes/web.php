@@ -121,6 +121,16 @@ Route::middleware(['auth'])
 
         /* ---------------- Score entry ---------------- */
         Route::get('scores', [ScoreEntryController::class, 'index'])->name('scores.index');
+
+        // Declared before the {examSubject} wildcard, or "grid" would be read as a
+        // subject id.
+        Route::get('scores/{exam}/grid', [ScoreEntryController::class, 'grid'])->name('scores.grid');
+        Route::post('scores/{exam}/grid', [ScoreEntryController::class, 'saveGrid'])->name('scores.grid.store');
+
+        // Also before the wildcard, for the same reason.
+        Route::get('scores/{exam}/verify', [ScoreEntryController::class, 'verify'])->name('scores.verify');
+        Route::post('scores/{exam}/verify', [ScoreEntryController::class, 'saveVerify'])->name('scores.verify.store');
+
         Route::get('scores/{exam}/{examSubject}', [ScoreEntryController::class, 'entry'])->name('scores.entry');
         Route::post('scores/{exam}/{examSubject}', [ScoreEntryController::class, 'store'])->name('scores.store');
 

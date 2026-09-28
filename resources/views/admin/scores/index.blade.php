@@ -57,6 +57,34 @@
 
         {{-- ================= Subjects ================= --}}
         <aside>
+            @if ($selectedExam && $subjects->isNotEmpty())
+                {{-- Marks read off a photograph are a guess until a person agrees
+                     with them, so this is put in front of everything else. --}}
+                @if (($awaitingVerification ?? 0) > 0)
+                    <a href="{{ route('admin.scores.verify', $selectedExam) }}"
+                       class="card-pad mb-6 block bg-gold-500 transition hover:bg-gold-400">
+                        <p class="font-display text-sm font-semibold text-gold-950">
+                            {{ $awaitingVerification }} mark(s) waiting to be verified
+                        </p>
+                        <p class="mt-1 text-xs text-gold-900">
+                            These were read from a sheet by machine. Check them against the scripts
+                            and sign them off before they count.
+                        </p>
+                    </a>
+                @endif
+
+                {{-- Keying a whole class off paper is the common case, so the grid is
+                     offered first. --}}
+                <a href="{{ route('admin.scores.grid', $selectedExam) }}"
+                   class="card-pad mb-6 block bg-brand-900 transition hover:bg-brand-800">
+                    <p class="font-display text-sm font-semibold text-white">Enter all subjects at once</p>
+                    <p class="mt-1 text-xs text-brand-200">
+                        One row per candidate, one column per paper, saved together — with
+                        support for pasting a whole column straight out of Excel.
+                    </p>
+                </a>
+            @endif
+
             <div class="card">
                 <div class="panel-header">
                     <p class="panel-title">Subjects</p>
@@ -66,8 +94,9 @@
                     <div class="divide-y divide-slate-100">
                         @foreach ($subjects as $examSubject)
                             @php
-                                $total = $examSubject->scores()->count();
-                                $captured = $examSubject->scores()->whereNotNull('score')->count();
+                                $row = $progress[$examSubject->id] ?? null;
+                                $total = (int) ($row->total ?? 0);
+                                $captured = (int) ($row->captured ?? 0);
                             @endphp
 
                             <a href="{{ route('admin.scores.entry', [$selectedExam, $examSubject]) }}"

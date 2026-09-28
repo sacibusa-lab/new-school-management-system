@@ -39,7 +39,11 @@
         </x-empty-state>
     </div>
 @else
-    <form method="POST" action="{{ route('admin.scores.store', [$exam, $examSubject]) }}" class="mt-6">
+    <form method="POST" action="{{ route('admin.scores.store', [$exam, $examSubject]) }}" class="mt-6"
+          x-data="scoreGrid(@js($gradeScale->map(fn ($g) => ['min' => (float) $g->min_score, 'grade' => $g->grade])->values()))"
+          @input="onInput($event)"
+          @paste="onPaste($event)"
+          @keydown="onKeydown($event)">
         @csrf
 
         <div class="card overflow-hidden">
@@ -52,17 +56,40 @@
                     </p>
                 </div>
 
-                <button type="submit" class="btn-primary">Save all scores</button>
+                <button type="submit" class="btn-primary" @disabled(! $editable)>Save all scores</button>
+            </div>
+
+            @unless ($editable)
+                <p class="border-b border-slate-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+                    This examination is locked, so the marks are shown but cannot be changed.
+                </p>
+            @endunless
+
+            <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    <label for="candidate-filter" class="sr-only">Find a candidate</label>
+                    <input id="candidate-filter" type="search" placeholder="Find a candidate by name or number"
+                           @input="filter = $event.target.value; applyFilter()"
+                           class="input max-w-xs py-2 text-sm">
+
+                    <p class="ml-auto text-xs text-slate-500">
+                        Passing mark
+                        <span class="font-medium text-slate-700">
+                            {{ rtrim(rtrim(number_format((float) $examSubject->effectivePassMark(), 2), '0'), '.') }}%
+                        </span>
+                        · <span x-text="savedCount"></span> box(es) changed
+                    </p>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
-                <table class="table">
+                <table class="table score-grid">
                     <thead>
                         <tr>
                             <th class="w-12 text-center">#</th>
                             <th>Registration no.</th>
                             <th>Candidate</th>
-                            <th class="w-36">Score</th>
+                            <th class="w-40">Score</th>
                             <th class="w-24 text-center">Absent</th>
                             <th class="w-32">Source</th>
                             <th class="w-28">Verified</th>
@@ -71,7 +98,9 @@
 
                     <tbody>
                         @foreach ($scores as $index => $score)
-                            <tr>
+                            @php $locked = $score->isVerified() && ! $canOverride; @endphp
+
+                            <tr data-row="{{ $index }}" data-match="{{ strtolower($score->applicant?->full_name . ' ' . $score->applicant?->registration_number) }}">
                                 <td class="text-center text-xs text-slate-400">{{ $index + 1 }}</td>
 
                                 <td class="font-mono text-xs font-medium text-slate-900">
@@ -85,37 +114,51 @@
                                     @endif
                                 </td>
 
-                                <td>
-                                    <div class="relative">
-                                        <input type="number"
-                                               name="scores[{{ $score->id }}]"
-                                               value="{{ old('scores.' . $score->id, $score->score) }}"
-                                               min="0"
-                                               max="{{ $max }}"
-                                               step="0.01"
-                                               @disabled($score->is_absent)
-                                               class="input py-2 pr-12 text-sm"
-                                               placeholder="—">
+                                <td class="align-top pb-1">
+                                    <input type="text"
+                                           inputmode="decimal"
+                                           autocomplete="off"
+                                           name="scores[{{ $score->id }}]"
+                                           value="{{ old('scores.' . $score->id, $score->is_absent ? 'A' : $score->score) }}"
+                                           data-row="{{ $index }}"
+                                           data-column="1"
+                                           data-max="{{ $max }}"
+                                           data-pass="{{ (float) $examSubject->effectivePassMark() }}"
+                                           data-verified="{{ $score->isVerified() ? 1 : 0 }}"
+                                           data-locked="{{ ($locked || ! $editable) ? 1 : 0 }}"
+                                           @readonly($locked || ! $editable)
+                                           @class([
+                                               'input py-2 text-center text-sm',
+                                               'input-error' => $errors->has('scores.' . $score->id),
+                                               'bg-slate-50 text-slate-500' => $locked || ! $editable,
+                                           ])
+                                           placeholder="—">
 
-                                        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-400">
-                                            /{{ rtrim(rtrim(number_format($max, 0), '0'), '.') }}
-                                        </span>
-                                    </div>
+                                    <span data-feedback class="mt-1 block text-center text-[11px] font-semibold"></span>
+
+                                    @if ($locked)
+                                        <p class="mt-0.5 text-center text-[11px] text-slate-400">Verified</p>
+                                    @endif
 
                                     @error('scores.' . $score->id)
-                                        <p class="error-text">{{ $message }}</p>
+                                        <p class="error-text text-center">{{ $message }}</p>
                                     @enderror
                                 </td>
 
-                                <td class="text-center">
+                                <td class="text-center align-top">
+                                    {{-- Ticking this greys out the mark, and unticking it brings the
+                                         box back, so the two can never disagree. --}}
                                     <input type="checkbox"
                                            name="absent[{{ $score->id }}]"
                                            value="1"
+                                           @change="toggleAbsent($event)"
                                            @checked(old('absent.' . $score->id, $score->is_absent))
+                                           @readonly($locked || ! $editable)
+                                           @disabled($locked || ! $editable)
                                            class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
                                 </td>
 
-                                <td>
+                                <td class="align-top">
                                     @if ($score->score !== null || $score->is_absent)
                                         <span class="badge {{ $score->source->badge() }}">{{ $score->source->label() }}</span>
                                     @else
@@ -123,7 +166,7 @@
                                     @endif
                                 </td>
 
-                                <td>
+                                <td class="align-top">
                                     @if ($score->isVerified())
                                         <span class="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
@@ -134,7 +177,7 @@
                                     @elseif ($score->needsVerification())
                                         <span class="badge bg-gold-50 text-gold-700 ring-gold-600/20">Check</span>
                                     @else
-                                        <span class="text-xs text-slate-400">—</span>
+                                        <span class="text-xs text-slate-400">Awaiting</span>
                                     @endif
                                 </td>
                             </tr>
@@ -144,12 +187,18 @@
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4">
-                <p class="text-xs text-slate-500">
-                    Saving marks a candidate as having sat the paper and updates the examination status to
-                    <strong>Marking</strong>.
+                <p class="max-w-2xl text-xs text-slate-500">
+                    @if ($mayVerify ?? false)
+                        Marks you save are verified straight away, because you hold the verification
+                        permission.
+                    @else
+                        Marks you save wait to be verified by the exam officer.
+                    @endif
+                    Saving also records that these candidates have sat the paper and moves the
+                    examination to <strong>Marking</strong>.
                 </p>
 
-                <button type="submit" class="btn-primary">Save all scores</button>
+                <button type="submit" class="btn-primary btn-sm" @disabled(! $editable)>Save all scores</button>
             </div>
         </div>
     </form>
@@ -180,3 +229,5 @@
 @endif
 
 @endsection
+
+@include('admin.scores.partials.grid-scripts')

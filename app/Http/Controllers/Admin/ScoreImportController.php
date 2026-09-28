@@ -162,9 +162,17 @@ class ScoreImportController extends Controller
             return back()->with('error', 'Nothing to commit — no row has both a student and a score. Resolve the flagged rows first.');
         }
 
+        // A sheet read off a photograph is a guess until somebody signs it off, so
+        // say plainly that the marks are held back rather than implying they count.
+        $tail = $import->driver->isImageBased()
+            ? ' They were read by machine, so they are held back until they are verified.'
+            : '';
+
         return redirect()
             ->route('admin.imports.show', $import)
-            ->with('status', "{$result['written']} score(s) committed to the examination." . ($result['skipped'] > 0 ? " {$result['skipped']} row(s) were skipped." : ''));
+            ->with('status', "{$result['written']} score(s) committed to the examination."
+                . ($result['skipped'] > 0 ? " {$result['skipped']} row(s) were skipped." : '')
+                . $tail);
     }
 
     public function destroy(ScoreImport $import): RedirectResponse

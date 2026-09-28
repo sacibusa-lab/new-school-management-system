@@ -63,6 +63,23 @@
                 .
             </x-alert>
         </div>
+
+        @if ($import->driver->isImageBased())
+            {{-- Read off a photograph, so nobody has agreed with these numbers yet. --}}
+            <div class="mt-3">
+                <x-alert tone="warning" title="These marks still need verifying">
+                    They were read from an image by {{ strtolower($driverLabel) }}, which misreads
+                    handwriting. Nothing here counts towards the merit list until a person compares
+                    the marks with the scripts and signs them off.
+
+                    @can('scores.verify')
+                        <a href="{{ route('admin.scores.verify', $import->exam) }}" class="font-semibold underline">
+                            Verify these marks
+                        </a>
+                    @endcan
+                </x-alert>
+            </div>
+        @endif
     @endif
 </div>
 
