@@ -56,6 +56,26 @@ class AdminApplicantRegistrationTest extends TestCase
         return UploadedFile::fake()->createWithContent($name, $contents);
     }
 
+    /**
+     * The least the office has to type: a name, a class, and the parent's phone
+     * and email, which are needed to open the fee account.
+     *
+     * @param  array<string,mixed>  $overrides
+     * @return array<string,mixed>
+     */
+    private function payload(array $overrides = []): array
+    {
+        return array_merge([
+            'first_name' => 'Chidera',
+            'last_name' => 'Okafor',
+            'level_applied_for_id' => SchoolLevel::query()->orderBy('order')->first()->id,
+            'guardian_name' => 'Mrs. Ngozi Okafor',
+            'guardian_relationship' => 'Mother',
+            'guardian_phone' => '08031234567',
+            'guardian_email' => 'ngozi@example.com',
+        ], $overrides);
+    }
+
     /* ------------------------------------------------------------------ */
     /* Typing one applicant in                                             */
     /* ------------------------------------------------------------------ */
@@ -63,11 +83,7 @@ class AdminApplicantRegistrationTest extends TestCase
     public function test_an_officer_can_register_an_applicant_from_the_office(): void
     {
         $this->actingAs($this->admin)
-            ->post(route('admin.applicants.store'), [
-                'first_name' => 'Chidera',
-                'last_name' => 'Okafor',
-                'level_applied_for_id' => SchoolLevel::query()->first()->id,
-            ])
+            ->post(route('admin.applicants.store'), $this->payload())
             ->assertRedirect();
 
         $applicant = Applicant::query()->sole();
@@ -77,16 +93,71 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->assertSame(ApplicantStatus::Registered, $applicant->status);
     }
 
-    public function test_only_the_name_and_class_are_needed(): void
+    public function test_the_parent_contact_details_are_stored_for_the_fee_account(): void
     {
-        // A paper form often arrives without the address or the applicant's own
-        // phone number; the record must still open.
+        $this->actingAs($this->admin)
+            ->post(route('admin.applicants.store'), $this->payload([
+                'guardian_name' => 'Mr. Paul Okafor',
+                'guardian_relationship' => 'Father',
+                'guardian_phone' => '08039876543',
+                'guardian_email' => 'paul@example.com',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $applicant = Applicant::query()->sole();
+
+        $this->assertSame('Mr. Paul Okafor', $applicant->guardian_name);
+        $this->assertSame('Father', $applicant->guardian_relationship);
+        $this->assertSame('08039876543', $applicant->guardian_phone);
+        $this->assertSame('paul@example.com', $applicant->guardian_email);
+    }
+
+    public function test_the_parent_phone_and_email_are_required(): void
+    {
+        // They are the details the fee account is opened in, so a record without
+        // them cannot be taken any further.
         $this->actingAs($this->admin)
             ->post(route('admin.applicants.store'), [
-                'first_name' => 'Aisha',
-                'last_name' => 'Bello',
+                'first_name' => 'Chidera',
+                'last_name' => 'Okafor',
                 'level_applied_for_id' => SchoolLevel::query()->first()->id,
             ])
+            ->assertSessionHasErrors(['guardian_phone', 'guardian_email']);
+
+        $this->assertSame(0, Applicant::query()->count());
+    }
+
+    public function test_a_bad_parent_email_is_rejected(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.applicants.store'), $this->payload(['guardian_email' => 'not-an-email']))
+            ->assertSessionHasErrors('guardian_email');
+
+        $this->assertSame(0, Applicant::query()->count());
+    }
+
+    public function test_the_applicants_own_contact_details_are_not_collected(): void
+    {
+        // The parent is the account holder; the child has no phone or email of
+        // their own on the form.
+        $this->actingAs($this->admin)
+            ->post(route('admin.applicants.store'), $this->payload([
+                'phone' => '08030000000',
+                'email' => 'child@example.com',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $applicant = Applicant::query()->sole();
+
+        $this->assertNull($applicant->phone);
+        $this->assertNull($applicant->email);
+    }
+
+    public function test_only_the_name_class_and_parent_contact_are_needed(): void
+    {
+        // A paper form often arrives without the address; the record must still open.
+        $this->actingAs($this->admin)
+            ->post(route('admin.applicants.store'), $this->payload())
             ->assertSessionHasNoErrors();
 
         $this->assertNull(Applicant::query()->sole()->address);
@@ -160,12 +231,9 @@ class AdminApplicantRegistrationTest extends TestCase
     /** The flash message after registering promises a slip; this proves it exists. */
     public function test_the_registration_slip_shows_the_number_and_the_class(): void
     {
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload([
             'gender' => 'female',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-        ]);
+        ]));
 
         $applicant = Applicant::query()->sole();
 
@@ -180,11 +248,10 @@ class AdminApplicantRegistrationTest extends TestCase
 
     public function test_the_slip_says_so_when_the_candidate_has_no_examination_yet(): void
     {
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload([
             'first_name' => 'Aisha',
             'last_name' => 'Bello',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-        ]);
+        ]));
 
         $this->actingAs($this->admin)
             ->get(route('admin.applicants.slip', Applicant::query()->sole()))
@@ -194,11 +261,7 @@ class AdminApplicantRegistrationTest extends TestCase
 
     public function test_the_slip_carries_the_examination_date_and_venue_once_entered(): void
     {
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-        ]);
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload());
 
         $applicant = Applicant::query()->sole();
 
@@ -241,11 +304,10 @@ class AdminApplicantRegistrationTest extends TestCase
     public function test_the_applicant_list_exports_as_csv(): void
     {
         foreach ([['Chidera', 'Okafor'], ['Aisha', 'Bello']] as [$first, $last]) {
-            $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
+            $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload([
                 'first_name' => $first,
                 'last_name' => $last,
-                'level_applied_for_id' => SchoolLevel::query()->first()->id,
-            ]);
+            ]));
         }
 
         $response = $this->actingAs($this->admin)->get(route('admin.applicants.export'));
@@ -268,17 +330,15 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         $levels = SchoolLevel::query()->orderBy('order')->get();
 
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload([
             'level_applied_for_id' => $levels[0]->id,
-        ]);
+        ]));
 
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload([
             'first_name' => 'Aisha',
             'last_name' => 'Bello',
             'level_applied_for_id' => $levels[1]->id,
-        ]);
+        ]));
 
         $csv = (string) $this->actingAs($this->admin)
             ->get(route('admin.applicants.export', ['level' => $levels[0]->id]))
@@ -303,12 +363,9 @@ class AdminApplicantRegistrationTest extends TestCase
     {
         Storage::fake('public');
 
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload([
             'photo' => UploadedFile::fake()->image('passport.jpg'),
-        ])->assertSessionHasNoErrors();
+        ]))->assertSessionHasNoErrors();
 
         $applicant = Applicant::query()->sole();
 
@@ -322,46 +379,36 @@ class AdminApplicantRegistrationTest extends TestCase
             ->assertDontSee('No photograph');
     }
 
-    public function test_scanned_documents_are_listed_on_the_applicant_page(): void
+    /**
+     * The office form no longer collects documents, but records that already carry
+     * them (from the public form, or from before) must still display.
+     */
+    public function test_documents_are_still_shown_when_a_record_has_any(): void
     {
-        Storage::fake('public');
-
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-            'documents' => [
-                UploadedFile::fake()->create('birth-certificate.pdf', 120, 'application/pdf'),
-            ],
-        ])->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload());
 
         $applicant = Applicant::query()->sole();
-
-        $this->assertCount(1, $applicant->documents);
-        $this->assertSame('birth-certificate.pdf', $applicant->documents[0]['name']);
-        Storage::disk('public')->assertExists($applicant->documents[0]['path']);
+        $applicant->forceFill(['documents' => [[
+            'name' => 'birth-certificate.pdf',
+            'path' => 'uploads/documents/applicants/birth-certificate.pdf',
+            'size' => '2048',
+        ]]])->save();
 
         $this->actingAs($this->admin)
             ->get(route('admin.applicants.show', $applicant))
             ->assertOk()
             ->assertSee('birth-certificate.pdf')
-            ->assertSee('storage/' . $applicant->documents[0]['path'])
-            ->assertDontSee('No supporting documents were uploaded');
+            ->assertSee('storage/uploads/documents/applicants/birth-certificate.pdf', false);
     }
 
-    public function test_the_applicant_page_asks_for_documents_when_there_are_none(): void
+    public function test_the_documents_card_is_hidden_when_there_is_nothing_to_show(): void
     {
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Aisha',
-            'last_name' => 'Bello',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-        ]);
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload());
 
         $this->actingAs($this->admin)
             ->get(route('admin.applicants.show', Applicant::query()->sole()))
             ->assertOk()
-            ->assertSee('No photograph')
-            ->assertSee('No supporting documents were uploaded');
+            ->assertDontSee('Passport and documents');
     }
 
     /* ------------------------------------------------------------------ */
@@ -371,11 +418,7 @@ class AdminApplicantRegistrationTest extends TestCase
     /** The route and the Edit button both existed while this view did not. */
     public function test_the_edit_screen_opens(): void
     {
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-        ]);
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload());
 
         $applicant = Applicant::query()->sole();
 
@@ -388,11 +431,7 @@ class AdminApplicantRegistrationTest extends TestCase
 
     public function test_an_edited_applicant_keeps_their_registration_number(): void
     {
-        $this->actingAs($this->admin)->post(route('admin.applicants.store'), [
-            'first_name' => 'Chidera',
-            'last_name' => 'Okafor',
-            'level_applied_for_id' => SchoolLevel::query()->first()->id,
-        ]);
+        $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload());
 
         $applicant = Applicant::query()->sole();
 

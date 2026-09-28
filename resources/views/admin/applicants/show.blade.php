@@ -57,15 +57,28 @@
                     ['Academic session', $applicant->academicSession?->name ?? '—'],
                     ['Date of birth', $applicant->date_of_birth?->format('j F Y') ?? '—'],
                     ['Gender', $applicant->gender?->label() ?? '—'],
-                    ['Phone', $applicant->phone ?? '—'],
-                    ['Email', $applicant->email ?? '—'],
                     ['Address', $applicant->address ?? '—'],
                     ['State / LGA', trim(($applicant->state ?? '—') . ($applicant->lga ? ' · ' . $applicant->lga : ''))],
                     ['Previous school', $applicant->previous_school ?? '—'],
+                    // The parent is the account holder, so their contact details are
+                    // the ones that matter here.
                     ['Parent / guardian', $applicant->guardian_name ?? '—'],
-                    ['Guardian phone', $applicant->guardian_phone ?? '—'],
+                    ['Parent phone', $applicant->guardian_phone ?? '—'],
+                    ['Parent email', $applicant->guardian_email ?? '—'],
                     ['Guardian relationship', $applicant->guardian_relationship ?? '—'],
                 ] as [$label, $value])
+                    <div>
+                        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</dt>
+                        <dd class="mt-1 text-sm text-slate-800">{{ $value }}</dd>
+                    </div>
+                @endforeach
+
+                {{-- The office form does not collect the applicant's own contact
+                     details, so these are only listed when a record has them. --}}
+                @foreach (array_filter([
+                    ['Applicant phone', $applicant->phone],
+                    ['Applicant email', $applicant->email],
+                ], fn ($row) => filled($row[1])) as [$label, $value])
                     <div>
                         <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</dt>
                         <dd class="mt-1 text-sm text-slate-800">{{ $value }}</dd>
@@ -82,22 +95,25 @@
         </div>
 
         {{-- ================= Passport & documents ================= --}}
+        @php
+            // Both are optional and the office form no longer collects documents, so
+            // this card only appears when there is actually something to show.
+            $documents = is_array($applicant->documents) ? $applicant->documents : [];
+        @endphp
+
+        @if ($applicant->photo_path || $documents !== [])
         <div class="card">
             <div class="panel-header">
                 <div>
                     <p class="panel-title">Passport and documents</p>
                     <p class="mt-0.5 text-xs text-slate-500">
-                        What the parent submitted with the application
+                        Held against this applicant
                     </p>
                 </div>
 
-                @php
-                    $documentCount = is_array($applicant->documents) ? count($applicant->documents) : 0;
-                @endphp
-
-                @if ($applicant->photo_path || $documentCount > 0)
+                @if ($documents !== [])
                     <span class="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20">
-                        {{ $documentCount }} document(s)
+                        {{ count($documents) }} document(s)
                     </span>
                 @endif
             </div>
@@ -124,9 +140,9 @@
 
                 {{-- Supporting documents --}}
                 <div class="min-w-56 flex-1">
-                    @if ($documentCount > 0)
+                    @if ($documents !== [])
                         <ul class="space-y-2">
-                            @foreach ($applicant->documents as $document)
+                            @foreach ($documents as $document)
                                 @php $path = $document['path'] ?? null; @endphp
 
                                 <li class="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
@@ -151,15 +167,11 @@
                                 </li>
                             @endforeach
                         </ul>
-                    @else
-                        <p class="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
-                            No supporting documents were uploaded. Ask the parent for the birth certificate
-                            and two passport photographs before the admission letter is issued.
-                        </p>
                     @endif
                 </div>
             </div>
         </div>
+        @endif
 
         {{-- ================= Scores ================= --}}
         <div class="card">

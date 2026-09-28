@@ -7,10 +7,15 @@ use Illuminate\Validation\Rule;
 /**
  * The admissions officer typing a paper form in from the office.
  *
- * Deliberately much looser than the public request: there is no applicant
- * standing there to sign a declaration, and a bulk upload rarely carries a full
- * address. Only the name and the class are truly needed to open a record — the
- * rest can be filled in later from the applicant's page.
+ * Looser than the public request — there is no applicant present to sign a
+ * declaration, and a record can be opened from just a name and a class.
+ *
+ * The parent's phone and email ARE required, unlike everything else here: they
+ * are the school's point of contact and the details the fee account is opened
+ * in, so a record without them cannot be taken any further.
+ *
+ * The applicant's own phone and email are deliberately not collected. The parent
+ * is the account holder.
  */
 class StoreAdminApplicantRequest extends StoreApplicantRequest
 {
@@ -25,15 +30,10 @@ class StoreAdminApplicantRequest extends StoreApplicantRequest
             'date_of_birth' => ['nullable', 'date', 'before:today', 'after:1990-01-01'],
             'nationality' => ['nullable', 'string', 'max:60'],
 
-            'email' => ['nullable', 'email', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30'],
-
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:80'],
             'state' => ['nullable', 'string', 'max:80'],
             'lga' => ['nullable', 'string', 'max:80'],
-
-            'previous_school' => ['nullable', 'string', 'max:150'],
 
             'level_applied_for_id' => [
                 'required',
@@ -42,19 +42,13 @@ class StoreAdminApplicantRequest extends StoreApplicantRequest
 
             'guardian_name' => ['nullable', 'string', 'max:120'],
             'guardian_relationship' => ['nullable', 'string', 'max:60'],
-            'guardian_phone' => ['nullable', 'string', 'max:30'],
-            'guardian_email' => ['nullable', 'email', 'max:150'],
-            'guardian_address' => ['nullable', 'string', 'max:255'],
+            'guardian_phone' => ['required', 'string', 'max:30'],
+            'guardian_email' => ['required', 'email', 'max:150'],
 
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 
-            // Scanned birth certificate, previous result, and so on. Accepted here
-            // too, because with registration moved into the office the public form
-            // may never be used.
-            'documents' => ['nullable', 'array', 'max:5'],
-            'documents.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
-
             // No declaration: the applicant is not present to sign it.
+            // No documents: the office form does not collect them.
         ];
     }
 
@@ -65,6 +59,9 @@ class StoreAdminApplicantRequest extends StoreApplicantRequest
             'first_name.required' => 'Enter the applicant\'s first name.',
             'last_name.required' => 'Enter the applicant\'s surname.',
             'date_of_birth.after' => 'Please enter a valid date of birth.',
+            'guardian_phone.required' => 'Enter the parent\'s phone number — it is needed to open the fee account.',
+            'guardian_email.required' => 'Enter the parent\'s email address — it is needed to open the fee account.',
+            'guardian_email.email' => 'That email address does not look right.',
         ];
     }
 }

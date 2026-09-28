@@ -264,10 +264,7 @@ class ApplicantController extends Controller
 
         $applicant = $this->registration->register(
             $request->validated(),
-            [
-                'photo' => $request->file('photo'),
-                'documents' => $request->file('documents') ?? [],
-            ],
+            ['photo' => $request->file('photo')],
         );
 
         return redirect()

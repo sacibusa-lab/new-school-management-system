@@ -185,6 +185,8 @@ class PublicRegistrationTest extends TestCase
                 'first_name' => 'Chidera',
                 'last_name' => 'Okafor',
                 'level_applied_for_id' => SchoolLevel::query()->first()->id,
+                'guardian_phone' => '08031234567',
+                'guardian_email' => 'ngozi@example.com',
             ])
             ->assertSessionHasNoErrors();
 

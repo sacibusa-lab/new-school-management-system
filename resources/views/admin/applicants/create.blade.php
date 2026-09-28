@@ -41,8 +41,8 @@
         <p class="eyebrow">Step 1</p>
         <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Applicant</h2>
         <p class="mt-1 text-sm text-slate-500">
-            Only the name and the class are required — everything else can be filled in later from the
-            applicant's page.
+            Only the name and the class are required here — the rest can be filled in later from the
+            applicant's page. The parent's details, however, are needed to open the fee account.
         </p>
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -67,15 +67,12 @@
             <x-field name="nationality" label="Nationality" :value="old('nationality', 'Nigerian')" />
         </div>
 
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div class="mt-4 sm:max-w-md">
             <x-field name="level_applied_for_id" label="Class applying for" type="select"
                      placeholder-option="Choose a class"
                      :value="old('level_applied_for_id')"
                      :options="$levels->pluck('name', 'id')->all()"
                      required />
-
-            <x-field name="previous_school" label="Previous school" :value="old('previous_school')"
-                     placeholder="Where they are coming from" />
         </div>
 
         <div class="mt-4">
@@ -88,73 +85,52 @@
                 <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
             @enderror
         </div>
-
-        <div class="mt-4">
-            <label for="documents" class="label">Supporting documents</label>
-            <input id="documents" name="documents[]" type="file" multiple
-                   accept=".jpg,.jpeg,.png,.pdf"
-                   class="input file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm">
-            <p class="mt-1 text-xs text-slate-500">
-                Optional. Birth certificate, previous result or report sheet. Up to 5 files, 4 MB each,
-                as JPG, PNG or PDF. They are listed on the applicant's page for you to open later.
-            </p>
-
-            @error('documents')
-                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
-            @enderror
-
-            @error('documents.*')
-                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
-            @enderror
-        </div>
     </div>
 
-    {{-- ================= 2. Contact ================= --}}
+    {{-- ================= 2. Parent / guardian & contact ================= --}}
     <div class="card-pad mt-6">
         <p class="eyebrow">Step 2</p>
-        <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Contact & address</h2>
-        <p class="mt-1 text-sm text-slate-500">Useful for the result and fee portals, and for reaching the family.</p>
-
-        <div class="mt-5 grid gap-4 sm:grid-cols-2">
-            <x-field name="phone" label="Applicant's phone" :value="old('phone')" placeholder="0803 000 0000" />
-            <x-field name="email" label="Applicant's email" type="email" :value="old('email')" />
-        </div>
-
-        <div class="mt-4">
-            <x-field name="address" label="Home address" :value="old('address')"
-                     placeholder="House number, street, area" />
-        </div>
-
-        <div class="mt-4 grid gap-4 sm:grid-cols-3">
-            <x-field name="city" label="Town / city" :value="old('city')" />
-            <x-field name="state" label="State" type="select"
-                     placeholder-option="Not stated"
-                     :value="old('state')"
-                     :options="$states" />
-            <x-field name="lga" label="LGA" :value="old('lga')" />
-        </div>
-    </div>
-
-    {{-- ================= 3. Guardian ================= --}}
-    <div class="card-pad mt-6">
-        <p class="eyebrow">Step 3</p>
-        <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Parent / guardian</h2>
+        <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Parent / guardian &amp; contact</h2>
         <p class="mt-1 text-sm text-slate-500">
-            The guardian's phone number is the one text messages are sent to, so it is worth getting right.
+            The parent's phone number and email are how the school reaches the family, and the details the
+            fee account is opened in — so take them straight from the parent.
         </p>
 
-        <div class="mt-5 grid gap-4 sm:grid-cols-3">
-            <x-field name="guardian_name" label="Full name" :value="old('guardian_name')"
-                     placeholder="Mrs. Ngozi Okafor" />
-            <x-field name="guardian_relationship" label="Relationship" :value="old('guardian_relationship')"
-                     placeholder="Mother, Father, Guardian…" />
-            <x-field name="guardian_phone" label="Phone" :value="old('guardian_phone')"
-                     placeholder="0803 000 0000" hint="Text messages go here." />
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <x-field name="guardian_phone" label="Parent phone number" :value="old('guardian_phone')"
+                     placeholder="0803 000 0000" required
+                     hint="Text messages are sent to this number." />
+
+            <x-field name="guardian_email" label="Parent email address" type="email"
+                     :value="old('guardian_email')" required
+                     placeholder="parent@example.com"
+                     hint="Used to open the fee account." />
         </div>
 
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <x-field name="guardian_email" label="Email" type="email" :value="old('guardian_email')" />
-            <x-field name="guardian_address" label="Address (if different)" :value="old('guardian_address')" />
+            <x-field name="guardian_name" label="Parent / guardian name" :value="old('guardian_name')"
+                     placeholder="Mrs. Ngozi Okafor" />
+
+            <x-field name="guardian_relationship" label="Relationship" :value="old('guardian_relationship')"
+                     placeholder="Mother, Father, Guardian…" />
+        </div>
+
+        <div class="mt-6 border-t border-slate-200 pt-5">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Home address</p>
+
+            <div class="mt-3">
+                <x-field name="address" label="Address" :value="old('address')"
+                         placeholder="House number, street, area" />
+            </div>
+
+            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                <x-field name="city" label="Town / city" :value="old('city')" />
+                <x-field name="state" label="State" type="select"
+                         placeholder-option="Not stated"
+                         :value="old('state')"
+                         :options="$states" />
+                <x-field name="lga" label="LGA" :value="old('lga')" />
+            </div>
         </div>
     </div>
 
