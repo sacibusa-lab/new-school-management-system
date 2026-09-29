@@ -11,7 +11,8 @@
 <div class="bg-slate-50 py-12 print:bg-white print:py-0">
     <div class="section max-w-4xl">
 
-        <div class="mx-auto max-w-2xl text-center">
+        {{-- The invitation to search means nothing on a printed record. --}}
+        <div class="mx-auto max-w-2xl text-center print:hidden">
             <span class="eyebrow">Admissions</span>
             <h1 class="mt-5 font-display text-3xl font-semibold text-slate-900 sm:text-4xl">
                 Check your admission status
@@ -39,7 +40,7 @@
 
         {{-- ================= Result ================= --}}
         @if ($searched)
-            <div class="mx-auto mt-8 max-w-2xl">
+            <div class="mx-auto mt-8 max-w-2xl print:mt-0">
                 @if ($applicant)
                     @php
                         // $decision and $papers arrive from the controller.
@@ -50,10 +51,10 @@
                         ], true);
                     @endphp
 
-                    <div class="card overflow-hidden">
+                    <div class="card overflow-hidden print:break-inside-avoid">
 
                         {{-- ============ Who this is ============ --}}
-                        <div class="flex flex-wrap items-center gap-5 border-b border-slate-200 bg-white p-5 sm:p-6">
+                        <div class="flex flex-wrap items-center gap-5 border-b border-slate-200 bg-white p-5 sm:p-6 print:gap-3 print:p-3">
                             {{-- The photograph is what identifies the candidate at a glance,
                                  which is the whole reason for asking for one. --}}
                             @if ($applicant->photo_path)
@@ -88,7 +89,7 @@
                         {{-- The figures first, then the papers they were added up from,
                              so a parent can check the arithmetic for themselves. --}}
                         @if ($decision)
-                            <div class="p-5 sm:p-6">
+                            <div class="p-5 sm:p-6 print:p-3">
                                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     Entrance examination
                                 </p>
@@ -174,7 +175,7 @@
 
                         {{-- ============ The verdict ============ --}}
                         @if ($applicant->isAdmitted())
-                            <div class="bg-emerald-50 p-6 text-center sm:p-8">
+                            <div class="bg-emerald-50 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
@@ -196,8 +197,8 @@
                             </div>
 
                             @if ($applicant->student)
-                                <div class="border-t border-slate-200 p-6 sm:p-8">
-                                    <div class="rounded-2xl bg-brand-950 p-6 text-center">
+                                <div class="border-t border-slate-200 p-6 sm:p-8 print:p-3">
+                                    <div class="rounded-2xl bg-brand-950 p-6 text-center print:p-4">
                                         <p class="text-xs font-semibold uppercase tracking-widest text-gold-300">
                                             Your admission number
                                         </p>
@@ -213,7 +214,7 @@
                             @endif
 
                         @elseif ($rejected)
-                            <div class="bg-rose-50 p-6 text-center sm:p-8">
+                            <div class="bg-rose-50 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-600 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
@@ -239,7 +240,7 @@
                             </div>
 
                         @elseif ($marked)
-                            <div class="bg-gold-50 p-6 text-center sm:p-8">
+                            <div class="bg-gold-50 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
@@ -256,7 +257,7 @@
                             </div>
 
                         @else
-                            <div class="bg-brand-50 p-6 text-center sm:p-8">
+                            <div class="bg-brand-50 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-700 text-white">
                                     <x-nav-icon name="clipboard" class="h-7 w-7" />
                                 </span>
@@ -273,7 +274,7 @@
 
                         {{-- ============ Next steps ============ --}}
                         @if ($rejected)
-                            <div class="border-t border-slate-200 p-5 sm:p-6">
+                            <div class="border-t border-slate-200 p-5 sm:p-6 print:p-3">
                                 @if ($openResit)
                                     {{-- Self-service resit booking: no phone call needed. --}}
                                     <div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
@@ -329,7 +330,7 @@
                         @endif
 
                         {{-- ============ Details ============ --}}
-                        <div class="border-t border-slate-200 p-5 sm:p-6">
+                        <div class="border-t border-slate-200 p-5 sm:p-6 print:p-3">
                             <dl class="grid gap-x-8 gap-y-4 sm:grid-cols-3">
                                 @foreach ([
                                     ['Class applied for', $applicant->levelAppliedFor?->name ?? '—'],

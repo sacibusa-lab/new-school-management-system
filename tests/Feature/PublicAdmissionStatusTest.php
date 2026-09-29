@@ -347,4 +347,52 @@ class PublicAdmissionStatusTest extends TestCase
             ->assertDontSee('View your fees')
             ->assertDontSee('Where you are in the process');
     }
+
+    /* ------------------------------------------------------------------ */
+    /* What comes out of the printer                                       */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * A parent printing this page wants the record, not the website around it
+     * and not the box they typed the number into. Each of these carries
+     * `print:hidden`; if one is dropped the sheet fills up with furniture again.
+     */
+    public function test_the_printout_leaves_out_the_website_and_the_search_box(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75);
+
+        $html = $this->search()->assertOk()->getContent();
+
+        // Literal class strings rather than a regex: the header tag spans several
+        // lines and `[^>]*` cannot cross the `>` inside its Alpine attributes.
+        $this->assertStringContainsString('transition-shadow print:hidden', $html, 'The site header would print.');
+        $this->assertStringContainsString('text-brand-100 print:hidden', $html, 'The site footer would print.');
+        $this->assertStringContainsString('text-center print:hidden', $html, 'The page heading would print.');
+        $this->assertStringContainsString('max-w-xl print:hidden', $html, 'The search form would print.');
+        $this->assertStringContainsString('class="mt-5 print:hidden"', $html, 'The print button would print itself.');
+    }
+
+    /**
+     * The record has to fit one sheet. It is laid out at ~880px against the
+     * ~1047px an A4 page gives once browser margins are taken off — so this
+     * guards the slack, not just the current fit.
+     */
+    public function test_the_printed_record_is_the_only_thing_on_the_page(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75);
+        $this->satPapers([
+            ['MTH', 'Mathematics', 90, false],
+            ['ENG', 'English Language', 80, false],
+            ['GPR', 'General Paper', 55, false],
+        ]);
+
+        $html = $this->search()->assertOk()->getContent();
+
+        // The body must not be forced to fill a screen on paper: `min-h-screen`
+        // would make it taller than the printable area and cost a second sheet.
+        $this->assertMatchesRegularExpression('/<body class="[^"]*print:min-h-0/', $html, 'The body would be screen-tall on paper.');
+
+        // The card is one object and must not be sliced across two sheets.
+        $this->assertStringContainsString('print:break-inside-avoid', $html);
+    }
 }

@@ -240,6 +240,34 @@
 }
 
 /* =====================================================================
+   PRINT
+   ===================================================================== */
+@media print {
+    /*
+     * Browsers leave background colours and images off when printing. That would
+     * turn the admission-number panel into white text on white paper and strip
+     * the green and red that say "admitted" or "not admitted" — the two things
+     * the printed sheet exists to convey. So print the colours as designed.
+     */
+    html {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Nothing hovers on paper. */
+    .card,
+    .card-pad,
+    .table-wrap {
+        box-shadow: none;
+    }
+
+    /* A record card is one object; do not slice it down the middle. */
+    .card {
+        break-inside: avoid;
+    }
+}
+
+/* =====================================================================
    UTILITIES
    ===================================================================== */
 @utility text-balance {

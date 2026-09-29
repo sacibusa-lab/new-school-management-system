@@ -13,20 +13,22 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
-<body class="flex min-h-screen flex-col bg-white">
+<body class="flex min-h-screen flex-col bg-white print:min-h-0">
 
     {{-- ================= Announcement bar ================= --}}
     @if (! empty($announcement))
-        <div class="bg-brand-950 px-4 py-2.5 text-center text-sm text-brand-100">
+        <div class="bg-brand-950 px-4 py-2.5 text-center text-sm text-brand-100 print:hidden">
             {!! $announcement !!}
         </div>
     @endif
 
     {{-- ================= Header ================= --}}
+    {{-- print:hidden — a parent printing their record wants the record, not the
+         navigation and the "apply now" button that go with it. --}}
     <header x-data="{ open: false, scrolled: false }"
             @scroll.window="scrolled = window.scrollY > 8"
             :class="scrolled ? 'shadow-lg shadow-slate-900/5' : ''"
-            class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-lg transition-shadow">
+            class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-lg transition-shadow print:hidden">
         <div class="section flex h-18 items-center justify-between gap-6 py-3">
 
             <a href="{{ route('home') }}" class="flex items-center gap-3">
@@ -140,7 +142,7 @@
     </main>
 
     {{-- ================= Footer ================= --}}
-    <footer class="mt-24 bg-brand-950 text-brand-100">
+    <footer class="mt-24 bg-brand-950 text-brand-100 print:hidden">
         <div class="section grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-4">
             <div class="lg:col-span-2">
                 <div class="flex items-center gap-3">
