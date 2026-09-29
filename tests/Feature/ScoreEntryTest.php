@@ -453,6 +453,153 @@ class ScoreEntryTest extends TestCase
         $this->assertNull($score->refresh()->score);
     }
 
+    public function test_the_grid_shows_each_candidates_total_and_average(): void
+    {
+        $this->registerFor($this->exam);
+        $this->mark('SAC-00001', ['MTH' => 78, 'ENG' => 65, 'GPR' => 82]);
+
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $this->exam->id]))
+            ->assertOk();
+
+        // Every paper is out of 100, so the percentages are the marks themselves:
+        // 78 + 65 + 82 = 225, over three papers, averaging 75.
+        $response->assertSee('225');
+        $response->assertSee('75%');
+        $response->assertSee('3 papers');
+    }
+
+    /**
+     * The figures on the screen and the figures the cutoff ranks on MUST be the
+     * same arithmetic. If they drift, a candidate's place is decided by numbers
+     * that were never in front of the person typing the marks.
+     */
+    public function test_the_total_and_average_are_the_ones_the_cutoff_desk_computes(): void
+    {
+        $this->registerFor($this->exam);
+        $this->mark('SAC-00001', ['MTH' => 78, 'ENG' => 65, 'GPR' => 82]);
+
+        $shown = $this->shownSummary($this->exam, $this->candidate);
+
+        app(\App\Services\Admissions\AdmissionService::class)->compute($this->exam, $this->officer);
+
+        $decision = \App\Models\AdmissionDecision::query()
+            ->where('applicant_id', $this->candidate->id)
+            ->where('exam_id', $this->exam->id)
+            ->sole();
+
+        $this->assertSame(225.0, $shown['total']);
+        $this->assertSame(75.0, $shown['average']);
+
+        $this->assertSame($shown['total'], (float) $decision->total_score);
+        $this->assertSame($shown['average'], (float) $decision->average_score);
+    }
+
+    public function test_a_paper_with_no_mark_is_left_out_of_the_total_and_the_average(): void
+    {
+        $this->registerFor($this->exam);
+
+        // General Paper has not been marked at all. Counting it as a zero would
+        // fail a candidate for a script nobody has looked at.
+        $this->mark('SAC-00001', ['MTH' => 80, 'ENG' => 60]);
+
+        $shown = $this->shownSummary($this->exam, $this->candidate);
+
+        $this->assertSame(140.0, $shown['total']);
+        $this->assertSame(70.0, $shown['average'], 'the average is over the two marked papers');
+        $this->assertSame(2, $shown['marked']);
+    }
+
+    public function test_an_absence_is_left_out_of_the_total_and_the_average(): void
+    {
+        $this->registerFor($this->exam);
+        $this->mark('SAC-00001', ['MTH' => 80, 'GPR' => 60]);
+
+        $absent = $this->papers['ENG'];
+        Score::query()
+            ->where('exam_subject_id', $absent->id)
+            ->update(['is_absent' => true, 'score' => null]);
+
+        $shown = $this->shownSummary($this->exam, $this->candidate);
+
+        $this->assertSame(140.0, $shown['total']);
+        $this->assertSame(70.0, $shown['average']);
+        $this->assertSame(2, $shown['marked']);
+    }
+
+    public function test_papers_with_different_totals_are_compared_as_percentages(): void
+    {
+        // A 50-mark paper must not drag a 100-mark paper's average down: the whole
+        // point of scoring in percentages.
+        $this->papers['GPR']->update(['total_marks' => 50]);
+
+        $this->registerFor($this->exam);
+        $this->mark('SAC-00001', ['MTH' => 80, 'ENG' => 60, 'GPR' => 25]);
+
+        $shown = $this->shownSummary($this->exam, $this->candidate);
+
+        // 80%, 60%, and 25/50 = 50% → total 190, average 63.33.
+        $this->assertSame(190.0, $shown['total']);
+        $this->assertSame(63.33, $shown['average']);
+    }
+
+    public function test_a_candidate_with_no_marks_at_all_shows_a_blank_summary(): void
+    {
+        $this->registerFor($this->exam);
+
+        $shown = $this->shownSummary($this->exam, $this->candidate);
+
+        $this->assertSame(0.0, $shown['total']);
+        $this->assertSame(0.0, $shown['average']);
+        $this->assertSame(0, $shown['marked']);
+    }
+
+    /** Write raw marks straight onto the slots, without going through the screen. */
+    private function mark(string $registration, array $marks): void
+    {
+        $applicant = Applicant::query()->where('registration_number', $registration)->sole();
+
+        foreach ($marks as $code => $value) {
+            Score::query()
+                ->where('exam_subject_id', $this->papers[$code]->id)
+                ->where('applicant_id', $applicant->id)
+                ->update(['score' => $value, 'is_absent' => false]);
+        }
+    }
+
+    /**
+     * Read the total and average OUT OF THE RENDERED GRID, the way a person reads
+     * them. Recomputing them in the test would only prove the test agrees with
+     * itself; parsing the page is what proves the screen shows the right figure.
+     *
+     * @return array{total:float,average:float,marked:int}
+     */
+    private function shownSummary(Exam $exam, Applicant $applicant): array
+    {
+        $html = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $exam->id]))
+            ->assertOk()
+            ->getContent();
+
+        preg_match(
+            '/<tr [^>]*data-match="[^"]*' . preg_quote(strtolower($applicant->registration_number), '/') . '".*?<\/tr>/s',
+            $html,
+            $row,
+        );
+
+        $this->assertNotEmpty($row, 'that candidate should have a row on the grid');
+
+        preg_match('/data-total[^>]*>\s*([\d.]+)/s', $row[0], $total);
+        preg_match('/data-average[^>]*>\s*([\d.]+)%/s', $row[0], $average);
+        preg_match('/data-count[^>]*>\s*(\d+) paper/s', $row[0], $count);
+
+        return [
+            'total' => (float) ($total[1] ?? 0),
+            'average' => (float) ($average[1] ?? 0),
+            'marked' => (int) ($count[1] ?? 0),
+        ];
+    }
+
     public function test_the_grid_saves_every_paper_in_one_go(): void
     {
         $maths = $this->slot();

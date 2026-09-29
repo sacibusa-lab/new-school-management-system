@@ -53,6 +53,11 @@
         You can copy a column of marks from Excel and paste it into any box — the values fill
         downwards from there.
     </p>
+    <p class="mt-1">
+        <strong>Total</strong> adds each paper up as a percentage of its own total, and
+        <strong>Average</strong> is over the papers that have a mark — the same two figures the
+        cutoff is applied to. A blank paper is not a zero, and an absence is not a zero either.
+    </p>
 </x-alert>
 
 @if ($errors->any())
@@ -125,12 +130,20 @@
                                 </span>
                             </th>
                         @endforeach
+
+                        {{-- What the cutoff will rank on, so the officer sees it while
+                             typing rather than after running the cutoff. --}}
+                        <th class="w-24 text-right">Total</th>
+                        <th class="w-24 text-right">Average</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     @foreach ($candidates as $rowIndex => $candidate)
+                        @php $summary = $summaries[$candidate->id] ?? ['total' => 0.0, 'average' => 0.0, 'marked' => 0]; @endphp
+
                         <tr data-row="{{ $rowIndex }}"
+                            data-cutoff="{{ (float) $exam->cutoff_mark }}"
                             data-match="{{ strtolower($candidate->full_name . ' ' . $candidate->registration_number) }}">
                             <td class="sticky left-0 z-10 bg-white">
                                 <p class="font-medium text-slate-900">{{ $candidate->full_name }}</p>
@@ -184,6 +197,32 @@
                                     @endif
                                 </td>
                             @endforeach
+
+                            {{-- Painted by the grid script on every keystroke, so the officer
+                                 sees the figure move as the marks go in. The starting values
+                                 are rendered here, so they are right before any script runs. --}}
+                            <td class="text-right align-top pt-3">
+                                <span data-total class="font-semibold text-slate-900">
+                                    {{ rtrim(rtrim(number_format($summary['total'], 2), '0'), '.') }}
+                                </span>
+                                <span data-count class="block text-[11px] text-slate-400">
+                                    {{ $summary['marked'] === 1 ? '1 paper' : $summary['marked'] . ' papers' }}
+                                </span>
+                            </td>
+
+                            <td class="text-right align-top pt-3">
+                                {{-- Compared against the examination's cutoff, not a
+                                     paper's pass mark: the average is what the cutoff
+                                     desk measures against cutoff_mark. --}}
+                                <span data-average @class([
+                                    'font-semibold',
+                                    'text-emerald-700' => $summary['marked'] > 0 && $summary['average'] >= (float) $exam->cutoff_mark,
+                                    'text-amber-700' => $summary['marked'] > 0 && $summary['average'] < (float) $exam->cutoff_mark,
+                                    'text-slate-400' => $summary['marked'] === 0,
+                                ])>
+                                    {{ rtrim(rtrim(number_format($summary['average'], 2), '0'), '.') }}%
+                                </span>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

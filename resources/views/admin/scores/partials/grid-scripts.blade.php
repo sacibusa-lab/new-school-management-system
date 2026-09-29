@@ -55,6 +55,11 @@
 
             /** Fills in the small badge under the box with the grade and percentage. */
             paint(input) {
+                this.paintBadge(input);
+                this.paintRow(input);
+            },
+
+            paintBadge(input) {
                 const badge = input.closest('td')?.querySelector('[data-feedback]');
                 if (!badge) return;
 
@@ -89,6 +94,60 @@
 
                 badge.textContent = (grade ? grade + ' · ' : '') + percentage.toFixed(0) + '%';
                 badge.className = base + (percentage < pass ? 'text-amber-600' : 'text-emerald-600');
+            },
+
+            /** Two decimals at most, with trailing zeros dropped: 225, 74.33. */
+            trim(value) {
+                return String(parseFloat(Number(value).toFixed(2)));
+            },
+
+            /**
+             * The row's total and average, on the same rule the cutoff desk uses:
+             * each mark becomes a percentage of its own paper FIRST, and the
+             * average is over the papers that carry a mark. A blank paper is not a
+             * zero and an absence is not a zero, so neither drags the average down.
+             *
+             * Mirrors ScoreEntryService::summarise() and AdmissionService::summarise().
+             * If those three ever disagree, a candidate's place is decided by a
+             * number that was never on this screen.
+             */
+            paintRow(input) {
+                const row = input.closest('tr');
+                const totalCell = row?.querySelector('[data-total]');
+                const averageCell = row?.querySelector('[data-average]');
+
+                if (!row || !totalCell || !averageCell) return;
+
+                let sum = 0;
+                let marked = 0;
+
+                row.querySelectorAll('input[data-max]').forEach((cell) => {
+                    const parsed = this.parse(cell.value);
+                    const max = parseFloat(cell.dataset.max || '0');
+
+                    // An over-max mark is refused on save, so it must not inflate
+                    // the total while somebody is still typing it.
+                    if (parsed.state !== 'mark' || max <= 0 || parsed.value < 0 || parsed.value > max) {
+                        return;
+                    }
+
+                    sum += (parsed.value / max) * 100;
+                    marked++;
+                });
+
+                const average = marked === 0 ? 0 : sum / marked;
+                const cutoff = parseFloat(row.dataset.cutoff || '0');
+
+                totalCell.textContent = this.trim(sum);
+
+                averageCell.textContent = this.trim(average) + '%';
+                averageCell.className = 'font-semibold '
+                    + (marked === 0 ? 'text-slate-400' : (average >= cutoff ? 'text-emerald-700' : 'text-amber-700'));
+
+                const countCell = row.querySelector('[data-count]');
+                if (countCell) {
+                    countCell.textContent = marked === 1 ? '1 paper' : marked + ' papers';
+                }
             },
 
             onInput(event) {

@@ -225,6 +225,34 @@ class ScoreEntryService
     }
 
     /**
+     * A candidate's total and average, worked out the way the cutoff desk does it.
+     *
+     * Deliberately the same rule as AdmissionService::summarise(): each mark is
+     * turned into a percentage of its paper's total FIRST, those percentages are
+     * added up, and the average is over the papers that actually carry a mark. A
+     * blank paper is not a zero, and an absence is not a zero either — neither
+     * counts towards the average, which is exactly how an admission decision is
+     * built.
+     *
+     * If these two ever disagree, a candidate's place would be decided by numbers
+     * that were never on the screen in front of the officer typing the marks.
+     *
+     * @param  array<int,float>  $percentages  one per marked, non-absent paper
+     * @return array{total:float,average:float,marked:int}
+     */
+    public function summarise(array $percentages): array
+    {
+        $marked = count($percentages);
+        $total = round(array_sum($percentages), 2);
+
+        return [
+            'total' => $total,
+            'average' => $marked === 0 ? 0.0 : round($total / $marked, 2),
+            'marked' => $marked,
+        ];
+    }
+
+    /**
      * Marks that still need a human signature on this examination.
      *
      * A row nobody has marked yet is deliberately excluded: "not marked" is not

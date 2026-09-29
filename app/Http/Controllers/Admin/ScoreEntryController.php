@@ -136,18 +136,27 @@ class ScoreEntryController extends Controller
             ->with('verifiedBy')
             ->get();
 
+        $papers = $exam->examSubjects()->with('subject')->get();
+
+        $candidates = Applicant::query()
+            ->whereIn('id', $scores->pluck('applicant_id')->unique())
+            ->with('levelAppliedFor')
+            ->orderBy('registration_number')
+            ->get();
+
+        // [applicant id][exam subject id] => the score row, so the view can render
+        // a cell without hunting for it.
+        $cells = $scores->groupBy('applicant_id')
+            ->map(fn ($rows) => $rows->keyBy('exam_subject_id'));
+
         return [
             'exam' => $exam,
-            'examSubjects' => $exam->examSubjects()->with('subject')->get(),
-            'candidates' => Applicant::query()
-                ->whereIn('id', $scores->pluck('applicant_id')->unique())
-                ->with('levelAppliedFor')
-                ->orderBy('registration_number')
-                ->get(),
-            // [applicant id][exam subject id] => the score row, so the view can
-            // render a cell without hunting for it.
-            'cells' => $scores->groupBy('applicant_id')
-                ->map(fn ($rows) => $rows->keyBy('exam_subject_id')),
+            'examSubjects' => $papers,
+            'candidates' => $candidates,
+            'cells' => $cells,
+            // Shown beside each candidate so the officer sees the figure the
+            // cutoff will rank on, without waiting to run the cutoff.
+            'summaries' => $this->summaries($candidates, $papers, $cells),
             'gradeScale' => GradeScale::query()->orderByDesc('min_score')->get(),
             // Locked for a read-only viewer as well as for a locked examination.
             'editable' => $exam->isEditable() && (bool) request()->user()?->can('scores.enter'),
@@ -155,6 +164,45 @@ class ScoreEntryController extends Controller
             'canOverride' => $this->canOverride(),
             'mayVerify' => (bool) request()->user()?->can('scores.verify'),
         ];
+    }
+
+    /**
+     * One total and average per candidate, built from the marks already saved.
+     *
+     * @param  \Illuminate\Support\Collection<int,Applicant>  $candidates
+     * @param  \Illuminate\Support\Collection<int,ExamSubject>  $papers
+     * @param  \Illuminate\Support\Collection<int,\Illuminate\Support\Collection<int,Score>>  $cells
+     * @return array<int,array{total:float,average:float,marked:int}>
+     */
+    protected function summaries($candidates, $papers, $cells): array
+    {
+        $summaries = [];
+
+        foreach ($candidates as $candidate) {
+            $row = $cells[$candidate->id] ?? collect();
+            $percentages = [];
+
+            foreach ($papers as $paper) {
+                $cell = $row->get($paper->id);
+
+                // Only a real mark counts. A blank paper is not a zero, and an
+                // absence is not a zero either — this is the cutoff desk's rule,
+                // and it has to stay that way.
+                if (! $cell || $cell->is_absent || $cell->score === null) {
+                    continue;
+                }
+
+                $percentage = $paper->toPercentage($cell->score);
+
+                if ($percentage !== null) {
+                    $percentages[] = (float) $percentage;
+                }
+            }
+
+            $summaries[$candidate->id] = $this->entry->summarise($percentages);
+        }
+
+        return $summaries;
     }
 
     /** One paper at a time, for working down a single marked script stack. */
