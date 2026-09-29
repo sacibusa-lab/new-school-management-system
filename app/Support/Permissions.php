@@ -55,6 +55,22 @@ class Permissions
                 'results.compute' => 'Compute term results and positions',
                 'results.publish' => 'Publish results to students',
             ],
+            /*
+            | The "Students & Results" module.
+            |
+            | Held by the Super Admin alone for now. Each of these pages is a blank
+            | placeholder, and handing a capability to a role before the page that
+            | uses it has been designed would spread access without anybody deciding
+            | it should be spread. Assign them as each page is built.
+            */
+            'Students & Results' => [
+                'results.check' => "Look up any student's result on their behalf",
+                'results.analytics' => 'View performance analytics across classes, terms and years',
+                'results.pins' => 'Generate and manage result-checking PINs',
+                'employees.manage' => 'Manage employee records',
+                'attendance.manage' => 'Record and correct attendance',
+                'alumni.manage' => 'Manage the alumni register',
+            ],
             'Messaging' => [
                 'sms.view' => 'View the SMS log',
                 'sms.send' => 'Send and resend text messages',

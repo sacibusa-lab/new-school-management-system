@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\ScoreImportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SmsController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\StudentsResultsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ProfileController;
@@ -197,6 +198,31 @@ Route::middleware(['auth'])
         Route::post('results/compute', [ResultController::class, 'compute'])->name('results.compute');
         Route::post('results/publish', [ResultController::class, 'publish'])->name('results.publish');
         Route::post('results/unpublish', [ResultController::class, 'unpublish'])->name('results.unpublish');
+
+        /*
+        | Students & Results — the module being built one page at a time.
+        |
+        | Every route is listed individually rather than caught by a {page}
+        | wildcard: each page is going to grow its own controller, its own
+        | permission and eventually its own children, and a wildcard would have to
+        | be pulled apart again at that point. Declared before the Fees block so
+        | the URL prefix keeps this module visibly separate from the flat
+        | /admin/students and /admin/results routes.
+        */
+        Route::prefix('students-results')->name('students-results.')->group(function (): void {
+            Route::get('/', [StudentsResultsController::class, 'dashboard'])->name('dashboard');
+            Route::get('check-result', [StudentsResultsController::class, 'checkResult'])->name('check-result');
+            Route::get('performance', [StudentsResultsController::class, 'performance'])->name('performance');
+            Route::get('pins', [StudentsResultsController::class, 'pins'])->name('pins');
+            Route::get('students', [StudentsResultsController::class, 'students'])->name('students');
+            Route::get('employees', [StudentsResultsController::class, 'employees'])->name('employees');
+            Route::get('academics', [StudentsResultsController::class, 'academics'])->name('academics');
+            Route::get('exam-master', [StudentsResultsController::class, 'examMaster'])->name('exam-master');
+            Route::get('attendance', [StudentsResultsController::class, 'attendance'])->name('attendance');
+            Route::get('reports', [StudentsResultsController::class, 'reports'])->name('reports');
+            Route::get('alumni', [StudentsResultsController::class, 'alumni'])->name('alumni');
+            Route::get('settings', [StudentsResultsController::class, 'settings'])->name('settings');
+        });
 
         /* ---------------- Fees ---------------- */
         Route::get('fees/categories', [FeeController::class, 'categories'])->name('fees.categories.index');

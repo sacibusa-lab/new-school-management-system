@@ -69,8 +69,21 @@
                         ['route' => 'admin.admissions.*', 'label' => 'Cutoff & decisions', 'icon' => 'scale', 'can' => 'admissions.decide'],
                     ],
                     'Students & Results' => [
-                        ['route' => 'admin.students.*', 'label' => 'Students', 'icon' => 'academic', 'can' => 'students.view'],
-                        ['route' => 'admin.results.*', 'label' => 'Results', 'icon' => 'chart', 'can' => 'results.view'],
+                        // The module the office listed for us, in their order. Every
+                        // one of these is built one at a time; until its turn comes it
+                        // is a blank page that says so, never a link that errors.
+                        ['route' => 'admin.students-results.dashboard', 'label' => 'Dashboard', 'icon' => 'grid', 'can' => 'results.view'],
+                        ['route' => 'admin.students-results.check-result', 'label' => 'Check Result', 'icon' => 'search', 'can' => 'results.check'],
+                        ['route' => 'admin.students-results.performance', 'label' => 'Performance Analytics', 'icon' => 'chart', 'can' => 'results.analytics'],
+                        ['route' => 'admin.students-results.pins', 'label' => 'Generate Pin', 'icon' => 'key', 'can' => 'results.pins'],
+                        ['route' => 'admin.students-results.students', 'label' => 'Students Details', 'icon' => 'academic', 'can' => 'students.view'],
+                        ['route' => 'admin.students-results.employees', 'label' => 'Employee', 'icon' => 'briefcase', 'can' => 'employees.manage'],
+                        ['route' => 'admin.students-results.academics', 'label' => 'Academic', 'icon' => 'book', 'can' => 'academics.manage'],
+                        ['route' => 'admin.students-results.exam-master', 'label' => 'Exam Master', 'icon' => 'clipboard-check', 'can' => 'exams.manage'],
+                        ['route' => 'admin.students-results.attendance', 'label' => 'Attendance', 'icon' => 'calendar', 'can' => 'attendance.manage'],
+                        ['route' => 'admin.students-results.reports', 'label' => 'Reports', 'icon' => 'report', 'can' => 'reports.view'],
+                        ['route' => 'admin.students-results.alumni', 'label' => 'Alumni', 'icon' => 'rosette', 'can' => 'alumni.manage'],
+                        ['route' => 'admin.students-results.settings', 'label' => 'Settings', 'icon' => 'sliders', 'can' => 'settings.manage'],
                     ],
                     'Fees' => [
                         ['route' => 'admin.fees.categories.*', 'label' => 'Fee categories', 'icon' => 'tag', 'can' => 'fees.manage'],
