@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AcademicCalendarController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
@@ -269,7 +270,16 @@ Route::middleware(['auth'])
         Route::post('settings/sequences', [SettingController::class, 'updateSequence'])->name('settings.sequences.update');
 
         // Where the school is now: the session we are in and the term that is
-        // active. Its own route because it moves rows, not setting values.
-        Route::put('settings/academic', [SettingController::class, 'updateAcademic'])->name('settings.academic.update');
+        // active, plus the calendar itself — adding and deleting sessions and
+        // terms. Its own controller because it moves rows, not setting values.
+        Route::prefix('settings/academic')->name('settings.academic.')->group(function (): void {
+            Route::put('/', [AcademicCalendarController::class, 'update'])->name('update');
+
+            Route::post('sessions', [AcademicCalendarController::class, 'storeSession'])->name('sessions.store');
+            Route::delete('sessions/{academicSession}', [AcademicCalendarController::class, 'destroySession'])->name('sessions.destroy');
+
+            Route::post('terms', [AcademicCalendarController::class, 'storeTerm'])->name('terms.store');
+            Route::delete('terms/{term}', [AcademicCalendarController::class, 'destroyTerm'])->name('terms.destroy');
+        });
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
     });

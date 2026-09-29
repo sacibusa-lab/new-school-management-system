@@ -4,30 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
-use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Models\Term;
 use App\Services\Branding\BrandingService;
 use App\Services\NumberSequenceService;
+use App\Services\Academics\AcademicCalendarService;
 use App\Support\SettingLayout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class SettingController extends Controller
 {
-    /**
-     * The terms a session runs, in order.
-     *
-     * Used only to lay them down for a session that has none — never to correct
-     * an existing one, since a school that has renamed or reordered its terms has
-     * said something and should not have it overwritten.
-     */
-    private const STANDARD_TERMS = [1 => 'First Term', 2 => 'Second Term', 3 => 'Third Term'];
-
-    public function index(NumberSequenceService $sequences): View
+    public function index(NumberSequenceService $sequences, AcademicCalendarService $academic): View
     {
         $this->authorize('settings.manage');
 
@@ -38,6 +28,10 @@ class SettingController extends Controller
 
         return view('admin.settings.index', [
             'groups' => SettingLayout::arrange($settings),
+            // The calendar card behind the selector: what exists to choose from,
+            // and what is in the way of deleting any of it.
+            'academic' => $academic,
+            'suggestedSession' => $academic->suggestNextSessionName(),
             'sessions' => AcademicSession::query()
                 ->with('terms')
                 ->orderByDesc('starts_on')
@@ -118,110 +112,6 @@ class SettingController extends Controller
         Setting::flush();
 
         return back()->with('status', 'Settings saved.');
-    }
-
-    /**
-     * Move the school to a different session and term.
-     *
-     * Every figure the school reports is relative to these two answers — a fee
-     * invoice, a result, an attendance register — so the rules that keep them
-     * single-valued live here rather than in whatever screen sets them next.
-     *
-     * Setting a value is therefore three writes, not one: the chosen row becomes
-     * current, and everything else stops being. A session left current behind us
-     * is the stale answer to "which session are we in?", and a term left current
-     * in the session we have just left is the same question answered twice.
-     */
-    public function updateAcademic(Request $request): RedirectResponse
-    {
-        $this->authorize('settings.manage');
-
-        $validated = $request->validate([
-            'academic_session_id' => ['required', 'integer', 'exists:academic_sessions,id'],
-            'term_id' => [
-                'nullable', 'integer', 'exists:terms,id',
-                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
-                    if (! $value) {
-                        return;
-                    }
-
-                    $belongs = Term::query()
-                        ->whereKey($value)
-                        ->where('academic_session_id', $request->input('academic_session_id'))
-                        ->exists();
-
-                    if (! $belongs) {
-                        $fail('That term belongs to a different academic session. Pick the term listed under the session you chose.');
-                    }
-                },
-            ],
-        ], [
-            'academic_session_id.required' => 'Choose the academic session the school is in.',
-            'academic_session_id.exists' => 'That academic session no longer exists.',
-            'term_id.exists' => 'That term no longer exists.',
-        ]);
-
-        $session = AcademicSession::query()->findOrFail($validated['academic_session_id']);
-
-        $created = [];
-
-        DB::transaction(function () use ($session, $validated, &$created): void {
-            AcademicSession::query()->whereKeyNot($session->id)->update(['is_current' => false]);
-            $session->forceFill(['is_current' => true])->save();
-
-            // A session with no terms cannot be "in" a term, and the page that
-            // manages terms is not built yet — so the three a Nigerian school runs
-            // are laid down, and only ever when the session has none at all.
-            if ($session->terms()->doesntExist()) {
-                foreach (self::STANDARD_TERMS as $position => $name) {
-                    $session->terms()->create(['name' => $name, 'position' => $position, 'is_current' => false]);
-                    $created[] = $name;
-                }
-
-                $session->load('terms');
-            }
-
-            $term = ! empty($validated['term_id'])
-                ? $session->terms->firstWhere('id', (int) $validated['term_id'])
-                : null;
-
-            // No term named means "the first one of this session", which is what
-            // somebody moving to a new session expects to get.
-            $term ??= $session->terms->sortBy('position')->first();
-
-            if ($term === null) {
-                return;
-            }
-
-            Term::query()->whereKeyNot($term->id)->update(['is_current' => false]);
-            $term->forceFill(['is_current' => true])->save();
-        });
-
-        $term = $session->terms()->where('is_current', true)->first();
-
-        ActivityLog::record(
-            'settings.academic',
-            $session,
-            sprintf(
-                'Moved the school to %s, %s%s',
-                $session->name,
-                $term?->name ?? 'no term set',
-                $created === [] ? '' : ' (' . implode(', ', $created) . ' created)',
-            ),
-            ['module' => 'settings'],
-        );
-
-        $message = sprintf('The school is now in %s', $session->name);
-
-        if ($term) {
-            $message .= ', ' . $term->name;
-        }
-
-        if ($created !== []) {
-            $message .= '. This session had no terms, so ' . implode(', ', $created) . ' were created for it.';
-        }
-
-        return back()->with('status', $message . '.');
     }
 
     /**
