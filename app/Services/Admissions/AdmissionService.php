@@ -78,26 +78,34 @@ class AdmissionService
 
         return DB::transaction(function () use ($ranked, $exam, $cutoff, $actor) {
             foreach ($ranked as $index => $row) {
-                AdmissionDecision::updateOrCreate(
-                    [
-                        'applicant_id' => $row['applicant_id'],
-                        'exam_id' => $exam->id,
-                    ],
-                    [
-                        'total_score' => $row['total'],
-                        'average_score' => $row['average'],
-                        'highest_score' => $row['highest'],
-                        'subjects_offered' => $row['subjects_offered'],
-                        'subjects_passed' => $row['subjects_passed'],
-                        'subjects_failed' => $row['subjects_failed'],
-                        'has_absent' => $row['has_absent'],
-                        'cutoff_mark' => $cutoff,
-                        'position' => $index + 1,
-                        'position_in_level' => $index + 1,
-                        // The verdict itself is set by applyCutoff().
-                        'decision' => AdmissionDecisionStatus::Pending,
-                    ],
-                );
+                $decision = AdmissionDecision::query()->firstOrNew([
+                    'applicant_id' => $row['applicant_id'],
+                    'exam_id' => $exam->id,
+                ]);
+
+                $decision->fill([
+                    'total_score' => $row['total'],
+                    'average_score' => $row['average'],
+                    'highest_score' => $row['highest'],
+                    'subjects_offered' => $row['subjects_offered'],
+                    'subjects_passed' => $row['subjects_passed'],
+                    'subjects_failed' => $row['subjects_failed'],
+                    'has_absent' => $row['has_absent'],
+                    'cutoff_mark' => $cutoff,
+                    'position' => $index + 1,
+                    'position_in_level' => $index + 1,
+                ]);
+
+                // A verdict already given stands. Recalculating the merit row
+                // must never quietly unmake a decision the school has made —
+                // neither the one the cutoff produced, nor, above all, one a
+                // person set by hand. Only a brand new row starts out Pending,
+                // waiting for applyCutoff() to judge it.
+                if (! $decision->exists) {
+                    $decision->decision = AdmissionDecisionStatus::Pending;
+                }
+
+                $decision->save();
             }
 
             // Everyone with a computed merit row has now sat the paper.
@@ -238,7 +246,14 @@ class AdmissionService
     /**
      * Mark everyone above the cutoff as admitted, subject to available slots.
      *
-     * @return array{admitted:int,rejected:int,cutoff:float,slots:?int,waiting:int}
+     * Decisions a person made are left exactly as they are: the cutoff can only
+     * decide the candidates nobody has decided by hand. It is the same rule as
+     * `compute()` — a recalculation may not unmake somebody's decision — and it
+     * is what stops an office override being quietly reversed the next time
+     * this button is pressed. They still hold the places they took, so the slot
+     * count starts from them.
+     *
+     * @return array{admitted:int,rejected:int,cutoff:float,slots:?int,waiting:int,kept:int}
      */
     public function applyCutoff(Exam $exam, ?User $actor = null, bool $respectSlots = true): array
     {
@@ -258,19 +273,35 @@ class AdmissionService
             ->orderByDesc('average_score')
             ->get();
 
+        // Places already taken by a hand-made decision, so the cutoff does not
+        // over-fill a level by ignoring them.
+        $manualAdmitted = $decisions
+            ->filter(fn (AdmissionDecision $decision) => $decision->isManuallyDecided())
+            ->filter(fn (AdmissionDecision $decision) => $decision->decision === AdmissionDecisionStatus::Admitted)
+            ->count();
+
         if ($decisions->isEmpty()) {
-            return ['admitted' => 0, 'rejected' => 0, 'cutoff' => $cutoff, 'slots' => $slots, 'waiting' => 0];
+            return ['admitted' => 0, 'rejected' => 0, 'cutoff' => $cutoff, 'slots' => $slots, 'waiting' => 0, 'kept' => 0];
         }
 
         $admitted = 0;
         $rejected = 0;
         $waiting = 0;
+        $kept = 0;
 
         // Collected inside the transaction, sent once it has committed.
         $notify = [];
 
-        DB::transaction(function () use ($decisions, $cutoff, $slots, $requireAll, $exam, $actor, &$admitted, &$rejected, &$waiting, &$notify) {
+        DB::transaction(function () use ($decisions, $cutoff, $slots, $requireAll, $exam, $actor, $manualAdmitted, &$admitted, &$rejected, &$waiting, &$kept, &$notify) {
             foreach ($decisions as $decision) {
+                // Somebody decided this one by hand. Leave it, and say so, rather
+                // than silently overruling the office.
+                if ($decision->isManuallyDecided()) {
+                    $kept++;
+
+                    continue;
+                }
+
                 $eligible = (float) $decision->average_score >= $cutoff
                     && $decision->subjects_offered > 0;
 
@@ -279,7 +310,7 @@ class AdmissionService
                     $decision->remarks = 'Did not pass every subject (policy requires all subjects passed).';
                 }
 
-                if ($eligible && $slots !== null && $admitted >= $slots) {
+                if ($eligible && $slots !== null && ($manualAdmitted + $admitted) >= $slots) {
                     // Above the line but out of places.
                     $eligible = false;
                     $decision->remarks = "Passed the cutoff of {$cutoff}% but all {$slots} places are filled.";
@@ -328,13 +359,15 @@ class AdmissionService
                 'admitted' => $admitted,
                 'rejected' => $rejected,
                 'deferred' => $waiting,
+                'left_as_decided' => $kept,
                 'by' => $actor?->name,
             ]);
 
             ActivityLog::record(
                 'admission.cutoff_applied',
                 $exam,
-                "Applied a cutoff of {$cutoff}% — {$admitted} admitted, {$rejected} not admitted",
+                "Applied a cutoff of {$cutoff}% — {$admitted} admitted, {$rejected} not admitted"
+                    . ($kept > 0 ? ", {$kept} left as decided by hand" : ''),
                 ['module' => 'admissions'],
             );
         });
@@ -359,6 +392,7 @@ class AdmissionService
             'cutoff' => $cutoff,
             'slots' => $slots,
             'waiting' => $waiting,
+            'kept' => $kept,
         ];
     }
 

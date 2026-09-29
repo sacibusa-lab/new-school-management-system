@@ -137,7 +137,9 @@ class AdmissionController extends Controller
         $result = $this->admissions->applyCutoff($exam, $request->user(), $request->boolean('respect_slots', true));
 
         if ($result['admitted'] + $result['rejected'] + $result['waiting'] === 0) {
-            return back()->with('error', 'No computed decisions found. Compute the merit list first.');
+            return back()->with('error', $result['kept'] > 0
+                ? 'Nothing to apply — every decision on this examination was made by hand.'
+                : 'No computed decisions found. Compute the merit list first.');
         }
 
         $message = sprintf(
@@ -149,6 +151,12 @@ class AdmissionController extends Controller
 
         if ($result['waiting'] > 0) {
             $message .= ", {$result['waiting']} above the line but out of places";
+        }
+
+        // Said out loud, so an override that survives the run is not mistaken
+        // for one the cutoff just made.
+        if ($result['kept'] > 0) {
+            $message .= ". {$result['kept']} decision(s) left as set by hand";
         }
 
         return redirect()
