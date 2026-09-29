@@ -12,12 +12,14 @@ use App\Models\SchoolLevel;
 use App\Models\Score;
 use App\Services\AdmissionLetterService;
 use App\Services\Admissions\ApplicantImportService;
+use App\Services\Admissions\ApplicantPhotoService;
 use App\Services\ApplicantRegistrationService;
 use App\Services\NumberSequenceService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -29,6 +31,7 @@ class ApplicantController extends Controller
     public function __construct(
         private readonly ApplicantRegistrationService $registration,
         private readonly ApplicantImportService $imports,
+        private readonly ApplicantPhotoService $photos,
     ) {
     }
 
@@ -384,6 +387,183 @@ class ApplicantController extends Controller
         return redirect()
             ->route('admin.applicants.index')
             ->with('status', $message . ' They now appear in the applicants list and can be added to an examination.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Photographs                                                         */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Add photographs in bulk, matched to candidates by the number in each file
+     * name.
+     *
+     * Names arrive in a spreadsheet; photographs do not. This is the other half
+     * of a bulk registration: drop in "SAC-00001.jpg", "SAC-00002.jpg" and so on,
+     * see whose each one was worked out to be, and only then attach them.
+     */
+    public function photos(): View
+    {
+        $this->authorize('admissions.update');
+
+        $staged = session(ApplicantPhotoService::SESSION_KEY);
+
+        return view('admin.applicants.photos', [
+            'staged' => $staged['rows'] ?? null,
+            'filename' => $staged['batch'] ?? null,
+            'withoutPhoto' => Applicant::query()->whereNull('photo_path')->count(),
+            'withPhoto' => Applicant::query()->whereNotNull('photo_path')->count(),
+            'maxFiles' => ApplicantPhotoService::MAX_FILES,
+            'maxKb' => ApplicantPhotoService::MAX_KB,
+            'extensions' => ApplicantPhotoService::EXTENSIONS,
+        ]);
+    }
+
+    public function previewPhotos(Request $request): RedirectResponse
+    {
+        $this->authorize('admissions.update');
+
+        $request->validate([
+            'photos' => ['required', 'array', 'min:1', 'max:' . ApplicantPhotoService::MAX_FILES],
+            'photos.*' => [
+                'file',
+                'mimes:' . ApplicantPhotoService::EXTENSIONS,
+                'max:' . ApplicantPhotoService::MAX_KB,
+            ],
+        ], [
+            'photos.required' => 'Choose the photographs to upload.',
+            'photos.max' => 'That is more than ' . ApplicantPhotoService::MAX_FILES . ' photographs. Split them into batches.',
+            'photos.*.mimes' => 'Every file has to be a photograph — JPG, PNG or WEBP.',
+            'photos.*.max' => 'Each photograph has to be under ' . (int) (ApplicantPhotoService::MAX_KB / 1024) . ' MB.',
+        ]);
+
+        // A fresh upload replaces the previous batch, including its parked files.
+        $this->clearStagedBatch();
+
+        $batch = (string) Str::uuid();
+
+        $rows = $this->photos->stage($request->file('photos') ?? [], $batch);
+
+        $request->session()->put(ApplicantPhotoService::SESSION_KEY, [
+            'batch' => $batch,
+            'rows' => $rows,
+        ]);
+
+        $matched = collect($rows)->whereNull('problem')->count();
+        $unmatched = count($rows) - $matched;
+
+        return redirect()
+            ->route('admin.applicants.photos')
+            ->with($matched > 0 ? 'status' : 'error', sprintf(
+                '%d photograph(s) read — %d matched to a candidate, %d could not be placed.',
+                count($rows),
+                $matched,
+                $unmatched,
+            ));
+    }
+
+    public function commitPhotos(Request $request): RedirectResponse
+    {
+        $this->authorize('admissions.update');
+
+        $staged = $request->session()->get(ApplicantPhotoService::SESSION_KEY);
+
+        if (! $staged) {
+            return redirect()
+                ->route('admin.applicants.photos')
+                ->with('error', 'That upload has expired. Please choose the photographs again.');
+        }
+
+        $validated = $request->validate([
+            'rows' => ['required', 'array', 'min:1'],
+            'rows.*' => ['integer'],
+        ], [
+            'rows.required' => 'Tick at least one photograph to attach.',
+        ]);
+
+        $result = $this->photos->commit($staged['rows'], $validated['rows'], $request->user());
+
+        $request->session()->forget(ApplicantPhotoService::SESSION_KEY);
+
+        if ($result['attached'] === 0) {
+            return redirect()
+                ->route('admin.applicants.photos')
+                ->with('error', 'Nothing was attached. ' . implode(' ', $result['failed']));
+        }
+
+        $message = $result['attached'] . ' photograph(s) attached to their candidates.';
+
+        if ($result['skipped'] > 0) {
+            $message .= ' ' . $result['skipped'] . ' file(s) were left alone.';
+        }
+
+        return redirect()
+            ->route('admin.applicants.index')
+            ->with('status', $message);
+    }
+
+    /** The thumbnail for one staged photograph, read from the parked batch. */
+    public function stagedPhoto(int $index): Response
+    {
+        $this->authorize('admissions.update');
+
+        $staged = session(ApplicantPhotoService::SESSION_KEY);
+
+        abort_if(! $staged, 404);
+
+        $contents = $this->photos->stagedContents($staged['rows'], $index);
+
+        abort_if($contents === null, 404);
+
+        return response($contents)
+            ->header('Content-Type', $this->imageType($staged['rows'][$index]['name']))
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /** Add or replace one applicant's photograph, from their own page. */
+    public function updatePhoto(Request $request, Applicant $applicant): RedirectResponse
+    {
+        $this->authorize('admissions.update');
+
+        $validated = $request->validate([
+            'photo' => ['required', 'file', 'mimes:' . ApplicantPhotoService::EXTENSIONS, 'max:' . ApplicantPhotoService::MAX_KB],
+        ], [
+            'photo.mimes' => 'That has to be a photograph — JPG, PNG or WEBP.',
+            'photo.max' => 'That photograph is over ' . (int) (ApplicantPhotoService::MAX_KB / 1024) . ' MB.',
+        ]);
+
+        $this->photos->store($applicant, $validated['photo']);
+
+        return back()->with('status', 'Photograph saved for ' . $applicant->full_name . '.');
+    }
+
+    public function destroyPhoto(Applicant $applicant): RedirectResponse
+    {
+        $this->authorize('admissions.update');
+
+        $this->photos->remove($applicant);
+
+        return back()->with('status', 'Photograph removed from ' . $applicant->full_name . '.');
+    }
+
+    /** Drop the previous batch's parked files so nothing is left behind. */
+    protected function clearStagedBatch(): void
+    {
+        $previous = session(ApplicantPhotoService::SESSION_KEY);
+
+        foreach ($previous['rows'] ?? [] as $row) {
+            if (isset($row['path']) && Storage::disk('local')->exists($row['path'])) {
+                Storage::disk('local')->delete($row['path']);
+            }
+        }
+    }
+
+    protected function imageType(string $fileName): string
+    {
+        return match (strtolower(pathinfo($fileName, PATHINFO_EXTENSION))) {
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
     }
 
     /**

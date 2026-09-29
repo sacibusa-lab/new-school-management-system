@@ -402,14 +402,30 @@ class AdminApplicantRegistrationTest extends TestCase
             ->assertSee('storage/uploads/documents/applicants/birth-certificate.pdf', false);
     }
 
-    public function test_the_documents_card_is_hidden_when_there_is_nothing_to_show(): void
+    /**
+     * This card used to disappear when there was neither a photograph nor a
+     * document — which hid the upload control from exactly the applicants who
+     * need it, because names arrive in a spreadsheet and photographs do not.
+     */
+    public function test_the_documents_card_still_offers_a_photograph_when_nothing_is_held(): void
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.store'), $this->payload());
 
-        $this->actingAs($this->admin)
-            ->get(route('admin.applicants.show', Applicant::query()->sole()))
+        $applicant = Applicant::query()->sole();
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.applicants.show', $applicant))
             ->assertOk()
-            ->assertDontSee('Passport and documents');
+            ->assertSee('Passport and documents')
+            ->assertSee('No photograph');
+
+        // One form posts the photograph; only a record that already has one gets
+        // a second form offering to take it back.
+        $this->assertSame(
+            1,
+            substr_count($response->getContent(), route('admin.applicants.photo.update', $applicant)),
+            'An applicant with no photograph should have exactly one photograph form.'
+        );
     }
 
     /* ------------------------------------------------------------------ */

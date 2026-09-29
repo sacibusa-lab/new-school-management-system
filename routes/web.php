@@ -101,6 +101,16 @@ Route::middleware(['auth'])
         Route::post('applicants/import/commit', [ApplicantController::class, 'commitImport'])
             ->name('applicants.import.commit');
 
+        /* Photographs, added after the names are already in. Literal paths before
+           the {applicant} wildcard, or "photos" would be read as an applicant id. */
+        Route::get('applicants/photos', [ApplicantController::class, 'photos'])->name('applicants.photos');
+        Route::post('applicants/photos/preview', [ApplicantController::class, 'previewPhotos'])
+            ->name('applicants.photos.preview');
+        Route::post('applicants/photos/commit', [ApplicantController::class, 'commitPhotos'])
+            ->name('applicants.photos.commit');
+        Route::get('applicants/photos/staged/{index}', [ApplicantController::class, 'stagedPhoto'])
+            ->name('applicants.photos.staged');
+
         Route::resource('applicants', ApplicantController::class)
             ->only(['index', 'show', 'edit', 'update', 'destroy']);
 
@@ -111,6 +121,12 @@ Route::middleware(['auth'])
             ->name('applicants.letter');
         Route::get('applicants/{applicant}/letter.pdf', [ApplicantController::class, 'letterPdf'])
             ->name('applicants.letter.pdf');
+
+        // One applicant's photograph, added or replaced from their own page.
+        Route::post('applicants/{applicant}/photo', [ApplicantController::class, 'updatePhoto'])
+            ->name('applicants.photo.update');
+        Route::delete('applicants/{applicant}/photo', [ApplicantController::class, 'destroyPhoto'])
+            ->name('applicants.photo.destroy');
 
         /* ---------------- Examinations ---------------- */
         Route::resource('exams', ExamController::class);

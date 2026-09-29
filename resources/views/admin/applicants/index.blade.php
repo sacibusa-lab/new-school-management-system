@@ -6,6 +6,7 @@
 @section('actions')
     @can('admissions.create')
         <a href="{{ route('admin.applicants.import') }}" class="btn-secondary btn-sm">Bulk upload</a>
+        <a href="{{ route('admin.applicants.photos') }}" class="btn-secondary btn-sm">Upload photos</a>
         <a href="{{ route('admin.applicants.create') }}" class="btn-primary btn-sm">Register applicant</a>
     @endcan
 @endsection
@@ -92,9 +93,17 @@
 
                     <td>
                         <div class="flex items-center gap-3">
-                            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-600">
-                                {{ $applicant->initials }}
-                            </span>
+                            {{-- The photograph if there is one, otherwise the initials: an
+                                 empty frame on every row would say nothing. --}}
+                            @if ($applicant->photo_path)
+                                <img src="{{ asset('storage/' . $applicant->photo_path) }}"
+                                     alt="" loading="lazy"
+                                     class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-slate-200">
+                            @else
+                                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-600">
+                                    {{ $applicant->initials }}
+                                </span>
+                            @endif
                             <div class="min-w-0">
                                 <p class="truncate font-medium text-slate-900">{{ $applicant->full_name }}</p>
                                 <p class="text-xs text-slate-500">

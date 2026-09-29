@@ -96,12 +96,12 @@
 
         {{-- ================= Passport & documents ================= --}}
         @php
-            // Both are optional and the office form no longer collects documents, so
-            // this card only appears when there is actually something to show.
             $documents = is_array($applicant->documents) ? $applicant->documents : [];
         @endphp
 
-        @if ($applicant->photo_path || $documents !== [])
+        {{-- Always shown, even when empty: names arrive in a spreadsheet but
+             photographs do not, so the applicants with no photograph are exactly
+             the ones this card has to be usable for. --}}
         <div class="card">
             <div class="panel-header">
                 <div>
@@ -136,6 +136,40 @@
                             <span class="text-xs text-slate-400">No photograph</span>
                         </div>
                     @endif
+
+                    {{-- Names arrive in a spreadsheet, photographs do not, so this has
+                         to be usable long after the applicant was registered. --}}
+                    @can('admissions.update')
+                        <form method="POST" action="{{ route('admin.applicants.photo.update', $applicant) }}"
+                              enctype="multipart/form-data" class="mt-3">
+                            @csrf
+
+                            <label for="applicant-photo" class="sr-only">Passport photograph</label>
+                            <input id="applicant-photo" name="photo" type="file" required
+                                   accept=".jpg,.jpeg,.png,.webp"
+                                   class="block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2.5 file:py-1.5 file:text-xs">
+
+                            @error('photo')
+                                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                            @enderror
+
+                            <button type="submit" class="btn-secondary btn-sm mt-2 w-full">
+                                {{ $applicant->photo_path ? 'Replace' : 'Upload' }}
+                            </button>
+                        </form>
+
+                        @if ($applicant->photo_path)
+                            <form method="POST" action="{{ route('admin.applicants.photo.destroy', $applicant) }}"
+                                  class="mt-1.5"
+                                  onsubmit="return confirm('Remove {{ $applicant->full_name }}\'s photograph?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn-ghost btn-sm w-full text-rose-600">
+                                    Remove
+                                </button>
+                            </form>
+                        @endif
+                    @endcan
                 </div>
 
                 {{-- Supporting documents --}}
@@ -171,7 +205,6 @@
                 </div>
             </div>
         </div>
-        @endif
 
         {{-- ================= Scores ================= --}}
         <div class="card">
