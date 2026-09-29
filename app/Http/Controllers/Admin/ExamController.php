@@ -42,7 +42,7 @@ class ExamController extends Controller
 
         $candidates = Applicant::query()
             ->whereIn('id', Score::query()->where('exam_id', $exam->id)->select('applicant_id'))
-            ->orderBy('registration_number')
+            ->inNameOrder()
             ->get();
 
         $handle = fopen('php://temp', 'r+');
@@ -263,7 +263,7 @@ class ExamController extends Controller
 
         return Applicant::query()
             ->whereIn('id', $scoresByApplicant->keys())
-            ->orderBy('registration_number')
+            ->inNameOrder()
             ->get()
             ->map(function (Applicant $applicant) use ($scoresByApplicant) {
                 $rows = $scoresByApplicant[$applicant->id];

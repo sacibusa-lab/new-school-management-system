@@ -220,11 +220,12 @@ class ScoreImportController extends Controller
             ->orderBy('row_number')
             ->get();
 
-        // Candidates offered in the "assign student" dropdown.
+        // Candidates offered in the "assign student" dropdown. Alphabetical,
+        // because the office is hunting for a name, not a number.
         $candidates = Applicant::query()
             ->where('academic_session_id', $import->exam->academic_session_id)
             ->when($import->exam->level_id, fn ($q) => $q->where('level_applied_for_id', $import->exam->level_id))
-            ->orderBy('registration_number')
+            ->inNameOrder()
             ->get();
 
         return view('admin.imports.show', [

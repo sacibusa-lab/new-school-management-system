@@ -141,7 +141,7 @@ class ScoreEntryController extends Controller
         $candidates = Applicant::query()
             ->whereIn('id', $scores->pluck('applicant_id')->unique())
             ->with('levelAppliedFor')
-            ->orderBy('registration_number')
+            ->inNameOrder()
             ->get();
 
         // [applicant id][exam subject id] => the score row, so the view can render
@@ -218,7 +218,11 @@ class ScoreEntryController extends Controller
         $scores = $examSubject->scores()
             ->with(['applicant.levelAppliedFor', 'enteredBy'])
             ->join('applicants', 'applicants.id', '=', 'scores.applicant_id')
-            ->orderBy('applicants.registration_number')
+            // Same order as the grid, so a paper marked on its own reads down the
+            // same way as the whole class.
+            ->orderBy('applicants.last_name')
+            ->orderBy('applicants.first_name')
+            ->orderBy('applicants.id')
             ->select('scores.*')
             ->get();
 

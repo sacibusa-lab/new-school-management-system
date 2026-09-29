@@ -114,6 +114,25 @@ class Applicant extends Model
         return $query->where('academic_session_id', $sessionId);
     }
 
+    /**
+     * Candidates in the order a teacher reads a register: surname, then first name.
+     *
+     * One rule rather than a `orderBy` at every call site, because a mark sheet, a
+     * scoresheet export and a candidate dropdown that disagree about who comes
+     * first are the same list in three places, and somebody has to check them
+     * against each other.
+     *
+     * The id is only a tie-break: two children can share a name, and a list that
+     * reshuffles between page loads is worse than one that is merely imperfect.
+     */
+    public function scopeInNameOrder(Builder $query): Builder
+    {
+        return $query
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->orderBy('id');
+    }
+
     /** Fuzzy search by name or registration number. */
     public function scopeSearch(Builder $query, ?string $term): Builder
     {

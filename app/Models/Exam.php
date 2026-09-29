@@ -83,12 +83,12 @@ class Exam extends Model
         return $this->hasMany(ScoreImport::class);
     }
 
-    /** Set of applicants who sat this exam. */
+    /** Set of applicants who sat this exam, in the order a register is read. */
     public function applicants()
     {
         return Applicant::query()
             ->whereIn('id', $this->scores()->select('applicant_id'))
-            ->orderBy('registration_number');
+            ->inNameOrder();
     }
 
     public function totalMarks(): float

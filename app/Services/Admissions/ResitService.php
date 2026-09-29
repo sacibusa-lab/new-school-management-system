@@ -88,7 +88,7 @@ class ResitService
             // applicant who already has a student record back into the pool.
             ->whereNotIn('status', [ApplicantStatus::Admitted->value])
             ->whereDoesntHave('student')
-            ->orderBy('registration_number')
+            ->inNameOrder()
             ->get();
     }
 

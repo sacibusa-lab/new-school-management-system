@@ -554,6 +554,41 @@ class ScoreEntryTest extends TestCase
         $this->assertSame(0, $shown['marked']);
     }
 
+    /**
+     * A teacher marks down a register by surname, but the candidates arrive on the
+     * grid in registration order — the order the numbers were handed out, which is
+     * the order the office happened to type them in. Those two disagree, and the
+     * register is the one that matters when somebody is checking a pile of scripts
+     * against the screen.
+     */
+    public function test_the_grid_lists_candidates_alphabetically_by_surname(): void
+    {
+        // Only candidates with a slot on this examination appear on the grid.
+        $this->registerFor($this->exam);
+
+        // setUp's candidate is Okafor (SAC-00001). Put one either side of them, so
+        // alphabetical and registration order disagree.
+        foreach ([['SAC-00002', 'Aisha', 'Bello'], ['SAC-00003', 'Yusuf', 'Zubairu']] as [$number, $first, $last]) {
+            $applicant = Applicant::create([
+                'registration_number' => $number,
+                'first_name' => $first,
+                'last_name' => $last,
+                'guardian_phone' => '08031234567',
+                'guardian_email' => 'parent@example.com',
+                'level_applied_for_id' => $this->level->id,
+                'academic_session_id' => $this->session->id,
+                'status' => ApplicantStatus::Registered,
+            ]);
+
+            $this->registerFor($this->exam, $applicant);
+        }
+
+        $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $this->exam->id]))
+            ->assertOk()
+            ->assertSeeInOrder(['Bello', 'Okafor', 'Zubairu']);
+    }
+
     /** Write raw marks straight onto the slots, without going through the screen. */
     private function mark(string $registration, array $marks): void
     {
