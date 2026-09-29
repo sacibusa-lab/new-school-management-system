@@ -1,10 +1,108 @@
 @extends('layouts.admin')
 
 @section('title', 'Settings')
-@section('subtitle', 'Branding, numbering, admissions, letters, messaging, fees and results')
+@section('subtitle', 'Academic session, branding, numbering, admissions, letters, messaging, fees and results')
 
 @section('content')
-<form method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data">
+
+{{-- ================= Where the school is now =================
+     Its own form, above the settings form rather than inside it: HTML forms
+     cannot nest, and this control moves rows in academic_sessions and terms
+     rather than writing setting values. --}}
+<div class="card-pad">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">Academic session</h2>
+            <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                The session the school is in and the term that is active. Every figure the
+                school reports hangs off these two answers — an invoice, a result, an
+                attendance register — so only one of each can be current at a time.
+            </p>
+        </div>
+
+        {{-- The state as it stands, so the answer is readable without opening a
+             select. The term dates come with it because "Second Term" means
+             nothing on its own in April. --}}
+        <div class="rounded-xl bg-slate-50 px-4 py-3 text-right ring-1 ring-slate-200">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Currently
+            </p>
+            <p class="mt-0.5 text-sm font-semibold text-slate-900">
+                {{ $currentSession?->name ?? 'No session set' }}
+                @if ($currentTerm)
+                    · {{ $currentTerm->name }}
+                @endif
+            </p>
+
+            @if ($currentTerm && ($currentTerm->starts_on || $currentTerm->ends_on))
+                <p class="mt-0.5 text-xs text-slate-500">
+                    {{ $currentTerm->starts_on?->format('j M Y') ?? '—' }}
+                    to
+                    {{ $currentTerm->ends_on?->format('j M Y') ?? '—' }}
+                </p>
+            @endif
+        </div>
+    </div>
+
+    <form method="POST" action="{{ route('admin.settings.academic.update') }}" class="mt-5">
+        @csrf
+        @method('PUT')
+
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+                <label for="academic_session_id" class="label">Academic session</label>
+                <select id="academic_session_id" name="academic_session_id"
+                        class="input @error('academic_session_id') input-error @enderror">
+                    @foreach ($sessions as $session)
+                        <option value="{{ $session->id }}"
+                                @selected((int) old('academic_session_id', $currentSession?->id) === $session->id)>
+                            {{ $session->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('academic_session_id')
+                    <p class="error-text">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label for="term_id" class="label">Active term</label>
+                {{-- Grouped by session rather than swapped by script: one save sets
+                     both, and the pairing is visible instead of implied. --}}
+                <select id="term_id" name="term_id"
+                        class="input @error('term_id') input-error @enderror">
+                    @foreach ($sessions as $session)
+                        <optgroup label="{{ $session->name }}">
+                            @forelse ($session->terms as $term)
+                                <option value="{{ $term->id }}"
+                                        @selected((int) old('term_id', $currentTerm?->id) === $term->id)>
+                                    {{ $term->name }}
+                                </option>
+                            @empty
+                                <option value="" disabled>No terms yet — they will be created</option>
+                            @endforelse
+                        </optgroup>
+                    @endforeach
+                </select>
+
+                @error('term_id')
+                    <p class="error-text">{{ $message }}</p>
+                @enderror
+
+                <p class="hint">
+                    A session with no terms has First, Second and Third Term laid down for it.
+                </p>
+            </div>
+
+            <div class="flex items-end">
+                <button type="submit" class="btn-primary">Set session and term</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<form method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data" class="mt-6">
     @csrf
     @method('PUT')
 
@@ -12,18 +110,22 @@
 
         {{-- ================= Settings groups ================= --}}
         <div class="space-y-6 lg:col-span-2">
-            @foreach ($settings as $group => $items)
+            {{-- The order comes from SettingLayout, not from the query: ordering by
+                 group then key is alphabetical twice over, which put the school's
+                 Address above its own Name and scattered the groups. --}}
+            @foreach ($groups as $group)
                 <div class="card-pad">
                     <h2 class="text-base font-semibold text-slate-900">
-                        {{ $groups[$group] ?? ucfirst($group) }}
+                        {{ $group['label'] }}
                     </h2>
 
                     <div class="mt-6 grid gap-5 sm:grid-cols-2">
-                        @foreach ($items as $setting)
+                        @foreach ($group['items'] as $setting)
                             @php
-                                $isWide = in_array($setting->key, ['contact_address', 'admission_letter_note'], true);
-                                // An image needs the room for its preview and its picker.
-                                $spansTwo = $isWide || in_array($setting->type, ['text', 'image'], true);
+                                // An image needs the room for its preview and its picker;
+                                // a sentence looks wrong squeezed into half a row.
+                                $spansTwo = \App\Support\SettingLayout::isWide($setting->key)
+                                    || in_array($setting->type, ['text', 'image'], true);
                             @endphp
 
                             <div @class(['sm:col-span-2' => $spansTwo])>

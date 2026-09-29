@@ -1,0 +1,198 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Setting;
+use App\Models\User;
+use App\Support\SettingLayout;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\SettingsSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
+use Tests\TestCase;
+
+/**
+ * How the settings page is arranged.
+ *
+ * The page used to be thrown at the screen in the order the database returned —
+ * `orderBy('group')->orderBy('key')`, which is alphabetical twice over. So Finance
+ * sat between Branding and Letters, and inside the school's own branding the first
+ * field was **Address**, because an address sorts before a name. The order the
+ * controller declared was only ever used for the heading text.
+ *
+ * A setting that vanished from the page would be far worse than one shown in the
+ * wrong place, so the last two tests here are about not losing anything.
+ */
+class SettingsLayoutTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(SettingsSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        Setting::flush();
+
+        $this->admin = User::factory()->create();
+        $this->admin->assignRole('Super Admin');
+    }
+
+    /** @param array<int,string> $keys of a single group */
+    private function group(string $group, array $keys): Collection
+    {
+        return collect($keys)->map(fn (string $key) => new Setting([
+            'key' => $key,
+            'group' => $group,
+            'type' => 'string',
+            'label' => $key,
+        ]));
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The order of the groups                                             */
+    /* ------------------------------------------------------------------ */
+
+    public function test_the_groups_are_drawn_in_the_order_they_are_declared(): void
+    {
+        $settings = Setting::query()->orderBy('key')->get()->groupBy('group');
+
+        $drawn = array_column(SettingLayout::arrange($settings), 'key');
+
+        $this->assertSame(
+            ['branding', 'numbering', 'admissions', 'letters', 'messaging', 'fees', 'results'],
+            $drawn,
+            'The groups are out of order. A new group has to be placed in SettingLayout::GROUPS.',
+        );
+    }
+
+    public function test_the_page_starts_with_the_school_itself_and_not_with_admissions(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.settings.index'))->assertOk()->getContent();
+
+        preg_match_all('/<h2 class="text-base font-semibold[^"]*">\s*([^<]+?)\s*<\/h2>/s', $html, $matches);
+
+        $headings = array_values(array_filter(array_map('trim', $matches[1])));
+
+        // The academic-session card sits above the form and is an h2 as well.
+        $this->assertSame('Academic session', $headings[0] ?? null);
+        $this->assertSame('School branding', $headings[1] ?? null);
+
+        $this->assertLessThan(
+            array_search('Admissions', $headings, true),
+            array_search('School branding', $headings, true),
+        );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The order of the fields inside a group                              */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The school's name is the first thing a school sets, and it was the seventh
+     * field in its own group.
+     */
+    public function test_the_school_name_comes_before_its_address(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.settings.index'))->assertOk()->getContent();
+
+        $name = strpos($html, 'id="setting_school_name"');
+        $motto = strpos($html, 'id="setting_school_motto"');
+        $address = strpos($html, 'id="setting_contact_address"');
+        $logo = strpos($html, 'setting_school_logo');
+
+        $this->assertNotFalse($name);
+        $this->assertNotFalse($address);
+
+        $this->assertLessThan($motto, $name, 'Motto is drawn above the school name.');
+        $this->assertLessThan($address, $name, 'The address is drawn above the school name.');
+        $this->assertLessThan($logo, $address, 'The logo is drawn above the address.');
+    }
+
+    public function test_a_prefix_is_drawn_next_to_the_padding_it_belongs_to(): void
+    {
+        $items = $this->group('numbering', [
+            'receipt_prefix',
+            'student_number_padding',
+            'admission_number_prefix',
+            'student_number_prefix',
+            'invoice_prefix',
+            'admission_number_padding',
+        ]);
+
+        $ordered = SettingLayout::fieldsIn($items, 'numbering')->pluck('key')->all();
+
+        $this->assertSame([
+            'admission_number_prefix',
+            'admission_number_padding',
+            'student_number_prefix',
+            'student_number_padding',
+            'invoice_prefix',
+            'receipt_prefix',
+        ], $ordered);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Nothing may quietly disappear                                       */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The layout file is knowledge about the school; the database is what exists.
+     * Where they disagree, the setting is shown.
+     */
+    public function test_a_setting_the_layout_has_never_heard_of_is_still_shown(): void
+    {
+        Setting::put('bell_time', '07:30', ['group' => 'branding', 'label' => 'Bell time']);
+
+        $settings = Setting::query()->orderBy('key')->get()->groupBy('group');
+        $branding = collect(SettingLayout::arrange($settings))->firstWhere('key', 'branding');
+
+        $keys = $branding['items']->pluck('key')->all();
+
+        $this->assertContains('bell_time', $keys);
+        // Appended rather than interleaved, so a listed field never moves.
+        $this->assertSame('bell_time', end($keys));
+    }
+
+    public function test_a_group_the_layout_has_never_heard_of_is_still_shown(): void
+    {
+        Setting::put('library_fine', '50', ['group' => 'library', 'label' => 'Library fine']);
+
+        $settings = Setting::query()->orderBy('key')->get()->groupBy('group');
+        $drawn = SettingLayout::arrange($settings);
+
+        $this->assertSame('library', end($drawn)['key']);
+        $this->assertSame('Library', end($drawn)['label'], 'An unknown group falls back to its own name.');
+    }
+
+    /** An empty heading is furniture, so a declared group with nothing in it is skipped. */
+    public function test_a_declared_group_with_no_settings_is_not_drawn(): void
+    {
+        $this->assertSame(0, Setting::query()->where('group', 'general')->count());
+
+        $html = $this->actingAs($this->admin)->get(route('admin.settings.index'))->assertOk()->getContent();
+
+        preg_match_all('/<h2 class="text-base font-semibold[^"]*">\s*([^<]+?)\s*<\/h2>/s', $html, $matches);
+
+        $headings = array_map('trim', $matches[1]);
+
+        $this->assertContains('School branding', $headings);
+        $this->assertNotContains('General', $headings);
+    }
+
+    public function test_every_setting_in_the_database_reaches_the_page(): void
+    {
+        $html = $this->actingAs($this->admin)->get(route('admin.settings.index'))->assertOk()->getContent();
+
+        foreach (Setting::query()->pluck('key') as $key) {
+            $this->assertStringContainsString(
+                'settings[' . $key . ']',
+                $html,
+                "The setting {$key} is not on the page.",
+            );
+        }
+    }
+}

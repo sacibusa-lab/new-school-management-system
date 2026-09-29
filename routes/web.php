@@ -267,5 +267,9 @@ Route::middleware(['auth'])
         Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
         Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
         Route::post('settings/sequences', [SettingController::class, 'updateSequence'])->name('settings.sequences.update');
+
+        // Where the school is now: the session we are in and the term that is
+        // active. Its own route because it moves rows, not setting values.
+        Route::put('settings/academic', [SettingController::class, 'updateAcademic'])->name('settings.academic.update');
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
     });
