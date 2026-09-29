@@ -53,6 +53,15 @@ class ApplicantController extends Controller
             'levels' => SchoolLevel::query()->active()->get(),
             'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
             'statuses' => ApplicantStatus::options(),
+            // The papers the office prints from the applicant list: an admissions
+            // officer holds the letters permission but cannot open the cutoff desk,
+            // so without these the merit list and the letters would be unreachable.
+            'exams' => Exam::query()
+                ->with('level')
+                ->when($session = AcademicSession::current(), fn ($q) => $q->where('academic_session_id', $session->id))
+                ->orderByDesc('exam_date')
+                ->orderByDesc('id')
+                ->get(),
             'counts' => Applicant::query()
                 ->selectRaw('status, COUNT(*) as total')
                 ->groupBy('status')

@@ -3,6 +3,22 @@
 @section('title', 'Cutoff & admission decisions')
 @section('subtitle', 'Set the pass mark, compute the merit list, and transfer successful applicants')
 
+@section('actions')
+    @if ($exam)
+        {{-- The three documents a school actually hands out, gathered where the
+             decisions that produce them are made. --}}
+        @can('admissions.view')
+            <a href="{{ route('admin.admissions.merit', $exam) }}" class="btn-secondary btn-sm">Merit list</a>
+        @endcan
+        @can('admissions.letters')
+            <a href="{{ route('admin.admissions.letters', $exam) }}" class="btn-secondary btn-sm">Admission letters</a>
+        @endcan
+        @can('admissions.view')
+            <a href="{{ route('admin.admissions.waiting', $exam) }}" class="btn-secondary btn-sm">Waiting list</a>
+        @endcan
+    @endif
+@endsection
+
 @section('content')
 
 @if ($exams->isEmpty())

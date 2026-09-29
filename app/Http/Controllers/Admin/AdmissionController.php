@@ -10,12 +10,14 @@ use App\Models\AdmissionSetting;
 use App\Models\Applicant;
 use App\Models\Exam;
 use App\Models\SchoolLevel;
+use App\Services\AdmissionLetterService;
 use App\Services\Admissions\AdmissionService;
 use App\Services\Admissions\ResitService;
 use App\Services\Admissions\StudentEnrolmentService;
 use App\Services\Sms\SmsNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 /**
@@ -31,6 +33,7 @@ class AdmissionController extends Controller
         private readonly StudentEnrolmentService $enrolment,
         private readonly ResitService $resits,
         private readonly SmsNotifier $sms,
+        private readonly AdmissionLetterService $letters,
     ) {
     }
 
@@ -182,6 +185,226 @@ class AdmissionController extends Controller
         );
 
         return back()->with('status', "Decision updated for {$decision->applicant?->registration_number}.");
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The paperwork the office hands out                                  */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The merit list, as a school pins it up on the noticeboard.
+     *
+     * The cutoff desk lists the same candidates, but paginated and tangled up with
+     * the controls; this is the sheet itself, in merit order, ready to print.
+     */
+    public function merit(Exam $exam): View
+    {
+        $this->authorize('admissions.view');
+
+        return view('admin.admissions.merit', $this->meritData($exam));
+    }
+
+    /** The same sheet for Excel, for a school that keeps its records in one. */
+    public function meritCsv(Exam $exam): Response
+    {
+        $this->authorize('admissions.view');
+
+        $data = $this->meritData($exam);
+
+        $handle = fopen('php://temp', 'r+');
+        // A UTF-8 byte-order mark, or Excel mangles accented names.
+        fwrite($handle, "\xEF\xBB\xBF");
+
+        fputcsv($handle, [
+            'Position', 'Registration number', 'Candidate', 'Class applied for',
+            'Papers', 'Total', 'Average', 'Cutoff', 'Passed', 'Failed', 'Decision', 'Remarks',
+        ]);
+
+        foreach ($data['decisions'] as $decision) {
+            fputcsv($handle, [
+                $decision->position,
+                $decision->applicant?->registration_number,
+                $decision->applicant?->full_name,
+                $decision->applicant?->levelAppliedFor?->name,
+                $decision->subjects_offered,
+                $decision->total_score,
+                $decision->average_score,
+                $decision->cutoff_mark,
+                $decision->subjects_passed,
+                $decision->subjects_failed,
+                $decision->decision?->label() ?? 'Not decided',
+                $decision->remarks,
+            ]);
+        }
+
+        rewind($handle);
+        $csv = (string) stream_get_contents($handle);
+        fclose($handle);
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="merit-list-'
+                . \Illuminate\Support\Str::slug($exam->title) . '.csv"',
+        ]);
+    }
+
+    /**
+     * Everyone who passed the cutoff but arrived after the places ran out.
+     *
+     * The cutoff already handles these correctly — deferred, with the reason
+     * written down — but nothing listed them together, so a place coming free meant
+     * reading the whole merit list to work out who was next in line.
+     */
+    public function waiting(Exam $exam): View
+    {
+        $this->authorize('admissions.view');
+
+        $slots = $this->slotsFor($exam);
+
+        $admitted = AdmissionDecision::query()
+            ->where('exam_id', $exam->id)
+            ->where('decision', AdmissionDecisionStatus::Admitted->value)
+            ->count();
+
+        return view('admin.admissions.waiting', [
+            'exam' => $exam,
+            'decisions' => AdmissionDecision::query()
+                ->with('applicant.levelAppliedFor')
+                ->where('exam_id', $exam->id)
+                ->where('decision', AdmissionDecisionStatus::Deferred->value)
+                // Whoever came closest to the line is first in line for a place.
+                ->orderByDesc('average_score')
+                ->get(),
+            'slots' => $slots,
+            'admitted' => $admitted,
+            'free' => $slots === null ? null : max(0, $slots - $admitted),
+        ]);
+    }
+
+    /** Give the waiting list the places that came free. */
+    public function promote(Request $request, Exam $exam): RedirectResponse
+    {
+        $this->authorize('admissions.decide');
+
+        $validated = $request->validate([
+            'decisions' => ['required', 'array', 'min:1'],
+            'decisions.*' => ['integer'],
+        ], [
+            'decisions.required' => 'Tick the candidate(s) to give a place to.',
+            'decisions.min' => 'Tick the candidate(s) to give a place to.',
+        ]);
+
+        $free = null;
+
+        if (($slots = $this->slotsFor($exam)) !== null) {
+            $admitted = AdmissionDecision::query()
+                ->where('exam_id', $exam->id)
+                ->where('decision', AdmissionDecisionStatus::Admitted->value)
+                ->count();
+
+            $free = max(0, $slots - $admitted);
+        }
+
+        // Only the waiting list can be promoted from here, and only as far as the
+        // places allow — this screen exists so a place is given away deliberately,
+        // not so the slot count can be quietly overshot.
+        $decisions = AdmissionDecision::query()
+            ->where('exam_id', $exam->id)
+            ->whereIn('id', $validated['decisions'])
+            ->where('decision', AdmissionDecisionStatus::Deferred->value)
+            ->orderByDesc('average_score')
+            ->get();
+
+        $wanted = $decisions->count();
+
+        if ($free !== null) {
+            $decisions = $decisions->take($free);
+        }
+
+        foreach ($decisions as $decision) {
+            $this->admissions->override(
+                $decision,
+                AdmissionDecisionStatus::Admitted,
+                'Promoted from the waiting list.',
+                $request->user(),
+            );
+        }
+
+        $promoted = $decisions->count();
+
+        if ($promoted === 0) {
+            return back()->with('error', 'No place to give — every slot is filled, or those candidates are no longer waiting.');
+        }
+
+        $message = sprintf('%d candidate(s) given the place(s) that came free.', $promoted);
+
+        if ($promoted < $wanted) {
+            $message .= sprintf(' %d could not be promoted: only %d place(s) were free.', $wanted - $promoted, $promoted);
+        }
+
+        return back()->with('status', $message . ' Their admission letters can be printed from this page.');
+    }
+
+    /** Every admission letter for one examination, one to a sheet. */
+    public function letters(Exam $exam): View
+    {
+        $this->authorize('admissions.letters');
+
+        $exam->loadMissing(['level', 'academicSession']);
+
+        $applicants = AdmissionDecision::query()
+            ->with('applicant.student')
+            ->where('exam_id', $exam->id)
+            ->where('decision', AdmissionDecisionStatus::Admitted->value)
+            ->orderBy('position')
+            ->get()
+            ->pluck('applicant')
+            ->filter()
+            ->values();
+
+        return view('admin.admissions.letters', [
+            'exam' => $exam,
+            'letters' => $applicants
+                ->map(fn (Applicant $applicant) => $this->letters->render($applicant))
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    protected function meritData(Exam $exam): array
+    {
+        $exam->loadMissing(['level', 'academicSession']);
+
+        $decisions = AdmissionDecision::query()
+            ->with(['applicant.levelAppliedFor', 'decider'])
+            ->where('exam_id', $exam->id)
+            ->orderBy('position')
+            ->orderByDesc('average_score')
+            ->get();
+
+        return [
+            'exam' => $exam,
+            'decisions' => $decisions,
+            'cutoff' => $this->admissions->cutoffFor($exam),
+            'slots' => $slots = $this->slotsFor($exam),
+            'admitted' => $decisions->where('decision', AdmissionDecisionStatus::Admitted)->count(),
+            'free' => $slots === null
+                ? null
+                : max(0, $slots - $decisions->where('decision', AdmissionDecisionStatus::Admitted)->count()),
+        ];
+    }
+
+    /** The places a level has, or null when no limit was set. */
+    protected function slotsFor(Exam $exam): ?int
+    {
+        return AdmissionSetting::query()
+            ->where('academic_session_id', $exam->academic_session_id)
+            ->where('level_id', $exam->level_id)
+            ->where('is_active', true)
+            ->first()
+            ?->available_slots;
     }
 
     /**

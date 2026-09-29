@@ -10,6 +10,9 @@
     @can('scores.import')
         <a href="{{ route('admin.imports.index', ['exam' => $exam->id]) }}" class="btn-primary btn-sm">Upload scoresheet</a>
     @endcan
+    @can('exams.view')
+        <a href="{{ route('admin.exams.admit-cards', $exam) }}" class="btn-secondary btn-sm">Admit cards</a>
+    @endcan
 @endsection
 
 @section('content')

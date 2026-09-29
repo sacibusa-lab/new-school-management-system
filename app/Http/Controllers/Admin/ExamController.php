@@ -32,6 +32,30 @@ class ExamController extends Controller
      * numbers in twice, and a blank cell is read as "not marked yet" rather than as
      * an absence.
      */
+    /**
+     * A card per candidate to hand out at the gate.
+     *
+     * The examination already knows its date, start time and venue, and each
+     * candidate already has a photograph and a number — the same facts the
+     * scoresheet is built from. Nothing new is captured; it is simply the other
+     * document a school needs on the day.
+     */
+    public function admitCards(Exam $exam): View
+    {
+        $this->authorize('exams.view');
+
+        $exam->loadMissing(['level', 'academicSession']);
+
+        return view('admin.exams.admit-cards', [
+            'exam' => $exam,
+            'candidates' => Applicant::query()
+                ->whereIn('id', Score::query()->where('exam_id', $exam->id)->select('applicant_id'))
+                ->with('levelAppliedFor')
+                ->inNameOrder()
+                ->get(),
+        ]);
+    }
+
     public function scoresheetTemplate(Exam $exam): Response
     {
         $this->authorize('scores.import');

@@ -27,6 +27,48 @@
     @endforeach
 </div>
 
+{{-- ================= The papers the office hands out ================= --}}
+@if ($exams->isNotEmpty() && auth()->user()?->can('admissions.view'))
+    <div class="card-pad mt-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-slate-900">Admission papers</p>
+                <p class="mt-0.5 text-xs text-slate-500">
+                    The merit list and the admission letters for this session's examinations, ready to print.
+                </p>
+            </div>
+        </div>
+
+        <ul class="mt-4 divide-y divide-slate-100">
+            @foreach ($exams as $paperExam)
+                <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-slate-900">{{ $paperExam->title }}</p>
+                        <p class="text-xs text-slate-500">
+                            {{ $paperExam->level?->name ?? 'All classes' }}
+                            @if ($paperExam->exam_date)
+                                · {{ $paperExam->exam_date->format('j M Y') }}
+                            @endif
+                        </p>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-2">
+                        <a href="{{ route('admin.admissions.merit', $paperExam) }}" class="btn-secondary btn-sm">Merit list</a>
+                        @can('admissions.letters')
+                            <a href="{{ route('admin.admissions.letters', $paperExam) }}" class="btn-secondary btn-sm">Letters</a>
+                        @endcan
+                        @can('admissions.decide')
+                            <a href="{{ route('admin.admissions.index', ['exam' => $paperExam->id]) }}" class="btn-ghost btn-sm">
+                                Cutoff desk
+                            </a>
+                        @endcan
+                    </div>
+                </li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 {{-- ================= Filters ================= --}}
 <form method="GET" class="card-pad mt-6">
     @if (request('status'))

@@ -138,6 +138,7 @@ Route::middleware(['auth'])
         // A blank scoresheet laid out one column per paper, so the office can fill
         // it in and upload it back rather than typing every mark.
         Route::get('exams/{exam}/scoresheet', [ExamController::class, 'scoresheetTemplate'])->name('exams.scoresheet-template');
+        Route::get('exams/{exam}/admit-cards', [ExamController::class, 'admitCards'])->name('exams.admit-cards');
 
         /* ---------------- Score entry ---------------- */
         Route::get('scores', [ScoreEntryController::class, 'index'])->name('scores.index');
@@ -170,6 +171,14 @@ Route::middleware(['auth'])
         Route::post('admissions/{exam}/apply', [AdmissionController::class, 'apply'])->name('admissions.apply');
         Route::post('admissions/decision/{decision}', [AdmissionController::class, 'override'])->name('admissions.decision.override');
         Route::post('admissions/{exam}/enrol', [AdmissionController::class, 'enrol'])->name('admissions.enrol');
+
+        /* The paperwork: the sheet the school pins up, the letters it posts, and
+           the waiting list it works from when a place comes free. */
+        Route::get('admissions/{exam}/merit', [AdmissionController::class, 'merit'])->name('admissions.merit');
+        Route::get('admissions/{exam}/merit.csv', [AdmissionController::class, 'meritCsv'])->name('admissions.merit.csv');
+        Route::get('admissions/{exam}/letters', [AdmissionController::class, 'letters'])->name('admissions.letters');
+        Route::get('admissions/{exam}/waiting', [AdmissionController::class, 'waiting'])->name('admissions.waiting');
+        Route::post('admissions/{exam}/waiting', [AdmissionController::class, 'promote'])->name('admissions.waiting.promote');
         Route::post('admissions/{exam}/resit', [AdmissionController::class, 'resit'])->name('admissions.resit');
 
         /* ---------------- Students ---------------- */
