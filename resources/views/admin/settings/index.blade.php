@@ -48,56 +48,62 @@
         @csrf
         @method('PUT')
 
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-                <label for="academic_session_id" class="label">Academic session</label>
-                <select id="academic_session_id" name="academic_session_id"
-                        class="input @error('academic_session_id') input-error @enderror">
-                    @foreach ($sessions as $session)
-                        <option value="{{ $session->id }}"
-                                @selected((int) old('academic_session_id', $currentSession?->id) === $session->id)>
-                            {{ $session->name }}
-                        </option>
-                    @endforeach
-                </select>
+        {{-- Fields, their note, then the action - one narrow column, left aligned.
+             Lined up across three columns of a full-width row, the button was
+             aligned to the bottom of the tallest cell rather than to the fields: on
+             a wide screen it sat in the far corner of the card, level with the note,
+             and looked like it belonged to the note. An error under a select moved
+             it again. Stacked, nothing can drift. --}}
+        <div class="lg:max-w-2xl">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="academic_session_id" class="label">Academic session</label>
+                    <select id="academic_session_id" name="academic_session_id"
+                            class="input @error('academic_session_id') input-error @enderror">
+                        @foreach ($sessions as $session)
+                            <option value="{{ $session->id }}"
+                                    @selected((int) old('academic_session_id', $currentSession?->id) === $session->id)>
+                                {{ $session->name }}
+                            </option>
+                        @endforeach
+                    </select>
 
-                @error('academic_session_id')
-                    <p class="error-text">{{ $message }}</p>
-                @enderror
+                    @error('academic_session_id')
+                        <p class="error-text">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="term_id" class="label">Active term</label>
+                    {{-- Grouped by session rather than swapped by script: one save sets
+                         both, and the pairing is visible instead of implied. --}}
+                    <select id="term_id" name="term_id"
+                            class="input @error('term_id') input-error @enderror">
+                        @foreach ($sessions as $session)
+                            <optgroup label="{{ $session->name }}">
+                                @forelse ($session->terms as $term)
+                                    <option value="{{ $term->id }}"
+                                            @selected((int) old('term_id', $currentTerm?->id) === $term->id)>
+                                        {{ $term->name }}
+                                    </option>
+                                @empty
+                                    <option value="" disabled>No terms yet — they will be created</option>
+                                @endforelse
+                            </optgroup>
+                        @endforeach
+                    </select>
+
+                    @error('term_id')
+                        <p class="error-text">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
 
-            <div>
-                <label for="term_id" class="label">Active term</label>
-                {{-- Grouped by session rather than swapped by script: one save sets
-                     both, and the pairing is visible instead of implied. --}}
-                <select id="term_id" name="term_id"
-                        class="input @error('term_id') input-error @enderror">
-                    @foreach ($sessions as $session)
-                        <optgroup label="{{ $session->name }}">
-                            @forelse ($session->terms as $term)
-                                <option value="{{ $term->id }}"
-                                        @selected((int) old('term_id', $currentTerm?->id) === $term->id)>
-                                    {{ $term->name }}
-                                </option>
-                            @empty
-                                <option value="" disabled>No terms yet — they will be created</option>
-                            @endforelse
-                        </optgroup>
-                    @endforeach
-                </select>
+            <p class="hint mt-3">
+                A session with no terms has First, Second and Third Term laid down for it.
+            </p>
 
-                @error('term_id')
-                    <p class="error-text">{{ $message }}</p>
-                @enderror
-
-                <p class="hint">
-                    A session with no terms has First, Second and Third Term laid down for it.
-                </p>
-            </div>
-
-            <div class="flex items-end">
-                <button type="submit" class="btn-primary">Set session and term</button>
-            </div>
+            <button type="submit" class="btn-primary mt-5">Set session and term</button>
         </div>
     </form>
 

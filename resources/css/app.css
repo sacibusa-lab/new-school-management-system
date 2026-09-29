@@ -182,7 +182,11 @@
 
     .btn-primary {
         @apply bg-brand-900 text-white shadow-sm
-               hover:bg-brand-800 hover:shadow-md active:scale-[0.985];
+               hover:bg-brand-800 hover:shadow-md active:scale-[0.985]
+               /* On a dark surface the deep navy is almost the colour of the surface
+                  it sits on, so the main action reads as a smudge. The lighter step
+                  is the same brand, at a contrast that says "press me". */
+               dark:bg-brand-600 dark:hover:bg-brand-500;
     }
 
     .btn-gold {
