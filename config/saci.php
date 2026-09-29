@@ -43,6 +43,7 @@ return [
         'scoresheets' => 'scoresheets',
         'photos' => 'photos',
         'documents' => 'documents',
+        'branding' => 'branding',
     ],
 
     /*

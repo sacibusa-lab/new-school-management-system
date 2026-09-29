@@ -4,7 +4,7 @@
 @section('subtitle', 'Branding, numbering, admissions, letters, messaging, fees and results')
 
 @section('content')
-<form method="POST" action="{{ route('admin.settings.update') }}">
+<form method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data">
     @csrf
     @method('PUT')
 
@@ -22,9 +22,11 @@
                         @foreach ($items as $setting)
                             @php
                                 $isWide = in_array($setting->key, ['contact_address', 'admission_letter_note'], true);
+                                // An image needs the room for its preview and its picker.
+                                $spansTwo = $isWide || in_array($setting->type, ['text', 'image'], true);
                             @endphp
 
-                            <div @class(['sm:col-span-2' => $isWide || $setting->type === 'text'])>
+                            <div @class(['sm:col-span-2' => $spansTwo])>
                                 @if ($setting->type === 'bool')
                                     <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
                                         <input type="hidden" name="settings[{{ $setting->key }}][value]" value="">
@@ -46,6 +48,8 @@
                                             </span>
                                         </span>
                                     </label>
+                                @elseif ($setting->type === 'image')
+                                    @include('admin.settings.partials.image-field', ['setting' => $setting])
                                 @else
                                     @php
                                         $displayValue = $setting->value;

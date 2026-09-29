@@ -8,6 +8,10 @@
 
     <title>@yield('title', $title ?? 'Sign in') · {{ $school->name }}</title>
 
+    @if ($school->favicon)
+        <link rel="icon" href="{{ asset('storage/' . $school->favicon) }}">
+    @endif
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="grid min-h-full grid-cols-1 lg:grid-cols-2">

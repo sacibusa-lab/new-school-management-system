@@ -58,10 +58,12 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
-        $branding = $this->branding();
-
-        View::composer('*', function ($view) use ($branding) {
-            $view->with('school', (object) $branding);
+        View::composer('*', function ($view) {
+            // Resolved per render rather than once at boot. Booting happens before
+            // anything is drawn, and the office can change the school's name or
+            // upload a logo — the very next page has to show it. The reads behind
+            // this are memoised, so asking again costs nothing.
+            $view->with('school', (object) $this->branding());
 
             // Shared with every view because the public header, footer and landing
             // page all change with it, and those render on pages that never pass it.
@@ -84,6 +86,8 @@ class AppServiceProvider extends ServiceProvider
                 'email' => Setting::get('contact_email'),
                 'phone' => Setting::get('contact_phone'),
                 'address' => Setting::get('contact_address'),
+                'logo' => Setting::get('school_logo'),
+                'favicon' => Setting::get('school_favicon'),
                 'currency' => Setting::get('currency_symbol', '₦'),
                 'code' => Setting::get('currency', 'NGN'),
             ];
@@ -94,6 +98,8 @@ class AppServiceProvider extends ServiceProvider
                 'email' => null,
                 'phone' => null,
                 'address' => null,
+                'logo' => null,
+                'favicon' => null,
                 'currency' => '₦',
                 'code' => 'NGN',
             ];

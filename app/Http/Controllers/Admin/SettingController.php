@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Services\Branding\BrandingService;
 use App\Services\NumberSequenceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\View\View;
 
 class SettingController extends Controller
@@ -38,19 +40,40 @@ class SettingController extends Controller
         ]);
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, BrandingService $branding): RedirectResponse
     {
         $this->authorize('settings.manage');
 
         $validated = $request->validate([
             'settings' => ['required', 'array'],
             'settings.*.value' => ['nullable', 'string', 'max:2000'],
+            'settings.*.file' => ['nullable', 'file', 'mimes:' . BrandingService::EXTENSIONS, 'max:' . BrandingService::MAX_KB],
+            'settings.*.remove' => ['nullable', 'boolean'],
+        ], [
+            'settings.*.file.mimes' => 'That file is not an image the browser can show. Use PNG, JPG, WEBP, SVG or ICO.',
+            'settings.*.file.max' => 'That image is larger than ' . round(BrandingService::MAX_KB / 1024) . ' MB.',
         ]);
 
         foreach ($validated['settings'] as $key => $payload) {
             $setting = Setting::query()->where('key', $key)->first();
 
             if (! $setting) {
+                continue;
+            }
+
+            // An image setting holds the path of a stored file. A new upload
+            // replaces it and the remove box clears it — and saving the rest of
+            // the page without touching it must leave it exactly as it was, not
+            // blank it because the form carried no text value for it.
+            if ($setting->type === 'image') {
+                $file = $payload['file'] ?? null;
+
+                if ($file instanceof UploadedFile) {
+                    $branding->replace($setting, $file);
+                } elseif (! empty($payload['remove'])) {
+                    $branding->clear($setting);
+                }
+
                 continue;
             }
 

@@ -17,6 +17,11 @@ class SettingsSeeder extends Seeder
             ['key' => 'contact_email', 'value' => 'info@saci.test', 'group' => 'branding', 'label' => 'Contact email'],
             ['key' => 'contact_phone', 'value' => '0800 000 0000', 'group' => 'branding', 'label' => 'Contact phone'],
             ['key' => 'contact_address', 'value' => '1 School Road, Lagos, Nigeria', 'group' => 'branding', 'label' => 'Address'],
+            // Uploaded images, not typed text. See the add_branding_image_settings
+            // migration: adding these here alone would not reach a live database,
+            // because this seeder overwrites every value it touches.
+            ['key' => 'school_logo', 'value' => null, 'group' => 'branding', 'type' => 'image', 'label' => 'School logo'],
+            ['key' => 'school_favicon', 'value' => null, 'group' => 'branding', 'type' => 'image', 'label' => 'Browser favicon'],
 
             // Numbering
             ['key' => 'admission_number_prefix', 'value' => 'SAC', 'group' => 'numbering', 'label' => 'Admission number prefix'],

@@ -8,6 +8,10 @@
 
     <title>@yield('title', $title ?? 'Dashboard') · {{ $school->name }}</title>
 
+    @if ($school->favicon)
+        <link rel="icon" href="{{ asset('storage/' . $school->favicon) }}">
+    @endif
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

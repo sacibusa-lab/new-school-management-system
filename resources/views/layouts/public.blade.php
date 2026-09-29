@@ -10,6 +10,10 @@
          is not always open. --}}
     <meta name="description" content="{{ $description ?? $school->name . ' — ' . $school->tagline . '. Admission status, examination results and school fees, in one place for parents and students.' }}">
 
+    @if ($school->favicon)
+        <link rel="icon" href="{{ asset('storage/' . $school->favicon) }}">
+    @endif
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

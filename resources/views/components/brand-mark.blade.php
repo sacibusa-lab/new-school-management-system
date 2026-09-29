@@ -3,8 +3,10 @@
 ])
 
 @php
-    $school = \App\Models\Setting::get('school_name', config('saci.school_name'));
-    $initials = collect(preg_split('/\s+/', (string) $school))
+    $name = \App\Models\Setting::get('school_name', config('saci.school_name'));
+    $logo = \App\Models\Setting::get('school_logo');
+
+    $initials = collect(preg_split('/\s+/', (string) $name))
         ->filter()
         ->take(2)
         ->map(fn ($word) => strtoupper(substr($word, 0, 1)))
@@ -17,5 +19,16 @@
     };
 @endphp
 
-<span {{ $attributes->merge(['class' => "inline-flex shrink-0 items-center justify-center bg-brand-900 font-display font-semibold text-gold-300 shadow-sm {$dimensions}"]) }}
-      aria-hidden="true">{{ $initials ?: 'SA' }}</span>
+@if ($logo)
+    {{-- The logo sits on its own light tile rather than straight on the background.
+         The admin sidebar is navy, and a logo drawn in dark ink on a transparent
+         background would vanish there while looking perfectly fine on the site. --}}
+    <span {{ $attributes->merge(['class' => "inline-flex shrink-0 items-center justify-center overflow-hidden bg-white p-0.5 ring-1 ring-black/5 {$dimensions}"]) }}>
+        <img src="{{ asset('storage/' . $logo) }}"
+             alt="{{ $name }}"
+             class="h-full w-full object-contain">
+    </span>
+@else
+    <span {{ $attributes->merge(['class' => "inline-flex shrink-0 items-center justify-center bg-brand-900 font-display font-semibold text-gold-300 shadow-sm {$dimensions}"]) }}
+          aria-hidden="true">{{ $initials ?: 'SA' }}</span>
+@endif
