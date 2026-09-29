@@ -418,4 +418,53 @@ class PublicAdmissionStatusTest extends TestCase
         // The card is one object and must not be sliced across two sheets.
         $this->assertStringContainsString('print:break-inside-avoid', $html);
     }
+
+    /**
+     * The site header carries the school's name and logo and is hidden on paper,
+     * which left the printed record anonymous — a sheet with nothing on it saying
+     * which school it came from.
+     */
+    public function test_the_printed_record_carries_the_school_name_and_logo(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75);
+
+        // A logo the office uploaded, so this proves the real mark travels with
+        // the record rather than a hard-coded path that 404s the day it changes.
+        Setting::query()->where('key', 'school_logo')->update(['value' => 'branding/crest.png']);
+        Setting::flush();
+
+        $html = $this->search()->assertOk()->getContent();
+
+        // Print-only: hidden on screen, a flex row on paper.
+        $this->assertStringContainsString('hidden print:mb-5 print:flex', $html, 'The letterhead is not a paper-only block.');
+        $this->assertStringContainsString('Admission status record', $html);
+
+        // Everything on it comes from Settings, where the office keeps it.
+        $this->assertStringContainsString(Setting::get('school_name'), $html);
+        $this->assertStringContainsString(Setting::get('contact_address'), $html);
+        $this->assertStringContainsString(Setting::get('contact_phone'), $html);
+        $this->assertStringContainsString('storage/branding/crest.png', $html, 'The uploaded logo is not on the printed record.');
+    }
+
+    /**
+     * The resit button is a screen action — a parent cannot press a button on
+     * paper. It stays off, but the printed record must not then end on a question
+     * with no answer.
+     */
+    public function test_the_resit_button_does_not_print_but_its_instruction_does(): void
+    {
+        $this->decide(ApplicantStatus::Rejected, 38.33, 115);
+
+        $html = $this->search()->assertOk()->getContent();
+
+        $this->assertStringContainsString('Register for the resit examination', $html, 'The resit button vanished from the screen.');
+        $this->assertStringContainsString('print:block', $html, 'Nothing tells a parent on paper how to book the resit.');
+
+        // The form the button lives in, and the button itself, are screen-only.
+        $this->assertMatchesRegularExpression(
+            '/<form method="POST" action="[^"]*\/admission\/resit" class="[^"]*print:hidden/',
+            $html,
+            'The resit form would print.',
+        );
+    }
 }

@@ -1,0 +1,5 @@
+Put the school's name and logo on the printed admission record
+
+The site header carries both, but it is deliberately hidden when printing, which left the printed record anonymous: a sheet a parent hands to a relative or an employer with nothing on it saying which school it came from. A print-only letterhead now restores that identity - the logo from Settings, the school's name, address, phone and email, and on the right what the sheet is, when it was printed and the registration number it belongs to.
+
+The resit button already stays off the paper, and that is right: nobody can press a button on a printed sheet. On its own, though, it left the printout ending on "Want another chance?" with no answer, so paper now carries the instruction instead - open the Admission Status page, or call the office on the number kept in Settings.

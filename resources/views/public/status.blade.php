@@ -51,6 +51,43 @@
         {{-- ================= Result ================= --}}
         @if ($searched)
             <div class="mx-auto mt-8 max-w-2xl print:mt-0">
+                {{-- ============ Letterhead, on paper only ============ --}}
+                {{-- The site header carries the school's name and logo, but it is
+                     deliberately hidden when printing — which left the printed record
+                     anonymous: a sheet a parent hands to a relative or an employer with
+                     nothing on it saying which school it came from. This is that
+                     identity, restored for paper. --}}
+                <div class="hidden print:mb-5 print:flex print:items-start print:justify-between print:gap-6 print:border-b print:border-slate-300 print:pb-4">
+                    <div class="flex items-center gap-3">
+                        <x-brand-mark size="lg" />
+
+                        <div>
+                            <p class="font-display text-lg font-semibold text-slate-900">{{ $school->name }}</p>
+
+                            @if ($school->address)
+                                <p class="text-xs text-slate-600">{{ $school->address }}</p>
+                            @endif
+
+                            @php $contact = collect([$school->phone, $school->email])->filter()->implode(' · '); @endphp
+                            @if ($contact)
+                                <p class="text-xs text-slate-600">{{ $contact }}</p>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="shrink-0 text-right">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Admission status record
+                        </p>
+                        <p class="mt-1 text-xs text-slate-600">Printed {{ now()->format('j F Y') }}</p>
+                        @if ($applicant)
+                            <p class="mt-0.5 font-mono text-xs text-slate-600">
+                                {{ $applicant->registration_number }}
+                            </p>
+                        @endif
+                    </div>
+                </div>
+
                 @if ($applicant)
                     @php
                         // $decision and $papers arrive from the controller.
@@ -355,6 +392,19 @@
                                                 Register for the resit examination
                                             </button>
                                         </form>
+
+                                        {{-- The button is a screen action and stays off the paper.
+                                             On its own that would leave the printed record ending on
+                                             a question with no answer, so paper gets the answer
+                                             instead. --}}
+                                        <p class="mt-3 hidden text-sm text-slate-700 print:block">
+                                            To book the resit, open the Admission Status page on the
+                                            school's website, or call the office
+                                            @if ($school->phone)
+                                                on {{ $school->phone }}
+                                            @endif
+                                            with this registration number.
+                                        </p>
                                     </div>
                                 @else
                                     <p class="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
