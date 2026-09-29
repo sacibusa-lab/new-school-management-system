@@ -306,12 +306,15 @@
                                             You will re-sit only the papers you did not pass. Your other marks are kept.
                                         </p>
 
+                                        {{-- The whole point of this screen for a failed candidate, so it
+                                             is the loudest thing on the page rather than a small
+                                             button a parent can scroll past. --}}
                                         <form method="POST" action="{{ route('public.resit.store') }}" class="mt-4 print:hidden">
                                             @csrf
                                             <input type="hidden" name="registration_number"
                                                    value="{{ $applicant->registration_number }}">
 
-                                            <button type="submit" class="btn-primary btn-sm">
+                                            <button type="submit" class="btn-danger btn-lg w-full">
                                                 Register for the resit examination
                                             </button>
                                         </form>
