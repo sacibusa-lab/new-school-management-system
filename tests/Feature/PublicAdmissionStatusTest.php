@@ -98,9 +98,16 @@ class PublicAdmissionStatusTest extends TestCase
         ]);
     }
 
-    private function search(string $number = 'SAC-00001')
+    /**
+     * The lookup asks for the number AND the surname, because the number alone is
+     * a counter — SAC-00001, SAC-00002 — and this page shows a child's photograph.
+     */
+    private function search(string $number = 'SAC-00001', ?string $surname = 'Okafor')
     {
-        return $this->get(route('public.status', ['registration_number' => $number]));
+        return $this->get(route('public.status', array_filter([
+            'registration_number' => $number,
+            'surname' => $surname,
+        ], fn ($value) => $value !== null)));
     }
 
     /**

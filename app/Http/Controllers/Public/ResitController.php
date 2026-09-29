@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Services\Admissions\ResitService;
 use App\Services\Sms\SmsNotifier;
 use App\Support\Concerns\FindsRecordsByNumber;
+use App\Support\Surname;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -36,8 +37,10 @@ class ResitController extends Controller
     {
         $validated = $request->validate([
             'registration_number' => ['required', 'string', 'max:40'],
+            'surname' => ['required', 'string', 'max:80'],
         ], [
             'registration_number.required' => 'Enter the registration number to book a resit.',
+            'surname.required' => 'Enter the surname as well, so we know whose resit this is.',
         ]);
 
         if (! $this->resits->isEnabled()) {
@@ -51,9 +54,12 @@ class ResitController extends Controller
             (int) (Setting::get('admission_number_padding') ?: 5),
         )->first();
 
-        if (! $applicant) {
+        // The surname is checked here as well, and both failures are reported the
+        // same way. This button writes to a child's record, and the number on its
+        // own is only a counter — as does saying which half was wrong.
+        if (! $applicant || ! Surname::matches($applicant->last_name, $validated['surname'])) {
             return back()
-                ->withErrors(['registration_number' => 'We could not find that registration number. Check it on your registration slip and try again.'])
+                ->withErrors(['registration_number' => 'We could not find that registration number and surname together. Check both on your registration slip and try again.'])
                 ->withInput();
         }
 
@@ -80,7 +86,10 @@ class ResitController extends Controller
 
         if ($result['already']) {
             return redirect()
-                ->route('public.status', ['registration_number' => $applicant->registration_number])
+                ->route('public.status', [
+                    'registration_number' => $applicant->registration_number,
+                    'surname' => $applicant->last_name,
+                ])
                 ->with('status', 'You are already registered for the resit examination. Please check back here for the date.');
         }
 
@@ -95,7 +104,10 @@ class ResitController extends Controller
         }
 
         return redirect()
-            ->route('public.status', ['registration_number' => $applicant->registration_number])
+            ->route('public.status', [
+                'registration_number' => $applicant->registration_number,
+                'surname' => $applicant->last_name,
+            ])
             ->with('status', $message);
     }
 }

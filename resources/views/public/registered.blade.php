@@ -134,7 +134,7 @@
                 Print this slip
             </button>
 
-            <a href="{{ route('public.status') }}?registration_number={{ urlencode($applicant->registration_number) }}"
+            <a href="{{ route('public.status') }}?registration_number={{ urlencode($applicant->registration_number) }}&surname={{ urlencode($applicant->last_name) }}"
                class="btn-secondary">
                 Check admission status
             </a>

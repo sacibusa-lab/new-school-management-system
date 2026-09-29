@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\TermResult;
+use App\Support\Surname;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -25,8 +26,14 @@ class ResultSlipController extends Controller
         $provided = strtoupper(str_replace(' ', '', (string) $request->query('student_number')));
         $expected = strtoupper(str_replace(' ', '', (string) $student->student_number));
 
+        // The surname really is checked. It used to be said and not done, which
+        // left the slip reachable with a student number alone — and those run
+        // SAC/2026/001, 002, 003 …, so they can be counted through.
         abort_unless(
-            $termResult->isPublished() && $provided !== '' && $provided === $expected,
+            $termResult->isPublished()
+                && $provided !== ''
+                && $provided === $expected
+                && Surname::matches($student->last_name, $request->query('surname')),
             404,
             'This result is not available for printing.',
         );

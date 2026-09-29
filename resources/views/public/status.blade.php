@@ -18,8 +18,9 @@
                 Check your admission status
             </h1>
             <p class="mt-4 text-slate-600">
-                Enter the registration number you were given when you applied.
-                It looks like <span class="font-mono font-semibold text-slate-800">SAC-00001</span>.
+                Enter the registration number you were given when you applied, and the
+                candidate's surname. The number looks like
+                <span class="font-mono font-semibold text-slate-800">SAC-00001</span>.
             </p>
         </div>
 
@@ -30,6 +31,15 @@
                      autofocus
                      autocomplete="off"
                      :value="request('registration_number')" />
+
+            {{-- Asked for because the number alone is not a secret: SAC-00001,
+                 SAC-00002 … can simply be counted through. --}}
+            <x-field name="surname" label="Candidate's surname" required
+                     class="mt-4"
+                     placeholder="Okafor"
+                     autocomplete="off"
+                     hint="A surname is all we ask for — it does not have to be spelled exactly right."
+                     :value="request('surname')" />
 
             <button type="submit" class="btn-primary mt-5 w-full">Check status</button>
 
@@ -314,6 +324,11 @@
                                             @csrf
                                             <input type="hidden" name="registration_number"
                                                    value="{{ $applicant->registration_number }}">
+                                            {{-- Booked from a page the parent already opened
+                                                 with the surname, so it is carried rather than
+                                                 asked for twice. The booking checks it. --}}
+                                            <input type="hidden" name="surname"
+                                                   value="{{ $applicant->last_name }}">
 
                                             <button type="submit" class="btn-danger btn-lg w-full">
                                                 Register for the resit examination
@@ -361,10 +376,11 @@
 
                 @else
                     <x-alert tone="danger" title="No match found">
-                        We could not find an application with the registration number
-                        <span class="font-mono font-semibold">{{ request('registration_number') }}</span>.
-                        Check the number carefully — it looks like
-                        <span class="font-mono">SAC-00001</span>, with the letters and numbers in that order.
+                        We could not find an application with that registration number and
+                        surname. Check both: the number looks like
+                        <span class="font-mono">SAC-00001</span>, with the letters and numbers
+                        in that order, and the surname is the candidate's own, as it was
+                        written on the application.
                     </x-alert>
                 @endif
             </div>

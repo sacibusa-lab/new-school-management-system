@@ -9,6 +9,7 @@ use App\Models\SchoolLevel;
 use App\Models\Setting;
 use App\Services\AdmissionLetterService;
 use App\Services\ApplicantRegistrationService;
+use App\Support\Surname;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -87,10 +88,8 @@ class RegistrationController extends Controller
      */
     public function slip(Request $request, Applicant $applicant): View
     {
-        $surname = strtolower(trim((string) $request->query('surname')));
-
         abort_unless(
-            $surname !== '' && strtolower(trim($applicant->last_name)) === $surname,
+            Surname::matches($applicant->last_name, $request->query('surname')),
             404,
             'That registration number and surname do not match our records.',
         );

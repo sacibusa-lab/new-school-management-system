@@ -212,7 +212,7 @@ class ResitTest extends TestCase
     {
         $applicant = $this->applicant('SAC-00001', ['MTH' => 10, 'ENG' => 20, 'GPR' => 30]);
 
-        $this->get('/admission?registration_number=' . $applicant->registration_number)
+        $this->get('/admission?registration_number=' . $applicant->registration_number . '&surname=Candidate')
             ->assertOk()
             ->assertSee('Not admitted on this occasion')
             ->assertSee('Register for the resit examination');
@@ -223,7 +223,7 @@ class ResitTest extends TestCase
         $applicant = $this->applicant('SAC-00001', ['MTH' => 90, 'ENG' => 90, 'GPR' => 90]);
         $applicant->forceFill(['status' => ApplicantStatus::Admitted])->save();
 
-        $this->get('/admission?registration_number=' . $applicant->registration_number)
+        $this->get('/admission?registration_number=' . $applicant->registration_number . '&surname=Candidate')
             ->assertOk()
             ->assertDontSee('Register for the resit examination');
     }
@@ -232,8 +232,13 @@ class ResitTest extends TestCase
     {
         $applicant = $this->applicant('SAC-00001', ['MTH' => 80, 'ENG' => 10, 'GPR' => 15]);
 
-        $this->post('/admission/resit', ['registration_number' => $applicant->registration_number])
-            ->assertRedirect(route('public.status', ['registration_number' => 'SAC-00001']));
+        $this->post('/admission/resit', [
+            'registration_number' => $applicant->registration_number,
+            'surname' => 'Candidate',
+        ])->assertRedirect(route('public.status', [
+            'registration_number' => 'SAC-00001',
+            'surname' => 'Candidate',
+        ]));
 
         $resit = Exam::query()->where('is_resit', true)->sole();
 
@@ -241,7 +246,7 @@ class ResitTest extends TestCase
         $this->assertCount(2, $resit->examSubjects, 'only English and General Paper were failed');
 
         // The page now confirms the booking instead of offering the button again.
-        $this->get('/admission?registration_number=' . $applicant->registration_number)
+        $this->get('/admission?registration_number=' . $applicant->registration_number . '&surname=Candidate')
             ->assertOk()
             ->assertSee('You are registered for a resit')
             ->assertDontSee('Register for the resit examination');
@@ -252,16 +257,22 @@ class ResitTest extends TestCase
         $applicant = $this->applicant('SAC-00001', ['MTH' => 10]);
         Setting::put('resit_enabled', false, ['type' => 'bool']);
 
-        $this->post('/admission/resit', ['registration_number' => $applicant->registration_number])
-            ->assertSessionHas('error');
+        $this->post('/admission/resit', [
+            'registration_number' => $applicant->registration_number,
+            'surname' => 'Candidate',
+        ])->assertSessionHas('error');
 
         $this->assertSame(0, Exam::query()->where('is_resit', true)->count());
     }
 
     public function test_an_unknown_registration_number_cannot_book_a_resit(): void
     {
-        $this->post('/admission/resit', ['registration_number' => 'SAC-99999'])
-            ->assertSessionHasErrors('registration_number');
+        // The number and the surname are checked together, and a pair that matches
+        // nothing is reported the same way whichever half was wrong.
+        $this->post('/admission/resit', [
+            'registration_number' => 'SAC-99999',
+            'surname' => 'Nobody',
+        ])->assertSessionHasErrors('registration_number');
 
         $this->assertSame(0, Exam::query()->where('is_resit', true)->count());
     }
@@ -277,8 +288,10 @@ class ResitTest extends TestCase
             'status' => ApplicantStatus::Registered,
         ]);
 
-        $this->post('/admission/resit', ['registration_number' => $applicant->registration_number])
-            ->assertSessionHas('error');
+        $this->post('/admission/resit', [
+            'registration_number' => $applicant->registration_number,
+            'surname' => 'Sat',
+        ])->assertSessionHas('error');
 
         $this->assertSame(0, Exam::query()->where('is_resit', true)->count());
     }

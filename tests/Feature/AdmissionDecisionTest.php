@@ -283,7 +283,10 @@ class AdmissionDecisionTest extends TestCase
         $this->admissions->compute($this->exam, $this->admin);
         $this->admissions->applyCutoff($this->exam, $this->admin);
 
-        $this->get(route('public.status', ['registration_number' => 'SAC-00002']))
+        $this->get(route('public.status', [
+            'registration_number' => 'SAC-00002',
+            'surname' => 'SAC-00002',
+        ]))
             ->assertOk()
             ->assertSee('Not admitted on this occasion')
             ->assertSee('Register for the resit examination')
@@ -309,7 +312,10 @@ class AdmissionDecisionTest extends TestCase
         $this->assertSame(AdmissionDecisionStatus::Rejected, $decision->decision);
         $this->assertSame(ApplicantStatus::Rejected, $decision->applicant->refresh()->status);
 
-        $this->get(route('public.status', ['registration_number' => 'SAC-00002']))
+        $this->get(route('public.status', [
+            'registration_number' => 'SAC-00002',
+            'surname' => 'SAC-00002',
+        ]))
             ->assertOk()
             ->assertSee('Not admitted on this occasion')
             ->assertDontSee('you have been admitted');

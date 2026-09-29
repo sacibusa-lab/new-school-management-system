@@ -89,7 +89,9 @@
                                         </p>
                                     </div>
 
-                                    <a href="{{ route('public.result.slip', $result) }}?student_number={{ urlencode($student->student_number) }}"
+                                    {{-- The slip checks the surname too, so it is carried
+                                         through rather than asked for a second time. --}}
+                                    <a href="{{ route('public.result.slip', $result) }}?student_number={{ urlencode($student->student_number) }}&surname={{ urlencode($student->last_name) }}"
                                        target="_blank"
                                        class="btn-secondary btn-sm">
                                         Printable report card

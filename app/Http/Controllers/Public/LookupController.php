@@ -10,13 +10,20 @@ use App\Models\TermResult;
 use App\Services\Admissions\AdmissionService;
 use App\Services\Admissions\ResitService;
 use App\Support\Concerns\FindsRecordsByNumber;
+use App\Support\Surname;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Public lookup screens. Access is by number + a second identifier (surname,
- * date of birth or phone) so a registration number alone is never enough to
- * read somebody else's record.
+ * Public lookup screens. Access is by number + a second identifier (surname, date
+ * of birth or phone) so a registration number alone is never enough to read
+ * somebody else's record.
+ *
+ * The number cannot be the only thing asked for, and on its own it cannot be the
+ * only thing checked: SAC-00001, SAC-00002, SAC/2026/001 … are sequential and can
+ * be counted through. Where a record is found by number, the surname is verified
+ * against it — and a mismatch is reported as "no match", the same as a number that
+ * does not exist, so the page never confirms that a number is real.
  */
 class LookupController extends Controller
 {
@@ -38,6 +45,9 @@ class LookupController extends Controller
 
         $validated = $request->validate([
             'registration_number' => ['nullable', 'string', 'max:40'],
+            'surname' => ['nullable', 'string', 'max:80', 'required_with:registration_number'],
+        ], [
+            'surname.required_with' => 'Please type the surname as well as the registration number.',
         ]);
 
         if ($request->filled('registration_number')) {
@@ -49,6 +59,11 @@ class LookupController extends Controller
                 $validated['registration_number'],
                 (int) (Setting::get('admission_number_padding') ?: 5),
             )->first();
+
+            // The number says which record; the surname is what makes it theirs.
+            if ($applicant && ! Surname::matches($applicant->last_name, $validated['surname'] ?? null)) {
+                $applicant = null;
+            }
         }
 
         $decision = $applicant?->decisions->sortByDesc('id')->first();
@@ -84,20 +99,25 @@ class LookupController extends Controller
 
         $validated = $request->validate([
             'student_number' => ['nullable', 'string', 'max:40'],
-            'surname' => ['nullable', 'string', 'max:80'],
+            'surname' => ['nullable', 'string', 'max:80', 'required_with:student_number'],
+        ], [
+            'surname.required_with' => 'Please type the surname as well as the admission number.',
         ]);
 
         if ($request->filled('student_number')) {
             $searched = true;
 
             $student = $this->findByNumber(
-                \App\Models\Student::query()
-                    ->with(['schoolClass.level', 'level'])
-                    ->when($request->filled('surname'), fn ($q) => $q->where('last_name', 'like', trim($validated['surname']))),
+                \App\Models\Student::query()->with(['schoolClass.level', 'level']),
                 'student_number',
                 $validated['student_number'],
                 (int) (Setting::get('student_number_padding') ?: 3),
             )->first();
+
+            // The form has always asked for a surname; until now nothing checked it.
+            if ($student && ! Surname::matches($student->last_name, $validated['surname'] ?? null)) {
+                $student = null;
+            }
 
             if ($student) {
                 $results = TermResult::query()
@@ -141,20 +161,24 @@ class LookupController extends Controller
 
         $validated = $request->validate([
             'student_number' => ['nullable', 'string', 'max:40'],
-            'surname' => ['nullable', 'string', 'max:80'],
+            'surname' => ['nullable', 'string', 'max:80', 'required_with:student_number'],
+        ], [
+            'surname.required_with' => 'Please type the surname as well as the admission number.',
         ]);
 
         if ($request->filled('student_number')) {
             $searched = true;
 
             $student = $this->findByNumber(
-                \App\Models\Student::query()
-                    ->with(['schoolClass', 'level'])
-                    ->when($request->filled('surname'), fn ($q) => $q->where('last_name', 'like', trim($validated['surname']))),
+                \App\Models\Student::query()->with(['schoolClass', 'level']),
                 'student_number',
                 $validated['student_number'],
                 (int) (Setting::get('student_number_padding') ?: 3),
             )->first();
+
+            if ($student && ! Surname::matches($student->last_name, $validated['surname'] ?? null)) {
+                $student = null;
+            }
 
             if ($student) {
                 $invoices = $student->invoices()
