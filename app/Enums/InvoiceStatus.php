@@ -28,11 +28,11 @@ enum InvoiceStatus: string
     public function badge(): string
     {
         return match ($this) {
-            self::Unpaid => 'bg-rose-50 text-rose-700 ring-rose-600/20',
-            self::Partial => 'bg-amber-50 text-amber-700 ring-amber-600/20',
-            self::Paid => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            self::Unpaid => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 ring-rose-600/20 dark:ring-rose-400/20',
+            self::Partial => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 ring-amber-600/20 dark:ring-amber-400/20',
+            self::Paid => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20',
             self::Overdue => 'bg-orange-50 text-orange-700 ring-orange-600/20',
-            self::Cancelled => 'bg-slate-100 text-slate-500 ring-slate-500/20',
+            self::Cancelled => 'bg-surface-3 text-muted ring-slate-500/20 dark:ring-slate-400/20',
         };
     }
 

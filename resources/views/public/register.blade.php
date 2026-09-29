@@ -3,16 +3,16 @@
 @section('title', 'Apply for admission')
 
 @section('content')
-<div class="bg-slate-50 py-12">
+<div class="bg-surface-2 py-12">
     <div class="section">
 
         {{-- ================= Heading ================= --}}
         <div class="mx-auto max-w-3xl text-center">
             <span class="eyebrow">Admission application</span>
-            <h1 class="mt-5 font-display text-3xl font-semibold text-slate-900 text-balance sm:text-4xl">
+            <h1 class="mt-5 font-display text-3xl font-semibold text-ink text-balance sm:text-4xl">
                 Apply for admission
             </h1>
-            <p class="mt-4 text-slate-600">
+            <p class="mt-4 text-ink-soft">
                 Complete the form below. As soon as you submit it you will receive a
                 registration number — write it down and keep it safe, it is how you
                 check your admission status.
@@ -45,9 +45,9 @@
 
                 {{-- ---------- 1. Applicant ---------- --}}
                 <div class="card-pad">
-                    <div class="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <div class="flex items-center gap-3 border-b border-line pb-4">
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-900 font-display text-sm font-semibold text-gold-300">1</span>
-                        <h2 class="text-base font-semibold text-slate-900">Applicant details</h2>
+                        <h2 class="text-base font-semibold text-ink">Applicant details</h2>
                     </div>
 
                     <div class="mt-6 grid gap-5 sm:grid-cols-2">
@@ -63,9 +63,9 @@
 
                 {{-- ---------- 2. Contact ---------- --}}
                 <div class="card-pad">
-                    <div class="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <div class="flex items-center gap-3 border-b border-line pb-4">
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-900 font-display text-sm font-semibold text-gold-300">2</span>
-                        <h2 class="text-base font-semibold text-slate-900">Contact &amp; schooling</h2>
+                        <h2 class="text-base font-semibold text-ink">Contact &amp; schooling</h2>
                     </div>
 
                     <div class="mt-6 grid gap-5 sm:grid-cols-2">
@@ -86,9 +86,9 @@
 
                 {{-- ---------- 3. Class ---------- --}}
                 <div class="card-pad">
-                    <div class="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <div class="flex items-center gap-3 border-b border-line pb-4">
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-900 font-display text-sm font-semibold text-gold-300">3</span>
-                        <h2 class="text-base font-semibold text-slate-900">Class you are applying for</h2>
+                        <h2 class="text-base font-semibold text-ink">Class you are applying for</h2>
                     </div>
 
                     <div class="mt-6 grid gap-5 sm:grid-cols-2">
@@ -107,9 +107,9 @@
 
                 {{-- ---------- 4. Guardian ---------- --}}
                 <div class="card-pad">
-                    <div class="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <div class="flex items-center gap-3 border-b border-line pb-4">
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-900 font-display text-sm font-semibold text-gold-300">4</span>
-                        <h2 class="text-base font-semibold text-slate-900">Parent / guardian</h2>
+                        <h2 class="text-base font-semibold text-ink">Parent / guardian</h2>
                     </div>
 
                     <div class="mt-6 grid gap-5 sm:grid-cols-2">
@@ -128,9 +128,9 @@
 
                 {{-- ---------- 5. Uploads ---------- --}}
                 <div class="card-pad">
-                    <div class="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <div class="flex items-center gap-3 border-b border-line pb-4">
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-900 font-display text-sm font-semibold text-gold-300">5</span>
-                        <h2 class="text-base font-semibold text-slate-900">Photograph &amp; documents</h2>
+                        <h2 class="text-base font-semibold text-ink">Photograph &amp; documents</h2>
                     </div>
 
                     <div class="mt-6 grid gap-5 sm:grid-cols-2">
@@ -150,8 +150,8 @@
                     <label class="flex items-start gap-3">
                         <input type="checkbox" name="declaration" value="1" required
                                @checked(old('declaration'))
-                               class="mt-0.5 h-5 w-5 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
-                        <span class="text-sm text-slate-700">
+                               class="mt-0.5 h-5 w-5 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
+                        <span class="text-sm text-ink-soft">
                             I confirm that the information given on this form is true and correct,
                             and I understand that any false declaration may lead to the application
                             being cancelled.
@@ -168,7 +168,7 @@
                             <span x-show="busy" x-cloak>Submitting…</span>
                         </button>
 
-                        <p class="text-xs text-slate-500">
+                        <p class="text-xs text-muted">
                             You will receive your registration number immediately.
                         </p>
                     </div>
@@ -178,8 +178,8 @@
             {{-- ================= Sidebar ================= --}}
             <aside class="space-y-6 lg:col-span-1">
                 <div class="card-pad">
-                    <h3 class="text-sm font-semibold text-slate-900">Before you start</h3>
-                    <ul class="mt-4 space-y-3 text-sm text-slate-600">
+                    <h3 class="text-sm font-semibold text-ink">Before you start</h3>
+                    <ul class="mt-4 space-y-3 text-sm text-ink-soft">
                         @foreach ([
                             'The applicant\'s date of birth',
                             'A recent passport photograph',
@@ -187,7 +187,7 @@
                             'Parent or guardian contact details',
                         ] as $item)
                             <li class="flex gap-2.5">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
                                 </svg>
                                 {{ $item }}
@@ -197,7 +197,7 @@
                 </div>
 
                 <div class="card-pad">
-                    <h3 class="text-sm font-semibold text-slate-900">After you submit</h3>
+                    <h3 class="text-sm font-semibold text-ink">After you submit</h3>
                     <ol class="mt-4 space-y-4">
                         @foreach ([
                             'You get a registration number such as SAC-00001.',
@@ -206,18 +206,18 @@
                             'Pass the cutoff and you are transferred into the results and fees portals.',
                         ] as $index => $step)
                             <li class="flex gap-3">
-                                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-xs font-semibold text-ink-soft">
                                     {{ $index + 1 }}
                                 </span>
-                                <span class="text-sm text-slate-600">{{ $step }}</span>
+                                <span class="text-sm text-ink-soft">{{ $step }}</span>
                             </li>
                         @endforeach
                     </ol>
                 </div>
 
                 <div class="card-pad bg-brand-50/60">
-                    <h3 class="text-sm font-semibold text-brand-900">Need help?</h3>
-                    <p class="mt-2 text-sm text-brand-800">
+                    <h3 class="text-sm font-semibold text-brand-900 dark:text-brand-100">Need help?</h3>
+                    <p class="mt-2 text-sm text-brand-800 dark:text-brand-200">
                         Call the school office on
                         <a href="tel:{{ $school->phone }}" class="font-semibold underline decoration-brand-300 underline-offset-2">{{ $school->phone }}</a>
                         or visit us — we will help you complete the form.

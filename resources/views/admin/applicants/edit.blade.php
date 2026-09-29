@@ -31,7 +31,7 @@
 
     {{-- ================= Applicant ================= --}}
     <div class="card-pad">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Applicant</h2>
+        <h2 class="font-display text-lg font-semibold text-ink">Applicant</h2>
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <x-field name="last_name" label="Surname" :value="$applicant->last_name" required />
@@ -67,7 +67,7 @@
 
     {{-- ================= Contact ================= --}}
     <div class="card-pad mt-6">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Contact</h2>
+        <h2 class="font-display text-lg font-semibold text-ink">Contact</h2>
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <x-field name="phone" label="Applicant's phone" :value="$applicant->phone" />
@@ -79,8 +79,8 @@
 
     {{-- ================= Guardian ================= --}}
     <div class="card-pad mt-6">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Parent / guardian</h2>
-        <p class="mt-1 text-sm text-slate-500">The guardian's phone is where text messages are sent.</p>
+        <h2 class="font-display text-lg font-semibold text-ink">Parent / guardian</h2>
+        <p class="mt-1 text-sm text-muted">The guardian's phone is where text messages are sent.</p>
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <x-field name="guardian_name" label="Full name" :value="$applicant->guardian_name" />
@@ -95,8 +95,8 @@
 
     {{-- ================= Office use ================= --}}
     <div class="card-pad mt-6">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Office notes</h2>
-        <p class="mt-1 text-sm text-slate-500">Only staff see this. Never shown to the applicant or the parent.</p>
+        <h2 class="font-display text-lg font-semibold text-ink">Office notes</h2>
+        <p class="mt-1 text-sm text-muted">Only staff see this. Never shown to the applicant or the parent.</p>
 
         <div class="mt-5">
             <x-field name="admin_notes" label="Notes" type="textarea" :value="$applicant->admin_notes" />
@@ -104,7 +104,7 @@
     </div>
 
     <div class="card-pad mt-6 flex flex-wrap items-center gap-4">
-        <p class="text-sm text-slate-500">
+        <p class="text-sm text-muted">
             Registered {{ $applicant->created_at->format('j F Y') }}
             @if ($applicant->submitted_at)
                 · submitted {{ $applicant->submitted_at->format('j F Y, g:ia') }}

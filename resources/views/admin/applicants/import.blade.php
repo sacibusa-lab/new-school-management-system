@@ -13,8 +13,8 @@
 {{-- ================= Upload ================= --}}
 <div class="card-pad">
     <p class="eyebrow">Step 1</p>
-    <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Choose the spreadsheet</h2>
-    <p class="mt-1 max-w-3xl text-sm text-slate-500">
+    <h2 class="mt-1 font-display text-lg font-semibold text-ink">Choose the spreadsheet</h2>
+    <p class="mt-1 max-w-3xl text-sm text-muted">
         A CSV or Excel file with the column headings across the top. Nothing is registered yet — the next
         screen shows exactly what will be created, and flags anything that needs fixing.
     </p>
@@ -27,11 +27,11 @@
             <div class="min-w-64 flex-1">
                 <label for="file" class="label">Spreadsheet</label>
                 <input id="file" name="file" type="file" accept=".csv,.txt,.xlsx,.xls" required
-                       class="input file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm">
+                       class="input file:mr-3 file:rounded-md file:border-0 file:bg-surface-3 file:px-3 file:py-1.5 file:text-sm">
                 @error('file')
-                    <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                    <p class="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
                 @enderror
-                <p class="mt-1 text-xs text-slate-500">Up to 8 MB, and up to {{ \App\Services\Admissions\ApplicantImportService::MAX_ROWS }} candidates per file.</p>
+                <p class="mt-1 text-xs text-muted">Up to 8 MB, and up to {{ \App\Services\Admissions\ApplicantImportService::MAX_ROWS }} candidates per file.</p>
             </div>
 
             <button type="submit" class="btn-primary btn-sm">Read the file</button>
@@ -45,11 +45,11 @@
 
 {{-- ================= Column guide ================= --}}
 <details class="card-pad mt-6" @if (! $staged) open @endif>
-    <summary class="cursor-pointer text-sm font-medium text-slate-700">
+    <summary class="cursor-pointer text-sm font-medium text-ink-soft">
         Which columns does it understand?
     </summary>
 
-    <p class="mt-3 text-sm text-slate-500">
+    <p class="mt-3 text-sm text-muted">
         The template carries only the columns that are actually required — the same ones the office
         registration form insists on. Everything below them is optional: add a column and it will be read,
         leave it out and nothing is lost. Headings are matched loosely, so “Surname”, “surname” and
@@ -59,18 +59,18 @@
 
     <div class="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
         @foreach ($columns as $column)
-            <div class="flex items-start gap-3 border-b border-slate-100 pb-3">
+            <div class="flex items-start gap-3 border-b border-line-soft pb-3">
                 <span class="mt-0.5 shrink-0">
                     @if ($column['required'])
-                        <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20">Required</span>
+                        <span class="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-200 ring-brand-600/20">Required</span>
                     @else
-                        <span class="badge bg-slate-100 text-slate-600 ring-slate-500/20">Optional</span>
+                        <span class="badge bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20">Optional</span>
                     @endif
                 </span>
 
                 <div class="min-w-0">
-                    <p class="font-mono text-xs font-medium text-slate-900">{{ $column['label'] }}</p>
-                    <p class="mt-0.5 text-xs text-slate-500">{{ $column['note'] }}</p>
+                    <p class="font-mono text-xs font-medium text-ink">{{ $column['label'] }}</p>
+                    <p class="mt-0.5 text-xs text-muted">{{ $column['note'] }}</p>
                 </div>
             </div>
         @endforeach
@@ -93,19 +93,19 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="min-w-0">
                     <p class="eyebrow">Step 2</p>
-                    <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Check before registering</h2>
-                    <p class="mt-1 text-sm text-slate-500">
-                        Read from <span class="font-medium text-slate-700">{{ $staged['filename'] }}</span>.
+                    <h2 class="mt-1 font-display text-lg font-semibold text-ink">Check before registering</h2>
+                    <p class="mt-1 text-sm text-muted">
+                        Read from <span class="font-medium text-ink-soft">{{ $staged['filename'] }}</span>.
                         Untick anybody you do not want to register.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
-                    <span class="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20">
+                    <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">
                         {{ $okRows->count() }} ready
                     </span>
                     @if ($badRows->isNotEmpty())
-                        <span class="badge bg-rose-50 text-rose-700 ring-rose-600/20">
+                        <span class="badge bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 ring-rose-600/20 dark:ring-rose-400/20">
                             {{ $badRows->count() }} need fixing
                         </span>
                     @endif
@@ -121,7 +121,7 @@
             @endif
 
             @if ($staged['ignored'] ?? [])
-                <p class="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 ring-1 ring-slate-200">
+                <p class="mt-4 rounded-xl bg-surface-2 p-3 text-xs text-ink-soft ring-1 ring-line">
                     Ignored columns: {{ implode(', ', $staged['ignored']) }}
                 </p>
             @endif
@@ -130,10 +130,10 @@
         {{-- Rows that cannot be registered, shown first so they are not missed. --}}
         @if ($badRows->isNotEmpty())
             <div class="card-pad mt-6">
-                <h3 class="font-display text-base font-semibold text-slate-900">
+                <h3 class="font-display text-base font-semibold text-ink">
                     Rows that will be skipped
                 </h3>
-                <p class="mt-1 text-sm text-slate-500">
+                <p class="mt-1 text-sm text-muted">
                     Correct these in the spreadsheet and upload it again, or register the rest now and fix
                     these afterwards by hand.
                 </p>
@@ -152,10 +152,10 @@
                         <tbody>
                             @foreach ($badRows as $row)
                                 <tr>
-                                    <td class="font-mono text-xs text-slate-500">{{ $row['line'] }}</td>
+                                    <td class="font-mono text-xs text-muted">{{ $row['line'] }}</td>
                                     <td class="text-sm">{{ $row['name'] ?: '—' }}</td>
                                     <td class="text-sm">{{ $row['class'] ?: '—' }}</td>
-                                    <td class="text-sm text-rose-700">{{ implode(' ', $row['errors']) }}</td>
+                                    <td class="text-sm text-rose-700 dark:text-rose-300">{{ implode(' ', $row['errors']) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -167,14 +167,14 @@
         {{-- Rows that will be created. --}}
         <div class="mt-6">
             <div class="flex items-center justify-between gap-4">
-                <p class="text-sm font-medium text-slate-700">
+                <p class="text-sm font-medium text-ink-soft">
                     {{ $okRows->count() }} candidate(s) to register
                 </p>
 
                 @if ($okRows->isNotEmpty())
-                    <label class="flex items-center gap-2 text-xs text-slate-600">
+                    <label class="flex items-center gap-2 text-xs text-ink-soft">
                         <input type="checkbox" x-model="all"
-                               class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                               class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
                         Select all
                     </label>
                 @endif
@@ -202,16 +202,16 @@
                                          if the Select all helper never loads. --}}
                                     <input type="checkbox" name="lines[]" value="{{ $row['line'] }}"
                                            checked x-bind:checked="all"
-                                           class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                           class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
                                 </td>
                                 <td>
-                                    <span class="font-medium text-slate-900">{{ $row['name'] }}</span>
+                                    <span class="font-medium text-ink">{{ $row['name'] }}</span>
 
                                     {{-- A note, not an error: brothers and sisters share a
                                          parent's name and number, so this says "look",
                                          and the row stays ticked. --}}
                                     @if (! empty($row['duplicates']))
-                                        <span class="mt-1 block text-xs font-medium text-amber-700">
+                                        <span class="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-300">
                                             Possibly already on file as {{ implode(', ', $row['duplicates']) }}
                                         </span>
                                     @endif
@@ -225,8 +225,8 @@
                         @empty
                             <tr>
                                 <td colspan="7" class="py-12 text-center">
-                                    <p class="text-sm font-medium text-slate-900">No row in this file can be registered</p>
-                                    <p class="mt-1 text-sm text-slate-500">
+                                    <p class="text-sm font-medium text-ink">No row in this file can be registered</p>
+                                    <p class="mt-1 text-sm text-muted">
                                         Fix the rows listed above and upload the file again.
                                     </p>
                                 </td>
@@ -238,7 +238,7 @@
         </div>
 
         <div class="card-pad mt-6 flex flex-wrap items-center gap-4">
-            <p class="max-w-2xl text-sm text-slate-500">
+            <p class="max-w-2xl text-sm text-muted">
                 Each candidate gets the next registration number in turn, in the order they appear here.
                 No text message is sent during a bulk upload — use the text messages screen afterwards.
             </p>

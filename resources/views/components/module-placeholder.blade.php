@@ -13,19 +13,19 @@
     ask rather than to hunt.
 --}}
 <div {{ $attributes->merge(['class' => 'card flex flex-col items-center justify-center px-6 py-16 text-center']) }}>
-    <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+    <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-3 text-muted">
         <x-nav-icon :name="$icon" class="h-7 w-7" />
     </span>
 
-    <p class="mt-4 font-display text-lg font-semibold text-slate-900">{{ $title }}</p>
+    <p class="mt-4 font-display text-lg font-semibold text-ink">{{ $title }}</p>
 
-    <p class="mt-1.5 max-w-md text-sm text-slate-500">
+    <p class="mt-1.5 max-w-md text-sm text-muted">
         This page has not been built yet — it is one of the Students &amp; Results pages being
         created one at a time. Nothing is wrong: there is simply nothing here to look at.
     </p>
 
     @if ($note)
-        <p class="mt-4 max-w-md rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600 ring-1 ring-slate-200">
+        <p class="mt-4 max-w-md rounded-xl bg-surface-2 px-4 py-3 text-xs text-ink-soft ring-1 ring-line">
             {{ $note }}
         </p>
     @endif

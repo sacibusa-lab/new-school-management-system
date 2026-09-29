@@ -37,10 +37,10 @@
     @can('sms.send')
         <div class="card-pad mt-6 flex flex-wrap items-center gap-4">
             <div class="min-w-0 flex-1">
-                <p class="font-display text-base font-semibold text-slate-900">
+                <p class="font-display text-base font-semibold text-ink">
                     {{ number_format($stats['queued']) }} message(s) are queued
                 </p>
-                <p class="mt-1 text-sm text-slate-500">
+                <p class="mt-1 text-sm text-muted">
                     Queued messages were written to the log but never handed to the gateway — usually because
                     this server has no background worker doing it automatically.
                 </p>
@@ -80,7 +80,7 @@
             <a href="{{ route('admin.sms.index') }}" class="btn-ghost btn-sm">Clear</a>
         @endif
 
-        <p class="ml-auto text-xs text-slate-500">{{ number_format($logs->total()) }} message(s)</p>
+        <p class="ml-auto text-xs text-muted">{{ number_format($logs->total()) }} message(s)</p>
     </div>
 </form>
 
@@ -101,30 +101,30 @@
         <tbody>
             @forelse ($logs as $log)
                 <tr>
-                    <td class="whitespace-nowrap font-mono text-xs text-slate-900">
+                    <td class="whitespace-nowrap font-mono text-xs text-ink">
                         {{ $log->internationalRecipient() }}
                         @if ($log->user)
-                            <p class="mt-1 font-sans text-[11px] text-slate-400">by {{ $log->user->name }}</p>
+                            <p class="mt-1 font-sans text-[11px] text-muted">by {{ $log->user->name }}</p>
                         @endif
                     </td>
 
                     <td class="max-w-md">
-                        <p class="text-sm text-slate-700">{{ $log->body }}</p>
+                        <p class="text-sm text-ink-soft">{{ $log->body }}</p>
 
                         @if ($log->error)
-                            <p class="mt-1 text-xs text-rose-600">{{ $log->error }}</p>
+                            <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $log->error }}</p>
                         @endif
                     </td>
 
-                    <td class="text-xs text-slate-500">
+                    <td class="text-xs text-muted">
                         {{ $log->template_key ? \App\Support\SmsTemplateKey::label($log->template_key) : 'One-off' }}
                     </td>
 
                     <td><x-status-pill :status="$log->status" /></td>
 
-                    <td class="whitespace-nowrap text-xs text-slate-500">
+                    <td class="whitespace-nowrap text-xs text-muted">
                         {{ $log->sent_at?->format('j M Y, H:i') ?? '—' }}
-                        <p class="mt-1 text-[11px] text-slate-400">logged {{ $log->created_at->diffForHumans() }}</p>
+                        <p class="mt-1 text-[11px] text-muted">logged {{ $log->created_at->diffForHumans() }}</p>
                     </td>
 
                     <td class="text-right">
@@ -141,8 +141,8 @@
             @empty
                 <tr>
                     <td colspan="6" class="py-16 text-center">
-                        <p class="text-sm font-medium text-slate-900">Nothing has been sent yet</p>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="text-sm font-medium text-ink">Nothing has been sent yet</p>
+                        <p class="mt-1 text-sm text-muted">
                             Messages appear here automatically when applicants apply, are admitted or pay fees.
                         </p>
                     </td>

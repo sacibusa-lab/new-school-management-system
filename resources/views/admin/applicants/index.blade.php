@@ -21,8 +21,8 @@
                'card p-4 transition hover:shadow-lift',
                'ring-2 ring-brand-600' => request('status') === $value,
            ])>
-            <p class="font-display text-xl font-semibold text-slate-900">{{ number_format($count) }}</p>
-            <p class="mt-1 text-xs font-medium text-slate-500">{{ $label }}</p>
+            <p class="font-display text-xl font-semibold text-ink">{{ number_format($count) }}</p>
+            <p class="mt-1 text-xs font-medium text-muted">{{ $label }}</p>
         </a>
     @endforeach
 </div>
@@ -32,19 +32,19 @@
     <div class="card-pad mt-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <p class="text-sm font-semibold text-slate-900">Admission papers</p>
-                <p class="mt-0.5 text-xs text-slate-500">
+                <p class="text-sm font-semibold text-ink">Admission papers</p>
+                <p class="mt-0.5 text-xs text-muted">
                     The merit list and the admission letters for this session's examinations, ready to print.
                 </p>
             </div>
         </div>
 
-        <ul class="mt-4 divide-y divide-slate-100">
+        <ul class="mt-4 divide-y divide-line-soft">
             @foreach ($exams as $paperExam)
                 <li class="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div class="min-w-0">
-                        <p class="truncate text-sm font-medium text-slate-900">{{ $paperExam->title }}</p>
-                        <p class="text-xs text-slate-500">
+                        <p class="truncate text-sm font-medium text-ink">{{ $paperExam->title }}</p>
+                        <p class="text-xs text-muted">
                             {{ $paperExam->level?->name ?? 'All classes' }}
                             @if ($paperExam->exam_date)
                                 · {{ $paperExam->exam_date->format('j M Y') }}
@@ -106,7 +106,7 @@
             </a>
         @endcan
 
-        <p class="ml-auto text-xs text-slate-500">
+        <p class="ml-auto text-xs text-muted">
             {{ number_format($applicants->total()) }} record(s)
         </p>
     </div>
@@ -131,7 +131,7 @@
         <tbody>
             @forelse ($applicants as $applicant)
                 <tr>
-                    <td class="font-mono text-xs font-medium text-slate-900">{{ $applicant->registration_number }}</td>
+                    <td class="font-mono text-xs font-medium text-ink">{{ $applicant->registration_number }}</td>
 
                     <td>
                         <div class="flex items-center gap-3">
@@ -140,15 +140,15 @@
                             @if ($applicant->photo_path)
                                 <img src="{{ asset('storage/' . $applicant->photo_path) }}"
                                      alt="" loading="lazy"
-                                     class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-slate-200">
+                                     class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-line">
                             @else
-                                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-600">
+                                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-[11px] font-semibold text-ink-soft">
                                     {{ $applicant->initials }}
                                 </span>
                             @endif
                             <div class="min-w-0">
-                                <p class="truncate font-medium text-slate-900">{{ $applicant->full_name }}</p>
-                                <p class="text-xs text-slate-500">
+                                <p class="truncate font-medium text-ink">{{ $applicant->full_name }}</p>
+                                <p class="text-xs text-muted">
                                     {{ $applicant->gender?->label() }}
                                     @if ($applicant->age) · {{ $applicant->age }} yrs @endif
                                 </p>
@@ -159,9 +159,9 @@
                     <td class="text-sm">{{ $applicant->levelAppliedFor?->name ?? '—' }}</td>
 
                     <td class="text-sm">
-                        <p class="text-slate-700">{{ $applicant->phone ?? '—' }}</p>
+                        <p class="text-ink-soft">{{ $applicant->phone ?? '—' }}</p>
                         @if ($applicant->email)
-                            <p class="truncate text-xs text-slate-500">{{ $applicant->email }}</p>
+                            <p class="truncate text-xs text-muted">{{ $applicant->email }}</p>
                         @endif
                     </td>
 
@@ -169,7 +169,7 @@
 
                     <td><x-status-pill :status="$applicant->status" /></td>
 
-                    <td class="text-xs text-slate-500">
+                    <td class="text-xs text-muted">
                         {{ $applicant->created_at->format('j M Y') }}
                     </td>
 
@@ -180,8 +180,8 @@
             @empty
                 <tr>
                     <td colspan="8" class="py-16 text-center">
-                        <p class="text-sm font-medium text-slate-900">No applicants match these filters</p>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="text-sm font-medium text-ink">No applicants match these filters</p>
+                        <p class="mt-1 text-sm text-muted">
                             Try clearing the filters, or share the application link with prospective parents.
                         </p>
                     </td>

@@ -15,9 +15,10 @@
     @endif
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.theme')
     @stack('head')
 </head>
-<body class="flex min-h-screen flex-col bg-white print:min-h-0">
+<body class="flex min-h-screen flex-col bg-surface print:min-h-0">
 
     {{-- ================= Announcement bar ================= --}}
     @if (! empty($announcement))
@@ -32,14 +33,14 @@
     <header x-data="{ open: false, scrolled: false }"
             @scroll.window="scrolled = window.scrollY > 8"
             :class="scrolled ? 'shadow-lg shadow-slate-900/5' : ''"
-            class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-lg transition-shadow print:hidden">
+            class="sticky top-0 z-40 border-b border-line/80 bg-surface/85 backdrop-blur-lg transition-shadow print:hidden">
         <div class="section flex h-18 items-center justify-between gap-6 py-3">
 
             <a href="{{ route('home') }}" class="flex items-center gap-3">
                 <x-brand-mark />
                 <span class="leading-tight">
-                    <span class="block font-display text-base font-semibold text-slate-900">{{ $school->name }}</span>
-                    <span class="hidden text-xs text-slate-500 sm:block">{{ $school->tagline }}</span>
+                    <span class="block font-display text-base font-semibold text-ink">{{ $school->name }}</span>
+                    <span class="hidden text-xs text-muted sm:block">{{ $school->tagline }}</span>
                 </span>
             </a>
 
@@ -54,13 +55,15 @@
                     <a href="{{ route($item['route']) }}"
                        @class([
                            'rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
-                           'bg-brand-50 text-brand-800' => $active,
-                           'text-slate-600 hover:bg-slate-100 hover:text-slate-900' => ! $active,
+                           'bg-brand-50 dark:bg-brand-900/30 text-brand-800 dark:text-brand-200' => $active,
+                           'text-ink-soft hover:bg-surface-3 hover:text-ink' => ! $active,
                        ])>{{ $item['label'] }}</a>
                 @endforeach
             </nav>
 
             <div class="hidden items-center gap-3 lg:flex">
+                <x-theme-toggle />
+
                 @auth
                     <a href="{{ route(auth()->user()->homeRoute()) }}" class="btn-secondary btn-sm">Dashboard</a>
                 @else
@@ -97,7 +100,7 @@
 
         {{-- Mobile menu --}}
         <div x-show="open" x-cloak x-transition.origin.top
-             class="border-t border-slate-200 bg-white lg:hidden">
+             class="border-t border-line bg-surface lg:hidden">
             <div class="section space-y-1 py-4">
                 @foreach ([
                     ['route' => 'home', 'label' => 'Home'],
@@ -107,6 +110,11 @@
                 ] as $item)
                     <a href="{{ route($item['route']) }}" class="nav-link">{{ $item['label'] }}</a>
                 @endforeach
+
+                <div class="flex items-center gap-2 pt-2">
+                    <x-theme-toggle />
+                    <span class="text-sm text-muted">Light or dark</span>
+                </div>
 
                 <div class="flex gap-3 pt-3">
                     @auth

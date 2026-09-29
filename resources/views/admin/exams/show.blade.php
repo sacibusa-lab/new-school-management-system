@@ -33,7 +33,7 @@
         <div class="panel-header">
             <div>
                 <p class="panel-title">Score capture by subject</p>
-                <p class="mt-0.5 text-xs text-slate-500">How much of the marking has been captured</p>
+                <p class="mt-0.5 text-xs text-muted">How much of the marking has been captured</p>
             </div>
         </div>
 
@@ -42,12 +42,12 @@
                 <x-empty-state title="No subjects yet" description="Add the subjects being examined before registering candidates." icon="list" />
             </div>
         @else
-            <div class="divide-y divide-slate-100">
+            <div class="divide-y divide-line-soft">
                 @foreach ($progress as $row)
                     <div class="flex flex-wrap items-center gap-4 px-5 py-4">
                         <div class="min-w-0 flex-1">
-                            <p class="text-sm font-medium text-slate-900">{{ $row['examSubject']->subject?->name }}</p>
-                            <p class="mt-0.5 text-xs text-slate-500">
+                            <p class="text-sm font-medium text-ink">{{ $row['examSubject']->subject?->name }}</p>
+                            <p class="mt-0.5 text-xs text-muted">
                                 Out of {{ rtrim(rtrim(number_format((float) $row['examSubject']->total_marks, 2), '0'), '.') }}
                                 · pass mark {{ rtrim(rtrim(number_format($row['examSubject']->effectivePassMark(), 2), '0'), '.') }}
                                 · {{ $row['candidates'] }} candidate(s)
@@ -55,11 +55,11 @@
                         </div>
 
                         <div class="w-full sm:w-40">
-                            <div class="flex items-center justify-between text-xs text-slate-500">
+                            <div class="flex items-center justify-between text-xs text-muted">
                                 <span>{{ $row['captured'] }}/{{ $row['candidates'] }}</span>
-                                <span class="font-semibold text-slate-700">{{ $row['percent'] }}%</span>
+                                <span class="font-semibold text-ink-soft">{{ $row['percent'] }}%</span>
                             </div>
-                            <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-3">
                                 <div @class([
                                     'h-full rounded-full transition-all',
                                     'bg-emerald-500' => $row['percent'] === 100,
@@ -78,7 +78,7 @@
                                       onsubmit="return confirm('Remove this subject from the examination?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn-ghost btn-sm text-rose-600 hover:bg-rose-50">Remove</button>
+                                    <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:bg-rose-950/40">Remove</button>
                                 </form>
                             @endcan
                         </div>
@@ -90,10 +90,10 @@
         @can('exams.manage')
             @if ($availableSubjects->isNotEmpty())
                 <form method="POST" action="{{ route('admin.exams.subjects.store', $exam) }}"
-                      class="border-t border-slate-200 bg-slate-50/70 p-5">
+                      class="border-t border-line bg-surface-2 p-5">
                     @csrf
 
-                    <p class="text-sm font-semibold text-slate-900">Add a subject</p>
+                    <p class="text-sm font-semibold text-ink">Add a subject</p>
 
                     <div class="mt-4 grid gap-4 sm:grid-cols-4">
                         <div class="sm:col-span-2">
@@ -115,8 +115,8 @@
     {{-- ================= Actions ================= --}}
     <aside class="space-y-6">
         <div class="card-pad">
-            <h3 class="text-sm font-semibold text-slate-900">Candidates</h3>
-            <p class="mt-2 text-sm text-slate-600">
+            <h3 class="text-sm font-semibold text-ink">Candidates</h3>
+            <p class="mt-2 text-sm text-ink-soft">
                 Registering candidates creates a blank score slot for every applicant in
                 {{ $exam->level?->name ?? 'this class' }} across {{ $examSubjects->count() }} subject(s).
             </p>
@@ -133,8 +133,8 @@
             @if ($candidateCount > 0 && $examSubjects->isNotEmpty() && auth()->user()?->can('scores.import'))
                 {{-- The same shape as the score entry grid: a row per candidate, a
                      column per paper. Fill it in, upload it back, review, commit. --}}
-                <div class="mt-4 border-t border-slate-100 pt-4">
-                    <p class="text-xs text-slate-500">
+                <div class="mt-4 border-t border-line-soft pt-4">
+                    <p class="text-xs text-muted">
                         Marks already on paper? Download the sheet for
                         {{ $examSubjects->count() }} subject(s), fill in the marks and upload it back —
                         the candidates are already listed, and a blank cell is read as “not marked yet”.
@@ -153,7 +153,7 @@
         </div>
 
         <div class="card-pad">
-            <h3 class="text-sm font-semibold text-slate-900">Examination details</h3>
+            <h3 class="text-sm font-semibold text-ink">Examination details</h3>
 
             <dl class="mt-4 space-y-3 text-sm">
                 @foreach ([
@@ -163,9 +163,9 @@
                     ['Created by', $exam->creator?->name ?? '—'],
                     ['Instructions', $exam->instructions ?: 'None'],
                 ] as [$label, $value])
-                    <div class="flex justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                        <dt class="shrink-0 text-slate-500">{{ $label }}</dt>
-                        <dd class="text-right font-medium text-slate-800">{{ $value }}</dd>
+                    <div class="flex justify-between gap-4 border-b border-line-soft pb-3 last:border-0 last:pb-0">
+                        <dt class="shrink-0 text-muted">{{ $label }}</dt>
+                        <dd class="text-right font-medium text-ink-soft">{{ $value }}</dd>
                     </div>
                 @endforeach
             </dl>
@@ -179,17 +179,17 @@
             <div class="card">
                 <div class="panel-header">
                     <p class="panel-title">Recent uploads</p>
-                    <a href="{{ route('admin.imports.index', ['exam' => $exam->id]) }}" class="text-xs font-semibold text-brand-700">All</a>
+                    <a href="{{ route('admin.imports.index', ['exam' => $exam->id]) }}" class="text-xs font-semibold text-brand-700 dark:text-brand-200">All</a>
                 </div>
 
-                <div class="divide-y divide-slate-100">
+                <div class="divide-y divide-line-soft">
                     @foreach ($imports as $import)
-                        <a href="{{ route('admin.imports.show', $import) }}" class="block px-5 py-3.5 transition hover:bg-slate-50">
+                        <a href="{{ route('admin.imports.show', $import) }}" class="block px-5 py-3.5 transition hover:bg-surface-2">
                             <div class="flex items-start justify-between gap-3">
-                                <p class="truncate text-sm text-slate-800">{{ $import->original_name }}</p>
+                                <p class="truncate text-sm text-ink-soft">{{ $import->original_name }}</p>
                                 <x-status-pill :status="$import->status" />
                             </div>
-                            <p class="mt-0.5 text-xs text-slate-500">
+                            <p class="mt-0.5 text-xs text-muted">
                                 {{ $import->rows_total }} rows · {{ $import->driver->label() }}
                             </p>
                         </a>
@@ -206,12 +206,12 @@
         <div class="panel-header">
             <div>
                 <p class="panel-title">Candidates sitting this examination</p>
-                <p class="mt-0.5 text-xs text-slate-500">
+                <p class="mt-0.5 text-xs text-muted">
                     Use this to see whose marks are still outstanding before you apply the cutoff
                 </p>
             </div>
 
-            <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20">
+            <span class="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-200 ring-brand-600/20">
                 {{ $candidates->count() }} candidate(s)
             </span>
         </div>
@@ -233,34 +233,34 @@
                 <tbody>
                     @foreach ($candidates as $index => $row)
                         <tr>
-                            <td class="text-center text-xs text-slate-400">{{ $index + 1 }}</td>
+                            <td class="text-center text-xs text-muted">{{ $index + 1 }}</td>
 
-                            <td class="font-mono text-xs font-medium text-slate-900">
+                            <td class="font-mono text-xs font-medium text-ink">
                                 {{ $row['applicant']->registration_number }}
                             </td>
 
                             <td>
-                                <p class="font-medium text-slate-900">{{ $row['applicant']->full_name }}</p>
+                                <p class="font-medium text-ink">{{ $row['applicant']->full_name }}</p>
                                 <x-status-pill :status="$row['applicant']->status" class="mt-1" />
                             </td>
 
                             <td class="text-sm">{{ $row['applicant']->levelAppliedFor?->name ?? '—' }}</td>
 
                             <td class="text-sm">
-                                <p class="text-slate-700">
+                                <p class="text-ink-soft">
                                     {{ $row['applicant']->guardian_phone ?? $row['applicant']->phone ?? '—' }}
                                 </p>
                             </td>
 
                             <td>
-                                <div class="flex items-center justify-between text-xs text-slate-500">
+                                <div class="flex items-center justify-between text-xs text-muted">
                                     <span>{{ $row['marked'] }}/{{ $row['total'] }}</span>
-                                    <span class="font-semibold {{ $row['percent'] === 100 ? 'text-emerald-700' : 'text-amber-700' }}">
+                                    <span class="font-semibold {{ $row['percent'] === 100 ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300' }}">
                                         {{ $row['percent'] === 100 ? 'Complete' : 'Outstanding' }}
                                     </span>
                                 </div>
 
-                                <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
                                     <div @class([
                                         'h-full rounded-full',
                                         'bg-emerald-500' => $row['percent'] === 100,
@@ -281,8 +281,8 @@
     </div>
 @elseif ($examSubjects->isNotEmpty())
     <div class="card-pad mt-6">
-        <p class="text-sm font-medium text-slate-900">No candidates registered yet</p>
-        <p class="mt-1 text-sm text-slate-500">
+        <p class="text-sm font-medium text-ink">No candidates registered yet</p>
+        <p class="mt-1 text-sm text-muted">
             Register the applicants for this class using the button above — that creates a blank mark
             for every candidate against every subject.
         </p>

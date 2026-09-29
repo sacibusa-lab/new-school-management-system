@@ -39,8 +39,8 @@
     {{-- ================= 1. Applicant ================= --}}
     <div class="card-pad mt-6">
         <p class="eyebrow">Step 1</p>
-        <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Applicant</h2>
-        <p class="mt-1 text-sm text-slate-500">
+        <h2 class="mt-1 font-display text-lg font-semibold text-ink">Applicant</h2>
+        <p class="mt-1 text-sm text-muted">
             Only the name and the class are required here — the rest can be filled in later from the
             applicant's page. The parent's details, however, are needed to open the fee account.
         </p>
@@ -78,11 +78,11 @@
         <div class="mt-4">
             <label for="photo" class="label">Passport photograph</label>
             <input id="photo" name="photo" type="file" accept="image/*"
-                   class="input file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm">
-            <p class="mt-1 text-xs text-slate-500">Optional. JPG, PNG or WEBP, up to 2 MB.</p>
+                   class="input file:mr-3 file:rounded-md file:border-0 file:bg-surface-3 file:px-3 file:py-1.5 file:text-sm">
+            <p class="mt-1 text-xs text-muted">Optional. JPG, PNG or WEBP, up to 2 MB.</p>
 
             @error('photo')
-                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                <p class="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
         </div>
     </div>
@@ -90,8 +90,8 @@
     {{-- ================= 2. Parent / guardian & contact ================= --}}
     <div class="card-pad mt-6">
         <p class="eyebrow">Step 2</p>
-        <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Parent / guardian &amp; contact</h2>
-        <p class="mt-1 text-sm text-slate-500">
+        <h2 class="mt-1 font-display text-lg font-semibold text-ink">Parent / guardian &amp; contact</h2>
+        <p class="mt-1 text-sm text-muted">
             The parent's phone number and email are how the school reaches the family, and the details the
             fee account is opened in — so take them straight from the parent.
         </p>
@@ -115,8 +115,8 @@
                      placeholder="Mother, Father, Guardian…" />
         </div>
 
-        <div class="mt-6 border-t border-slate-200 pt-5">
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Home address</p>
+        <div class="mt-6 border-t border-line pt-5">
+            <p class="text-xs font-semibold uppercase tracking-wider text-muted">Home address</p>
 
             <div class="mt-3">
                 <x-field name="address" label="Address" :value="old('address')"
@@ -136,7 +136,7 @@
 
     {{-- ================= Save ================= --}}
     <div class="card-pad mt-6 flex flex-wrap items-center gap-4">
-        <p class="text-sm text-slate-500">
+        <p class="text-sm text-muted">
             Saving allocates the registration number and opens the applicant's record.
         </p>
 

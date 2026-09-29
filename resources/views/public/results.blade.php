@@ -3,15 +3,15 @@
 @section('title', 'Check result')
 
 @section('content')
-<div class="bg-slate-50 py-12">
+<div class="bg-surface-2 py-12">
     <div class="section max-w-5xl">
 
         <div class="mx-auto max-w-2xl text-center">
             <span class="eyebrow">Results</span>
-            <h1 class="mt-5 font-display text-3xl font-semibold text-slate-900 sm:text-4xl">
+            <h1 class="mt-5 font-display text-3xl font-semibold text-ink sm:text-4xl">
                 Check your result
             </h1>
-            <p class="mt-4 text-slate-600">
+            <p class="mt-4 text-ink-soft">
                 Results appear here as soon as the school publishes them for the term.
             </p>
         </div>
@@ -55,19 +55,19 @@
                 @else
                     {{-- ================= Student header ================= --}}
                     <div class="card overflow-hidden">
-                        <div class="border-b border-slate-200 bg-slate-50/70 p-5 sm:p-6">
+                        <div class="border-b border-line bg-surface-2 p-5 sm:p-6">
                             <div class="flex flex-wrap items-center justify-between gap-4">
                                 <div class="flex items-center gap-3">
                                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-900 font-display text-base font-semibold text-gold-300">
                                         {{ $student->initials }}
                                     </span>
                                     <div>
-                                        <p class="font-display text-lg font-semibold text-slate-900">{{ $student->full_name }}</p>
-                                        <p class="font-mono text-sm text-slate-500">{{ $student->student_number }}</p>
+                                        <p class="font-display text-lg font-semibold text-ink">{{ $student->full_name }}</p>
+                                        <p class="font-mono text-sm text-muted">{{ $student->student_number }}</p>
                                     </div>
                                 </div>
 
-                                <p class="text-sm text-slate-600">
+                                <p class="text-sm text-ink-soft">
                                     {{ $student->schoolClass?->name ?? $student->level?->name }}
                                 </p>
                             </div>
@@ -78,12 +78,12 @@
                     <div class="mt-6 space-y-8">
                         @foreach ($results as $result)
                             <div class="card overflow-hidden">
-                                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/70 px-5 py-4">
+                                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-2 px-5 py-4">
                                     <div>
-                                        <p class="font-display text-base font-semibold text-slate-900">
+                                        <p class="font-display text-base font-semibold text-ink">
                                             {{ $result->term?->name }} — {{ $result->academicSession?->name }}
                                         </p>
-                                        <p class="mt-0.5 text-xs text-slate-500">
+                                        <p class="mt-0.5 text-xs text-muted">
                                             {{ $result->subjects_count }} subject(s)
                                             · published {{ $result->published_at?->format('j M Y') }}
                                         </p>
@@ -99,7 +99,7 @@
                                 </div>
 
                                 {{-- Summary strip --}}
-                                <div class="grid divide-y divide-slate-200 border-b border-slate-200 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+                                <div class="grid divide-y divide-line border-b border-line sm:grid-cols-4 sm:divide-x sm:divide-y-0">
                                     @foreach ([
                                         ['Average', rtrim(rtrim(number_format((float) $result->average, 2), '0'), '.') . '%'],
                                         ['Position', $result->ordinalPosition() . ($result->class_size ? ' of ' . $result->class_size : '')],
@@ -107,8 +107,8 @@
                                         ['Total', rtrim(rtrim(number_format((float) $result->total_score, 2), '0'), '.')],
                                     ] as [$label, $value])
                                         <div class="p-4 text-center">
-                                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</p>
-                                            <p class="mt-1.5 font-display text-xl font-semibold text-slate-900">{{ $value }}</p>
+                                            <p class="text-xs font-semibold uppercase tracking-wider text-muted">{{ $label }}</p>
+                                            <p class="mt-1.5 font-display text-xl font-semibold text-ink">{{ $value }}</p>
                                         </div>
                                     @endforeach
                                 </div>
@@ -130,15 +130,15 @@
                                         <tbody>
                                             @foreach ($result->items as $item)
                                                 <tr>
-                                                    <td class="font-medium text-slate-900">{{ $item->subject?->name }}</td>
+                                                    <td class="font-medium text-ink">{{ $item->subject?->name }}</td>
                                                     <td class="text-right text-sm">{{ rtrim(rtrim(number_format((float) $item->ca_score, 2), '0'), '.') }}</td>
                                                     <td class="text-right text-sm">{{ rtrim(rtrim(number_format((float) $item->exam_score, 2), '0'), '.') }}</td>
                                                     <td class="text-right font-semibold">{{ rtrim(rtrim(number_format((float) $item->total_score, 2), '0'), '.') }}</td>
                                                     <td class="text-center">
-                                                        <span class="badge bg-slate-100 text-slate-700 ring-slate-500/20">{{ $item->grade ?? '—' }}</span>
+                                                        <span class="badge bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20">{{ $item->grade ?? '—' }}</span>
                                                     </td>
-                                                    <td class="text-center text-sm text-slate-500">{{ $item->subject_position ?? '—' }}</td>
-                                                    <td class="text-sm text-slate-600">{{ $item->is_absent ? 'Absent' : ($item->remark ?? '—') }}</td>
+                                                    <td class="text-center text-sm text-muted">{{ $item->subject_position ?? '—' }}</td>
+                                                    <td class="text-sm text-ink-soft">{{ $item->is_absent ? 'Absent' : ($item->remark ?? '—') }}</td>
                                                 </tr>
                                             @endforeach
                                         </tbody>
@@ -146,18 +146,18 @@
                                 </div>
 
                                 @if ($result->teacher_remark || $result->principal_remark)
-                                    <div class="grid gap-4 border-t border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2">
+                                    <div class="grid gap-4 border-t border-line bg-surface-2 p-5 sm:grid-cols-2">
                                         @if ($result->teacher_remark)
                                             <div>
-                                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Class teacher</p>
-                                                <p class="mt-1 text-sm text-slate-700">{{ $result->teacher_remark }}</p>
+                                                <p class="text-xs font-semibold uppercase tracking-wider text-muted">Class teacher</p>
+                                                <p class="mt-1 text-sm text-ink-soft">{{ $result->teacher_remark }}</p>
                                             </div>
                                         @endif
 
                                         @if ($result->principal_remark)
                                             <div>
-                                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Principal</p>
-                                                <p class="mt-1 text-sm text-slate-700">{{ $result->principal_remark }}</p>
+                                                <p class="text-xs font-semibold uppercase tracking-wider text-muted">Principal</p>
+                                                <p class="mt-1 text-sm text-ink-soft">{{ $result->principal_remark }}</p>
                                             </div>
                                         @endif
                                     </div>

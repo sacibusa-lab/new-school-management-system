@@ -13,6 +13,7 @@
     @endif
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.theme')
 </head>
 <body class="grid min-h-full grid-cols-1 lg:grid-cols-2">
 
@@ -21,7 +22,7 @@
         <div class="mx-auto w-full max-w-sm">
             <a href="{{ route('home') }}" class="inline-flex items-center gap-3">
                 <x-brand-mark />
-                <span class="font-display text-base font-semibold text-slate-900">{{ $school->name }}</span>
+                <span class="font-display text-base font-semibold text-ink">{{ $school->name }}</span>
             </a>
 
             <div class="mt-10">
@@ -29,8 +30,8 @@
                 @yield('content')
             </div>
 
-            <p class="mt-10 text-center text-xs text-slate-500">
-                <a href="{{ route('home') }}" class="transition hover:text-slate-700">&larr; Back to the school website</a>
+            <p class="mt-10 text-center text-xs text-muted">
+                <a href="{{ route('home') }}" class="transition hover:text-ink-soft">&larr; Back to the school website</a>
             </p>
         </div>
     </div>

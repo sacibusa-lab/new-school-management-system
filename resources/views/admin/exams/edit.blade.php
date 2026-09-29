@@ -34,7 +34,7 @@
 
     {{-- ================= Details ================= --}}
     <div class="card-pad">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Examination details</h2>
+        <h2 class="font-display text-lg font-semibold text-ink">Examination details</h2>
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -73,8 +73,8 @@
 
     {{-- ================= Status ================= --}}
     <div class="card-pad mt-6">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Where this examination has got to</h2>
-        <p class="mt-1 text-sm text-slate-500">
+        <h2 class="font-display text-lg font-semibold text-ink">Where this examination has got to</h2>
+        <p class="mt-1 text-sm text-muted">
             The status decides what can still be changed. Marking and publishing lock the marks down.
         </p>
 
@@ -85,24 +85,24 @@
                      x-model="status" />
 
             <div class="flex items-end pb-2">
-                <label class="flex items-center gap-2 text-sm text-slate-700">
+                <label class="flex items-center gap-2 text-sm text-ink-soft">
                     <input type="checkbox" name="results_locked" value="1"
                            @checked(old('results_locked', $exam->results_locked))
-                           class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                           class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
                     Lock the marks
-                    <span class="text-slate-500">(no further score edits)</span>
+                    <span class="text-muted">(no further score edits)</span>
                 </label>
             </div>
         </div>
 
         <div x-show="status === 'published'" x-cloak
-             class="mt-4 rounded-xl bg-gold-50 p-4 text-sm text-gold-900 ring-1 ring-inset ring-gold-600/20">
+             class="mt-4 rounded-xl bg-gold-50 dark:bg-gold-950/40 p-4 text-sm text-gold-900 ring-1 ring-inset ring-gold-600/20 dark:ring-gold-400/20">
             Publishing makes the examination visible to applicants. It is stamped with the date you publish
             and is not un-published by changing the status back.
         </div>
 
         @if ($exam->published_at)
-            <p class="mt-4 text-xs text-slate-500">
+            <p class="mt-4 text-xs text-muted">
                 First published {{ $exam->published_at->format('j F Y, g:ia') }}.
             </p>
         @endif
@@ -110,8 +110,8 @@
 
     {{-- ================= Subjects note ================= --}}
     <div class="card-pad mt-6">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Subjects and candidates</h2>
-        <p class="mt-1 text-sm text-slate-500">
+        <h2 class="font-display text-lg font-semibold text-ink">Subjects and candidates</h2>
+        <p class="mt-1 text-sm text-muted">
             These are managed on the examination page, because adding a subject has to create a blank mark
             for every candidate — that is not something to do by accident while editing the title.
         </p>
@@ -128,7 +128,7 @@
 
     {{-- ================= Save ================= --}}
     <div class="card-pad mt-6 flex flex-wrap items-center gap-4">
-        <p class="text-sm text-slate-500">
+        <p class="text-sm text-muted">
             Created {{ $exam->created_at->format('j F Y') }}
             @if ($exam->creator) by {{ $exam->creator->name }} @endif.
         </p>
@@ -143,15 +143,15 @@
 {{-- ================= Danger zone ================= --}}
 @can('delete', $exam)
     <div class="card-pad mt-6">
-        <h2 class="font-display text-lg font-semibold text-slate-900">Delete this examination</h2>
+        <h2 class="font-display text-lg font-semibold text-ink">Delete this examination</h2>
 
         @if ($exam->decisions()->exists())
-            <p class="mt-1 text-sm text-slate-500">
+            <p class="mt-1 text-sm text-muted">
                 This examination has admission decisions attached, so it cannot be deleted —
                 deleting it would orphan those decisions. Set its status to withdrawn instead.
             </p>
         @else
-            <p class="mt-1 text-sm text-slate-500">
+            <p class="mt-1 text-sm text-muted">
                 This also removes every mark captured against it. Only possible while no admission
                 decisions have been made from it.
             </p>

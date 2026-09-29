@@ -169,16 +169,16 @@
             <a href="{{ $card['href'] }}"
                class="group card relative overflow-hidden p-6 transition duration-200 hover:-translate-y-1 hover:shadow-lift">
                 <div class="flex items-start justify-between">
-                    <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/10">
+                    <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-200 ring-1 ring-inset ring-brand-600/10">
                         <x-nav-icon :name="$card['icon']" class="h-6 w-6" />
                     </span>
                     <span class="font-display text-sm font-semibold text-slate-300">{{ $card['step'] }}</span>
                 </div>
 
-                <h3 class="mt-5 font-display text-lg font-semibold text-slate-900">{{ $card['title'] }}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ $card['body'] }}</p>
+                <h3 class="mt-5 font-display text-lg font-semibold text-ink">{{ $card['title'] }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-ink-soft">{{ $card['body'] }}</p>
 
-                <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700">
+                <span class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 dark:text-brand-200">
                     {{ $card['cta'] }}
                     <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
@@ -195,10 +195,10 @@
 <section class="section py-24">
     <div class="max-w-2xl">
         <span class="eyebrow">How it works</span>
-        <h2 class="mt-5 font-display text-3xl font-semibold text-slate-900 text-balance sm:text-4xl">
+        <h2 class="mt-5 font-display text-3xl font-semibold text-ink text-balance sm:text-4xl">
             From application to student account in four steps
         </h2>
-        <p class="mt-4 text-slate-600">
+        <p class="mt-4 text-ink-soft">
             The moment you pass the cutoff mark, the system does the paperwork for you —
             creating your student record, your portal login and your first fee invoice.
         </p>
@@ -217,8 +217,8 @@
                 <span class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900 font-display text-sm font-semibold text-gold-300">
                     {{ $index + 1 }}
                 </span>
-                <h3 class="mt-5 text-base font-semibold text-slate-900">{{ $step['title'] }}</h3>
-                <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ $step['body'] }}</p>
+                <h3 class="mt-5 text-base font-semibold text-ink">{{ $step['title'] }}</h3>
+                <p class="mt-2 text-sm leading-relaxed text-ink-soft">{{ $step['body'] }}</p>
             </li>
         @endforeach
     </ol>
@@ -228,15 +228,15 @@
      Cutoff marks
      ================================================================== --}}
 @if ($cutoffs->isNotEmpty())
-    <section class="border-y border-slate-200 bg-white py-20">
+    <section class="border-y border-line bg-surface py-20">
         <div class="section">
             <div class="flex flex-wrap items-end justify-between gap-6">
                 <div class="max-w-xl">
                     <span class="eyebrow">Merit</span>
-                    <h2 class="mt-5 font-display text-2xl font-semibold text-slate-900 sm:text-3xl">
+                    <h2 class="mt-5 font-display text-2xl font-semibold text-ink sm:text-3xl">
                         Cutoff marks for {{ $session?->name }}
                     </h2>
-                    <p class="mt-3 text-sm text-slate-600">
+                    <p class="mt-3 text-sm text-ink-soft">
                         Set by the examination officer. Applicants who score at or above the
                         cutoff for their class are admitted automatically.
                     </p>
@@ -246,16 +246,16 @@
 
             <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($cutoffs as $cutoff)
-                    <div class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+                    <div class="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface-2 p-5">
                         <div>
-                            <p class="font-display text-lg font-semibold text-slate-900">{{ $cutoff->level?->name }}</p>
-                            <p class="mt-0.5 text-xs text-slate-500">
+                            <p class="font-display text-lg font-semibold text-ink">{{ $cutoff->level?->name }}</p>
+                            <p class="mt-0.5 text-xs text-muted">
                                 {{ $cutoff->available_slots ? $cutoff->available_slots . ' places' : 'Unlimited places' }}
                             </p>
                         </div>
                         <div class="text-right">
-                            <p class="font-display text-2xl font-semibold text-brand-800">{{ rtrim(rtrim(number_format((float) $cutoff->cutoff_mark, 2), '0'), '.') }}%</p>
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Cutoff</p>
+                            <p class="font-display text-2xl font-semibold text-brand-800 dark:text-brand-200">{{ rtrim(rtrim(number_format((float) $cutoff->cutoff_mark, 2), '0'), '.') }}%</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wider text-muted">Cutoff</p>
                         </div>
                     </div>
                 @endforeach

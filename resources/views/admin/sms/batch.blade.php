@@ -91,8 +91,8 @@
 
         {{-- ================= Who ================= --}}
         <div class="card-pad">
-            <h2 class="font-display text-lg font-semibold text-slate-900">1. Who is this going to?</h2>
-            <p class="mt-1 text-sm text-slate-500">
+            <h2 class="font-display text-lg font-semibold text-ink">1. Who is this going to?</h2>
+            <p class="mt-1 text-sm text-muted">
                 Only people with a usable mobile number are messaged. Anyone without one is skipped and reported.
             </p>
 
@@ -100,16 +100,16 @@
                 @foreach ($audiences as $value => $label)
                     {{-- The highlight is Alpine-driven, not server-rendered: a stale
                          server-side class would stay lit after the choice changes. --}}
-                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-slate-300"
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 transition hover:border-line"
                            x-bind:class="audience === @js($value)
                                ? 'border-brand-600 bg-brand-50/60 ring-1 ring-brand-600'
                                : ''">
                         <input type="radio" name="audience" value="{{ $value }}" x-model="audience"
-                               class="mt-0.5 h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500">
+                               class="mt-0.5 h-4 w-4 border-line text-brand-600 focus:ring-brand-500">
 
                         <span class="min-w-0 flex-1">
-                            <span class="block text-sm font-medium text-slate-900">{{ $label }}</span>
-                            <span class="mt-0.5 block text-xs text-slate-500">
+                            <span class="block text-sm font-medium text-ink">{{ $label }}</span>
+                            <span class="mt-0.5 block text-xs text-muted">
                                 {{ number_format($audienceSizes[$value] ?? 0) }} on record
                             </span>
                         </span>
@@ -134,10 +134,10 @@
 
         {{-- ================= What ================= --}}
         <div class="card-pad">
-            <h2 class="font-display text-lg font-semibold text-slate-900">2. What should it say?</h2>
-            <p class="mt-1 text-sm text-slate-500">
+            <h2 class="font-display text-lg font-semibold text-ink">2. What should it say?</h2>
+            <p class="mt-1 text-sm text-muted">
                 Pick a saved message, or write your own. Placeholders in
-                <code class="rounded bg-slate-100 px-1 py-0.5 text-xs">{curly braces}</code> are filled in per person.
+                <code class="rounded bg-surface-3 px-1 py-0.5 text-xs">{curly braces}</code> are filled in per person.
             </p>
 
             <div class="mt-5 grid gap-4 lg:grid-cols-2">
@@ -148,9 +148,9 @@
                          :options="$templates->pluck('name', 'key')->all()" />
 
                 <div class="flex items-end">
-                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <label class="flex items-center gap-2 text-sm text-ink-soft">
                         <input type="checkbox" x-model="useOverride"
-                               class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                               class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
                         Write a different message instead
                     </label>
                 </div>
@@ -160,7 +160,7 @@
                 <label for="body_override" class="label">Your message</label>
                 <textarea id="body_override" name="body_override" rows="5" x-model="overrideText"
                           class="input font-mono text-[13px]"></textarea>
-                <p class="mt-1 text-xs text-slate-500">
+                <p class="mt-1 text-xs text-muted">
                     Keep it under 160 characters to stay inside a single SMS. Longer text is split and charged per part.
                 </p>
             </div>
@@ -170,7 +170,7 @@
                 <p class="label">Available placeholders</p>
                 <div class="flex flex-wrap gap-1.5">
                     @foreach ($placeholders as $placeholder)
-                        <span class="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">
+                        <span class="rounded-md bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-ink-soft">
                             {{ '{' . $placeholder . '}' }}
                         </span>
                     @endforeach
@@ -181,8 +181,8 @@
         {{-- ================= Preview ================= --}}
         <div class="card-pad">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="font-display text-lg font-semibold text-slate-900">3. Check it before you send</h2>
-                <p class="text-xs text-slate-500">
+                <h2 class="font-display text-lg font-semibold text-ink">3. Check it before you send</h2>
+                <p class="text-xs text-muted">
                     <span x-text="length"></span> characters ·
                     <span x-text="parts"></span> SMS part(s) per person
                 </p>
@@ -190,13 +190,13 @@
 
             {{-- A phone-shaped preview, because this is what the parent sees. --}}
             <div class="mt-4 max-w-md rounded-2xl bg-slate-900 p-4">
-                <p class="mb-2 text-[11px] uppercase tracking-wider text-slate-400">Message preview</p>
-                <div class="rounded-xl bg-white p-3">
-                    <p class="whitespace-pre-line text-sm leading-relaxed text-slate-800" x-text="preview"></p>
+                <p class="mb-2 text-[11px] uppercase tracking-wider text-muted">Message preview</p>
+                <div class="rounded-xl bg-surface p-3">
+                    <p class="whitespace-pre-line text-sm leading-relaxed text-ink-soft" x-text="preview"></p>
                 </div>
             </div>
 
-            <p class="mt-3 text-xs text-slate-500">
+            <p class="mt-3 text-xs text-muted">
                 The names, numbers and amounts above are samples so you can read the sentence flow.
                 Real values are substituted for each recipient.
             </p>
@@ -206,7 +206,7 @@
         <div class="card-pad">
             {{-- Blocked before it becomes a phone call from a confused parent. --}}
             <div x-show="missing.length > 0" x-cloak
-                 class="mb-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900 ring-1 ring-inset ring-rose-600/15">
+                 class="mb-5 rounded-xl bg-rose-50 dark:bg-rose-950/40 p-4 text-sm text-rose-900 dark:text-rose-100 ring-1 ring-inset ring-rose-600/15">
                 <p class="font-semibold">This message needs details this audience does not have</p>
                 <p class="mt-1">
                     It uses
@@ -219,10 +219,10 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-4">
-                <label class="flex items-center gap-2 text-sm text-slate-700">
+                <label class="flex items-center gap-2 text-sm text-ink-soft">
                     <input type="checkbox" name="send_now" value="1" checked
-                           class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                    Send immediately <span class="text-slate-500">(untick to leave them in the outbox)</span>
+                           class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
+                    Send immediately <span class="text-muted">(untick to leave them in the outbox)</span>
                 </label>
 
                 <div class="ml-auto flex items-center gap-3">

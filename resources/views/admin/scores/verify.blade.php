@@ -44,7 +44,7 @@
     @endif
 
     @if ($awaiting->isNotEmpty())
-    <div class="mt-6 rounded-xl bg-gold-50 px-5 py-4 ring-1 ring-gold-600/20">
+    <div class="mt-6 rounded-xl bg-gold-50 dark:bg-gold-950/40 px-5 py-4 ring-1 ring-gold-600/20 dark:ring-gold-400/20">
         <h3 class="text-sm font-semibold text-gold-900">Why these marks are held back</h3>
         <p class="mt-1.5 text-sm text-gold-900">
             A sheet that was photographed or scanned is read by software, and software misreads
@@ -60,19 +60,19 @@
     @endif
 
     @unless ($editable)
-        <div class="mt-6 rounded-xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-600/20">
+        <div class="mt-6 rounded-xl bg-amber-50 dark:bg-amber-950/40 px-5 py-4 text-sm text-amber-900 dark:text-amber-100 ring-1 ring-amber-600/20 dark:ring-amber-400/20">
             This examination is locked. The marks are shown for checking, but nothing can be saved.
         </div>
     @endunless
 
     @if ($errors->any())
-        <div class="mt-6 rounded-xl bg-rose-50 px-5 py-4 ring-1 ring-rose-600/20">
-            <h3 class="text-sm font-semibold text-rose-900">Nothing was saved</h3>
-            <p class="mt-1 text-sm text-rose-800">
+        <div class="mt-6 rounded-xl bg-rose-50 dark:bg-rose-950/40 px-5 py-4 ring-1 ring-rose-600/20 dark:ring-rose-400/20">
+            <h3 class="text-sm font-semibold text-rose-900 dark:text-rose-100">Nothing was saved</h3>
+            <p class="mt-1 text-sm text-rose-800 dark:text-rose-200">
                 Fix the marks below and save again. A sheet is written as a whole, so one bad box
                 holds up the rest.
             </p>
-            <ul class="mt-2 list-inside list-disc text-sm text-rose-800">
+            <ul class="mt-2 list-inside list-disc text-sm text-rose-800 dark:text-rose-200">
                 @foreach ($errors->all() as $message)
                     <li>{{ $message }}</li>
                 @endforeach
@@ -102,13 +102,13 @@
                 <div class="panel-header">
                     <div>
                         <p class="panel-title">{{ $examSubject->subject?->name ?? 'Subject' }}</p>
-                        <p class="mt-0.5 text-xs text-slate-500">
+                        <p class="mt-0.5 text-xs text-muted">
                             Out of {{ rtrim(rtrim(number_format($max, 2), '0'), '.') }}
                             · pass mark {{ rtrim(rtrim(number_format($pass, 2), '0'), '.') }}%
                             @if ($rows->isEmpty())
-                                · <span class="font-medium text-emerald-700">all signed off</span>
+                                · <span class="font-medium text-emerald-700 dark:text-emerald-300">all signed off</span>
                             @elseif ($shaky > 0)
-                                · <span class="font-medium text-amber-700">{{ $shaky }} uncertain read(s)</span>
+                                · <span class="font-medium text-amber-700 dark:text-amber-300">{{ $shaky }} uncertain read(s)</span>
                             @endif
                         </p>
                     </div>
@@ -151,16 +151,16 @@
 
                                 <tr data-row="{{ $rowIndex }}"
                                     data-match="{{ strtolower($score->applicant?->full_name . ' ' . $score->applicant?->registration_number) }}">
-                                    <td class="text-center text-xs text-slate-400">{{ $loop->iteration }}</td>
+                                    <td class="text-center text-xs text-muted">{{ $loop->iteration }}</td>
 
-                                    <td class="font-mono text-xs font-medium text-slate-900">
+                                    <td class="font-mono text-xs font-medium text-ink">
                                         {{ $score->applicant?->registration_number }}
                                     </td>
 
                                     <td>
-                                        <p class="font-medium text-slate-900">{{ $score->applicant?->full_name }}</p>
+                                        <p class="font-medium text-ink">{{ $score->applicant?->full_name }}</p>
                                         @if ($score->applicant?->levelAppliedFor)
-                                            <p class="text-xs text-slate-500">{{ $score->applicant->levelAppliedFor->name }}</p>
+                                            <p class="text-xs text-muted">{{ $score->applicant->levelAppliedFor->name }}</p>
                                         @endif
                                     </td>
 
@@ -179,7 +179,7 @@
                                                    'input py-2 text-center text-sm',
                                                    'input-error' => $cellError,
                                                    'ring-2 ring-amber-400' => ! $cellError && ! $trusted($score),
-                                                   'bg-slate-50 text-slate-500' => ! $editable,
+                                                   'bg-surface-2 text-muted' => ! $editable,
                                                ])>
 
                                         <span data-feedback class="mt-1 block text-center text-[11px] font-semibold"></span>
@@ -193,13 +193,13 @@
                                         <span class="badge {{ $score->source->badge() }}">{{ $score->source->label() }}</span>
 
                                         @if ($score->confidence !== null)
-                                            <p class="mt-1 text-[11px] text-slate-500">
+                                            <p class="mt-1 text-[11px] text-muted">
                                                 {{ (int) round((float) $score->confidence * 100) }}% sure
                                             </p>
                                         @endif
 
                                         @if ($score->enteredBy)
-                                            <p class="text-[11px] text-slate-400">
+                                            <p class="text-[11px] text-muted">
                                                 committed by {{ $score->enteredBy->name }}
                                             </p>
                                         @endif
@@ -211,7 +211,7 @@
                                                value="1"
                                                @checked(old('verify.' . $score->id, $trusted($score)))
                                                @disabled(! $editable)
-                                               class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                                               class="h-4 w-4 rounded border-line text-emerald-600 dark:text-emerald-400 focus:ring-emerald-500">
                                     </td>
                                 </tr>
                             @endforeach
@@ -225,34 +225,34 @@
                          accepted too quickly. Sending it back puts it in the queue
                          again instead of re-typing it under a signature that no
                          longer means anything. --}}
-                    <details class="border-t border-slate-200 bg-slate-50/70">
-                        <summary class="cursor-pointer px-5 py-3 text-xs font-medium text-slate-600 hover:text-slate-900">
+                    <details class="border-t border-line bg-surface-2">
+                        <summary class="cursor-pointer px-5 py-3 text-xs font-medium text-ink-soft hover:text-ink">
                             {{ $verified->count() }} mark(s) on this paper already verified
                         </summary>
 
-                        <ul class="divide-y divide-slate-200 border-t border-slate-200">
+                        <ul class="divide-y divide-line border-t border-line">
                             @foreach ($verified as $score)
                                 <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5">
                                     <div class="min-w-0">
-                                        <p class="text-sm text-slate-800">
-                                            <span class="font-mono text-xs text-slate-500">{{ $score->applicant?->registration_number }}</span>
+                                        <p class="text-sm text-ink-soft">
+                                            <span class="font-mono text-xs text-muted">{{ $score->applicant?->registration_number }}</span>
                                             {{ $score->applicant?->full_name }}
                                             <span class="font-semibold">
                                                 {{ $score->is_absent ? 'absent' : rtrim(rtrim(number_format((float) $score->score, 2), '0'), '.') }}
                                             </span>
                                         </p>
-                                        <p class="text-[11px] text-slate-500">
+                                        <p class="text-[11px] text-muted">
                                             {{ $score->source->label() }}
                                             @if ($score->verifiedBy) · signed off by {{ $score->verifiedBy->name }} @endif
                                         </p>
                                     </div>
 
-                                    <label class="flex items-center gap-2 text-xs text-slate-600">
+                                    <label class="flex items-center gap-2 text-xs text-ink-soft">
                                         <input type="checkbox"
                                                name="unverify[{{ $score->id }}]"
                                                value="1"
                                                @disabled(! $editable)
-                                               class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+                                               class="h-4 w-4 rounded border-line text-rose-600 dark:text-rose-400 focus:ring-rose-500">
                                         Send back
                                     </label>
                                 </li>

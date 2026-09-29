@@ -15,13 +15,13 @@
 <label for="{{ $inputId }}" class="label">{{ $setting->label ?? $setting->key }}</label>
 
 <div class="flex flex-wrap items-start gap-4">
-    <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface">
         @if ($setting->value)
             <img src="{{ asset('storage/' . $setting->value) }}"
                  alt="The current {{ $what }}"
                  class="h-full w-full object-contain p-2">
         @else
-            <span class="px-2 text-center text-[11px] leading-tight text-slate-400">
+            <span class="px-2 text-center text-[11px] leading-tight text-muted">
                 No {{ $what }} yet
             </span>
         @endif
@@ -32,17 +32,17 @@
                type="file"
                name="settings[{{ $setting->key }}][file]"
                accept="{{ $accept }}"
-               class="block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2.5 file:py-1.5 file:text-xs @error($errorKey) input-error @enderror">
+               class="block w-full text-xs text-ink-soft file:mr-2 file:rounded-md file:border-0 file:bg-surface-3 file:px-2.5 file:py-1.5 file:text-xs @error($errorKey) input-error @enderror">
 
         @if ($setting->value)
             {{-- Only offered when there is something to take back, and never
                  pre-ticked: losing the school's logo to a stray click would be
                  noticed only once parents saw the site. --}}
-            <label class="mt-2 inline-flex items-center gap-2 text-xs text-slate-600">
+            <label class="mt-2 inline-flex items-center gap-2 text-xs text-ink-soft">
                 <input type="checkbox"
                        name="settings[{{ $setting->key }}][remove]"
                        value="1"
-                       class="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+                       class="h-3.5 w-3.5 rounded border-line text-rose-600 dark:text-rose-400 focus:ring-rose-500">
                 Remove the current {{ $what }}
             </label>
         @endif

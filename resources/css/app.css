@@ -1,5 +1,17 @@
 @import 'tailwindcss';
 
+/*
+ * Dark mode is a class on <html>, not the operating system's setting.
+ *
+ * Tailwind's default `dark:` follows prefers-color-scheme, which would leave the
+ * office with no way to choose: a machine set to dark would get a dark control
+ * panel whether anybody wanted it or not, and a shared computer in the school
+ * office would change under whoever sat down at it. So the theme is the user's
+ * to pick, remembered on their machine, and it starts from what their system
+ * already says - which is what the pre-paint script in each layout arranges.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../../vendor/livewire/livewire/**/*.blade.php';
@@ -49,6 +61,72 @@
     --radius-xl: 0.875rem;
     --radius-2xl: 1.125rem;
     --radius-3xl: 1.5rem;
+
+    /*
+     | Semantic colours.
+     |
+     | These are what the components are built from, so a component never has to
+     | know which theme it is in. Each is defined once, below, for light and for
+     | dark; naming a surface "white" and a line "slate-200" is what makes a
+     | dark mode a rewrite instead of a palette.
+     */
+    --color-surface: var(--surface);          /* cards, panels, inputs */
+    --color-surface-2: var(--surface-2);      /* the page behind them */
+    --color-surface-3: var(--surface-3);      /* recessed: table heads, wells */
+    --color-ink: var(--ink);                  /* headings and strong text */
+    --color-ink-soft: var(--ink-soft);        /* body copy */
+    --color-muted: var(--muted);              /* labels, hints, meta */
+    --color-line: var(--line);                /* borders and dividers */
+    --color-line-soft: var(--line-soft);      /* hairline dividers inside cards */
+}
+
+/* ---------------------------------------------------------------------
+   LIGHT
+   --------------------------------------------------------------------- */
+:root {
+    color-scheme: light;
+
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --surface-3: #f1f5f9;
+    --ink: #0f172a;
+    --ink-soft: #334155;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --line-soft: #f1f5f9;
+
+    --ring-edge: rgb(15 23 42 / 0.06);
+    --input-arrow: %2364748b;
+}
+
+/* ---------------------------------------------------------------------
+   DARK
+
+   Navy rather than black: this is a school, and the identity is already deep
+   navy. Surfaces step up in lightness away from the page, so a card still reads
+   as raised without a shadow doing the whole job.
+   --------------------------------------------------------------------- */
+.dark {
+    color-scheme: dark;
+
+    --surface: #111a2e;
+    --surface-2: #090f1c;
+    --surface-3: #182240;
+    --ink: #eef3fb;
+    --ink-soft: #c7d2e4;
+    --muted: #93a3bd;
+    --line: #23304e;
+    --line-soft: #1b2540;
+
+    --ring-edge: rgb(255 255 255 / 0.08);
+    --input-arrow: %2393a3bd;
+
+    /* A shadow on a dark surface only reads as a shadow if it is darker than the
+       surface, which the light-mode values are not. Borders do more of the work
+       here, so these are kept shallow. */
+    --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35), 0 1px 3px 0 rgb(0 0 0 / 0.25);
+    --shadow-lift: 0 10px 30px -12px rgb(0 0 0 / 0.55);
+    --shadow-float: 0 24px 60px -20px rgb(0 0 0 / 0.65);
 }
 
 /* =====================================================================
@@ -61,7 +139,7 @@
     }
 
     body {
-        @apply bg-slate-50 text-slate-800 antialiased;
+        @apply bg-surface-2 text-ink-soft antialiased;
         font-feature-settings: 'cv11', 'ss01';
     }
 
@@ -69,7 +147,7 @@
     h2,
     h3,
     h4 {
-        @apply text-slate-900 tracking-tight;
+        @apply text-ink tracking-tight;
     }
 
     [x-cloak] {
@@ -113,12 +191,12 @@
     }
 
     .btn-secondary {
-        @apply border border-slate-300 bg-white text-slate-700 shadow-sm
-               hover:border-slate-400 hover:bg-slate-50 active:scale-[0.985];
+        @apply border border-line bg-surface text-ink-soft shadow-sm
+               hover:border-slate-400 hover:bg-surface-3 active:scale-[0.985];
     }
 
     .btn-ghost {
-        @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+        @apply text-ink-soft hover:bg-surface-3 hover:text-ink;
     }
 
     .btn-danger {
@@ -135,15 +213,15 @@
 
     /* ---------- Forms ---------- */
     .label {
-        @apply block text-sm font-medium text-slate-700 mb-1.5;
+        @apply block text-sm font-medium text-ink-soft mb-1.5;
     }
 
     .input {
-        @apply block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5
-               text-sm text-slate-900 shadow-sm transition
-               placeholder:text-slate-400
+        @apply block w-full rounded-xl border border-line bg-surface px-3.5 py-2.5
+               text-sm text-ink shadow-sm transition
+               placeholder:text-muted
                focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:outline-none
-               disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+               disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-muted;
     }
 
     .input-error {
@@ -151,11 +229,11 @@
     }
 
     .hint {
-        @apply mt-1.5 text-xs text-slate-500;
+        @apply mt-1.5 text-xs text-muted;
     }
 
     .error-text {
-        @apply mt-1.5 text-xs font-medium text-rose-600;
+        @apply mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400;
     }
 
     select.input {
@@ -165,10 +243,16 @@
         background-size: 1.1rem;
     }
 
+    /* The chevron is drawn in the light-mode grey; on a dark surface it needs the
+       lighter one or the arrow disappears into the field. */
+    .dark select.input {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2393a3bd' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3e%3c/svg%3e");
+    }
+
     /* ---------- Surfaces ---------- */
     .card,
     .card-pad {
-        @apply rounded-2xl border border-slate-200 bg-white shadow-card;
+        @apply rounded-2xl border border-line bg-surface shadow-card;
     }
 
     .card-pad {
@@ -176,11 +260,11 @@
     }
 
     .panel-header {
-        @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4;
+        @apply flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4;
     }
 
     .panel-title {
-        @apply text-base font-semibold text-slate-900;
+        @apply text-base font-semibold text-ink;
     }
 
     /* ---------- Badges ---------- */
@@ -190,38 +274,39 @@
     }
 
     .badge-neutral {
-        @apply bg-slate-100 text-slate-700 ring-slate-500/20;
+        @apply bg-surface-3 text-ink-soft ring-line;
     }
 
     /* ---------- Tables ---------- */
     .table-wrap {
-        @apply overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-card;
+        @apply overflow-x-auto rounded-2xl border border-line bg-surface shadow-card;
     }
 
     .table {
-        @apply min-w-full divide-y divide-slate-200 text-sm;
+        @apply min-w-full divide-y divide-line text-sm;
     }
 
     .table thead th {
-        @apply bg-slate-50/80 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500;
+        @apply bg-surface-3 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted;
     }
 
     .table tbody td {
-        @apply px-4 py-3 align-middle text-slate-700;
+        @apply px-4 py-3 align-middle text-ink-soft;
     }
 
     .table tbody tr {
-        @apply transition-colors hover:bg-slate-50/70;
+        @apply transition-colors hover:bg-surface-3/60;
     }
 
     /* ---------- Navigation ---------- */
     .nav-link {
         @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
-               text-slate-600 transition-colors hover:bg-white hover:text-brand-900;
+               text-ink-soft transition-colors hover:bg-surface-3 hover:text-brand-700
+               dark:hover:text-brand-200;
     }
 
     .nav-link-active {
-        @apply bg-white text-brand-900 shadow-sm ring-1 ring-slate-200;
+        @apply bg-surface text-brand-700 shadow-sm ring-1 ring-line dark:text-brand-200;
     }
 
     /* ---------- Public site ---------- */
@@ -231,11 +316,12 @@
 
     .eyebrow {
         @apply inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1
-               text-xs font-semibold uppercase tracking-widest text-brand-700 ring-1 ring-brand-600/10;
+               text-xs font-semibold uppercase tracking-widest text-brand-700 ring-1 ring-brand-600/10
+               dark:bg-brand-900/40 dark:text-brand-200 dark:ring-brand-300/20;
     }
 
     .display {
-        @apply font-display font-semibold tracking-tight text-slate-900;
+        @apply font-display font-semibold tracking-tight text-ink;
     }
 }
 
@@ -243,6 +329,27 @@
    PRINT
    ===================================================================== */
 @media print {
+    /*
+     * Paper is white, whatever the screen is doing. The tokens are reset to the
+     * light palette so a parent who prints their child's record in dark mode does
+     * not get a sheet of near-black ink. The standalone documents (the merit list,
+     * the letters, the admit cards, the slips) are not themed at all for the same
+     * reason: a document should look like a document.
+     */
+    :root,
+    .dark {
+        --surface: #ffffff;
+        --surface-2: #ffffff;
+        --surface-3: #f8fafc;
+        --ink: #0f172a;
+        --ink-soft: #1e293b;
+        --muted: #475569;
+        --line: #cbd5e1;
+        --line-soft: #e2e8f0;
+        --ring-edge: rgb(15 23 42 / 0.08);
+        color-scheme: light;
+    }
+
     /*
      * Browsers leave background colours and images off when printing. That would
      * turn the admission-number panel into white text on white paper and strip

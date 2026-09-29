@@ -74,13 +74,13 @@
             <div class="panel-header">
                 <div>
                     <p class="panel-title">Cutoff marks</p>
-                    <p class="mt-0.5 text-xs text-slate-500">
+                    <p class="mt-0.5 text-xs text-muted">
                         {{ $session?->name }} · set by the exam officer
                     </p>
                 </div>
             </div>
 
-            <div class="divide-y divide-slate-100">
+            <div class="divide-y divide-line-soft">
                 @php $activeLevels = $levels->where('id', $exam->level_id); @endphp
 
                 @foreach (($activeLevels->isNotEmpty() ? $activeLevels : $levels) as $level)
@@ -93,13 +93,13 @@
                         <input type="hidden" name="academic_session_id" value="{{ $session?->id }}">
 
                         <div class="flex items-center justify-between gap-3">
-                            <p class="text-sm font-semibold text-slate-900">{{ $level->name }}</p>
+                            <p class="text-sm font-semibold text-ink">{{ $level->name }}</p>
                             @if ($setting)
-                                <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20">
+                                <span class="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-200 ring-brand-600/20">
                                     {{ rtrim(rtrim(number_format((float) $setting->cutoff_mark, 2), '0'), '.') }}%
                                 </span>
                             @else
-                                <span class="badge bg-slate-100 text-slate-600 ring-slate-500/20">Not set</span>
+                                <span class="badge bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20">Not set</span>
                             @endif
                         </div>
 
@@ -117,10 +117,10 @@
                                      :value="$setting?->available_slots" />
 
                             <div class="pt-6">
-                                <label class="flex items-center gap-2 text-sm text-slate-700">
+                                <label class="flex items-center gap-2 text-sm text-ink-soft">
                                     <input type="checkbox" name="require_all_subjects" value="1"
                                            @checked($setting?->require_all_subjects)
-                                           class="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                           class="h-4 w-4 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
                                     Must pass all
                                 </label>
                             </div>
@@ -137,17 +137,17 @@
         {{-- ================= Run the pipeline ================= --}}
         <div class="space-y-6 lg:col-span-2">
             <div class="card-pad">
-                <h2 class="text-base font-semibold text-slate-900">Run the admission pipeline</h2>
-                <p class="mt-1 text-sm text-slate-500">
+                <h2 class="text-base font-semibold text-ink">Run the admission pipeline</h2>
+                <p class="mt-1 text-sm text-muted">
                     Work down the three steps in order. Each one is safe to run more than once.
                 </p>
 
                 <div class="mt-6 space-y-4">
                     {{-- Step 1 --}}
-                    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
                         <div>
-                            <p class="text-sm font-semibold text-slate-900">1. Compute the merit list</p>
-                            <p class="mt-0.5 text-sm text-slate-500">
+                            <p class="text-sm font-semibold text-ink">1. Compute the merit list</p>
+                            <p class="mt-0.5 text-sm text-muted">
                                 Totals each candidate's marks as a percentage and ranks them by class.
                             </p>
                         </div>
@@ -161,10 +161,10 @@
                     </div>
 
                     {{-- Step 2 --}}
-                    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
                         <div>
-                            <p class="text-sm font-semibold text-slate-900">2. Apply the cutoff mark</p>
-                            <p class="mt-0.5 text-sm text-slate-500">
+                            <p class="text-sm font-semibold text-ink">2. Apply the cutoff mark</p>
+                            <p class="mt-0.5 text-sm text-muted">
                                 Marks everyone above the cutoff as admitted, respecting the number of places.
                             </p>
                         </div>
@@ -180,10 +180,10 @@
                     </div>
 
                     {{-- Step 3 --}}
-                    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 p-4">
                         <div>
-                            <p class="text-sm font-semibold text-emerald-900">3. Transfer admitted applicants</p>
-                            <p class="mt-0.5 text-sm text-emerald-800">
+                            <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">3. Transfer admitted applicants</p>
+                            <p class="mt-0.5 text-sm text-emerald-800 dark:text-emerald-200">
                                 Issues an admission number like
                                 <span class="font-mono">SAC/{{ $session?->startYear() ?? now()->year }}/001</span>,
                                 creates a portal login, and raises the first fee invoice.
@@ -200,7 +200,7 @@
                     </div>
                 </div>
 
-                <p class="mt-5 rounded-xl bg-slate-50 p-4 text-xs text-slate-600 ring-1 ring-slate-200">
+                <p class="mt-5 rounded-xl bg-surface-2 p-4 text-xs text-ink-soft ring-1 ring-line">
                     An applicant is only ever transferred once. Running step 3 again simply skips
                     anyone who already has a student record.
                 </p>
@@ -215,8 +215,8 @@
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0">
                         <p class="eyebrow">Another chance</p>
-                        <h2 class="mt-1 font-display text-lg font-semibold text-slate-900">Resit examination</h2>
-                        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                        <h2 class="mt-1 font-display text-lg font-semibold text-ink">Resit examination</h2>
+                        <p class="mt-1 max-w-2xl text-sm text-muted">
                             A resit is a fresh sitting built from this one. Only the papers each candidate
                             actually failed are copied across, and it runs through the same score entry,
                             marking and cutoff steps — so nothing extra to learn.
@@ -224,14 +224,14 @@
                     </div>
 
                     @if (! $resitEnabled)
-                        <span class="badge bg-slate-100 text-slate-600 ring-slate-500/20">Switched off in Settings</span>
+                        <span class="badge bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20">Switched off in Settings</span>
                     @endif
                 </div>
 
                 {{-- Resits already created from this sitting. --}}
                 @if ($existingResits->isNotEmpty())
-                    <div class="mt-5 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <div class="mt-5 rounded-xl bg-surface-2 p-4 ring-1 ring-line">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-muted">
                             Already created from this sitting
                         </p>
 
@@ -239,17 +239,17 @@
                             @foreach ($existingResits as $resit)
                                 <li class="flex flex-wrap items-center gap-3 text-sm">
                                     <x-status-pill :status="$resit->status" />
-                                    <span class="font-medium text-slate-800">
+                                    <span class="font-medium text-ink-soft">
                                         Resit {{ $resit->resit_round }}
                                     </span>
-                                    <span class="text-slate-500">
+                                    <span class="text-muted">
                                         {{ $resit->examSubjects_count }} paper(s)
                                         @if ($resit->exam_date)
                                             · {{ $resit->exam_date->format('j M Y') }}
                                         @endif
                                     </span>
                                     <a href="{{ route('admin.exams.show', $resit) }}"
-                                       class="ml-auto text-xs font-medium text-brand-700 hover:underline">
+                                       class="ml-auto text-xs font-medium text-brand-700 dark:text-brand-200 hover:underline">
                                         Open sitting →
                                     </a>
                                 </li>
@@ -259,7 +259,7 @@
                 @endif
 
                 @if ($resitCandidates->isEmpty())
-                    <p class="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                    <p class="mt-5 rounded-xl bg-surface-2 p-4 text-sm text-ink-soft ring-1 ring-line">
                         Nobody is eligible for a resit yet. Candidates appear here once they have sat
                         {{ $exam->title }} and have not been admitted.
                     </p>
@@ -268,29 +268,29 @@
                         @csrf
 
                         <div class="flex items-center justify-between gap-4">
-                            <p class="text-sm font-medium text-slate-700">
+                            <p class="text-sm font-medium text-ink-soft">
                                 {{ $resitCandidates->count() }} candidate(s) eligible
                             </p>
 
-                            <label class="flex items-center gap-2 text-xs text-slate-600">
+                            <label class="flex items-center gap-2 text-xs text-ink-soft">
                                 <input type="checkbox" x-model="all"
-                                       class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                       class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
                                 Select all
                             </label>
                         </div>
 
-                        <div class="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
+                        <div class="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-xl border border-line p-3">
                             @foreach ($resitCandidates as $candidate)
-                                <label class="flex cursor-pointer items-start gap-3 rounded-lg p-2 transition hover:bg-slate-50">
+                                <label class="flex cursor-pointer items-start gap-3 rounded-lg p-2 transition hover:bg-surface-2">
                                     <input type="checkbox" name="applicant_ids[]" value="{{ $candidate->id }}"
                                            x-bind:checked="all"
-                                           class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                           class="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
 
                                     <span class="min-w-0 flex-1">
-                                        <span class="block text-sm font-medium text-slate-900">
+                                        <span class="block text-sm font-medium text-ink">
                                             {{ $candidate->full_name }}
                                         </span>
-                                        <span class="block font-mono text-xs text-slate-500">
+                                        <span class="block font-mono text-xs text-muted">
                                             {{ $candidate->registration_number }}
                                         </span>
                                     </span>
@@ -310,7 +310,7 @@
                             <button type="submit" class="btn-primary btn-sm" @disabled(! $resitEnabled)>
                                 Create resit sitting
                             </button>
-                            <p class="text-xs text-slate-500">
+                            <p class="text-xs text-muted">
                                 Guardians are texted automatically, and each candidate
                                 keeps the marks they already passed.
                             </p>
@@ -345,11 +345,11 @@
                         @php $margin = $decision->margin(); @endphp
 
                         <tr>
-                            <td class="text-center font-semibold text-slate-900">{{ $decision->position ?? '—' }}</td>
+                            <td class="text-center font-semibold text-ink">{{ $decision->position ?? '—' }}</td>
 
                             <td>
-                                <p class="font-medium text-slate-900">{{ $decision->applicant?->full_name }}</p>
-                                <p class="font-mono text-xs text-slate-500">
+                                <p class="font-medium text-ink">{{ $decision->applicant?->full_name }}</p>
+                                <p class="font-mono text-xs text-muted">
                                     {{ $decision->applicant?->registration_number }}
                                     @if ($decision->applicant?->student)
                                         → {{ $decision->applicant->student->student_number }}
@@ -359,16 +359,16 @@
 
                             <td class="text-center text-sm">{{ $decision->subjects_offered }}</td>
                             <td class="text-center text-sm">{{ $decision->subjects_offered }}</td>
-                            <td class="text-center text-sm font-medium text-emerald-700">{{ $decision->subjects_passed }}</td>
-                            <td class="text-center text-sm {{ $decision->subjects_failed > 0 ? 'font-medium text-rose-600' : 'text-slate-400' }}">
+                            <td class="text-center text-sm font-medium text-emerald-700 dark:text-emerald-300">{{ $decision->subjects_passed }}</td>
+                            <td class="text-center text-sm {{ $decision->subjects_failed > 0 ? 'font-medium text-rose-600 dark:text-rose-400' : 'text-muted' }}">
                                 {{ $decision->subjects_failed }}
                             </td>
 
-                            <td class="text-right font-semibold text-slate-900">
+                            <td class="text-right font-semibold text-ink">
                                 {{ rtrim(rtrim(number_format((float) $decision->average_score, 2), '0'), '.') }}%
                             </td>
 
-                            <td class="text-right text-sm font-medium {{ $margin >= 0 ? 'text-emerald-700' : 'text-rose-600' }}">
+                            <td class="text-right text-sm font-medium {{ $margin >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-400' }}">
                                 {{ $margin >= 0 ? '+' : '' }}{{ rtrim(rtrim(number_format($margin, 2), '0'), '.') }}
                             </td>
 
@@ -381,7 +381,7 @@
                                 @if ($decision->decision === \App\Enums\AdmissionDecisionStatus::Admitted
                                      && $decision->applicant
                                      && ! $decision->applicant->student)
-                                    <p class="mt-1.5 text-[11px] font-semibold text-gold-700">
+                                    <p class="mt-1.5 text-[11px] font-semibold text-gold-700 dark:text-gold-300">
                                         Not transferred yet
                                     </p>
                                 @endif
@@ -405,7 +405,7 @@
                                             <button type="submit" class="btn-ghost btn-sm">Set</button>
                                         </form>
                                     @else
-                                        <span class="text-xs text-slate-400">Transferred</span>
+                                        <span class="text-xs text-muted">Transferred</span>
                                     @endif
                                 @endcan
                             </td>
@@ -413,8 +413,8 @@
                     @empty
                         <tr>
                             <td colspan="10" class="py-16 text-center">
-                                <p class="text-sm font-medium text-slate-900">Nothing computed yet</p>
-                                <p class="mt-1 text-sm text-slate-500">
+                                <p class="text-sm font-medium text-ink">Nothing computed yet</p>
+                                <p class="mt-1 text-sm text-muted">
                                     Run step 1 above to build the merit list from the captured scores.
                                 </p>
                             </td>

@@ -37,7 +37,7 @@
     <div class="panel-header">
         <div>
             <p class="panel-title">Waiting list</p>
-            <p class="mt-0.5 text-xs text-slate-500">
+            <p class="mt-0.5 text-xs text-muted">
                 Candidates who passed the cutoff after the places ran out. Closest to the line comes first.
             </p>
         </div>
@@ -65,7 +65,7 @@
                                      never load. --}}
                                 <input type="checkbox"
                                        onclick="const on = this.checked; this.closest('form').querySelectorAll('input[name^=decisions]').forEach(function (cb) { cb.checked = on; });"
-                                       class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                       class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
                                        aria-label="Select every waiting candidate">
                             </th>
                             <th>Candidate</th>
@@ -82,12 +82,12 @@
                                 <td>
                                     <input type="checkbox" name="decisions[]" value="{{ $decision->id }}"
                                            @checked($free !== null && $index < $free)
-                                           class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                           class="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500">
                                 </td>
 
                                 <td>
-                                    <p class="font-medium text-slate-900">{{ $decision->applicant?->full_name ?? '—' }}</p>
-                                    <p class="font-mono text-xs text-slate-500">
+                                    <p class="font-medium text-ink">{{ $decision->applicant?->full_name ?? '—' }}</p>
+                                    <p class="font-mono text-xs text-muted">
                                         {{ $decision->applicant?->registration_number ?? '—' }}
                                     </p>
                                 </td>
@@ -96,18 +96,18 @@
 
                                 <td class="text-right font-semibold">{{ $fmt($decision->average_score) }}%</td>
 
-                                <td class="text-right text-sm text-emerald-700">
+                                <td class="text-right text-sm text-emerald-700 dark:text-emerald-300">
                                     +{{ $fmt($decision->margin()) }}
                                 </td>
 
-                                <td class="max-w-xs text-xs text-slate-500">{{ $decision->remarks ?? '—' }}</td>
+                                <td class="max-w-xs text-xs text-muted">{{ $decision->remarks ?? '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3 border-t border-slate-200 p-5 sm:p-6">
+            <div class="flex flex-wrap items-center gap-3 border-t border-line p-5 sm:p-6">
                 @can('admissions.decide')
                     <button type="submit" class="btn-primary btn-sm"
                             @disabled($free !== null && $free === 0)>
@@ -115,7 +115,7 @@
                     </button>
                 @endcan
 
-                <p class="text-xs text-slate-500">
+                <p class="text-xs text-muted">
                     @if ($free === null)
                         No limit is set, so any number can be promoted.
                     @elseif ($free === 0)

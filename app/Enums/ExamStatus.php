@@ -32,12 +32,12 @@ enum ExamStatus: string
     public function badge(): string
     {
         return match ($this) {
-            self::Draft => 'bg-slate-100 text-slate-600 ring-slate-500/20',
-            self::Scheduled => 'bg-sky-50 text-sky-700 ring-sky-600/20',
+            self::Draft => 'bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20',
+            self::Scheduled => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 ring-sky-600/20 dark:ring-sky-400/20',
             self::Ongoing => 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
             self::Marking => 'bg-violet-50 text-violet-700 ring-violet-600/20',
-            self::AwaitingReview => 'bg-amber-50 text-amber-700 ring-amber-600/20',
-            self::Completed => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            self::AwaitingReview => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 ring-amber-600/20 dark:ring-amber-400/20',
+            self::Completed => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20',
             self::Published => 'bg-teal-50 text-teal-700 ring-teal-600/20',
         };
     }

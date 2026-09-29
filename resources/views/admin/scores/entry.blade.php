@@ -50,7 +50,7 @@
             <div class="panel-header">
                 <div>
                     <p class="panel-title">Marked scripts</p>
-                    <p class="mt-0.5 text-xs text-slate-500">
+                    <p class="mt-0.5 text-xs text-muted">
                         Enter each candidate's mark out of {{ rtrim(rtrim(number_format($max, 2), '0'), '.') }}.
                         Leave blank if the script has not been marked yet.
                     </p>
@@ -60,21 +60,21 @@
             </div>
 
             @unless ($editable)
-                <p class="border-b border-slate-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+                <p class="border-b border-line bg-amber-50 dark:bg-amber-950/40 px-5 py-3 text-sm text-amber-900 dark:text-amber-100">
                     This examination is locked, so the marks are shown but cannot be changed.
                 </p>
             @endunless
 
-            <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-3">
+            <div class="border-b border-line bg-surface-2 px-5 py-3">
                 <div class="flex flex-wrap items-center gap-3">
                     <label for="candidate-filter" class="sr-only">Find a candidate</label>
                     <input id="candidate-filter" type="search" placeholder="Find a candidate by name or number"
                            @input="filter = $event.target.value; applyFilter()"
                            class="input max-w-xs py-2 text-sm">
 
-                    <p class="ml-auto text-xs text-slate-500">
+                    <p class="ml-auto text-xs text-muted">
                         Passing mark
-                        <span class="font-medium text-slate-700">
+                        <span class="font-medium text-ink-soft">
                             {{ rtrim(rtrim(number_format((float) $examSubject->effectivePassMark(), 2), '0'), '.') }}%
                         </span>
                         · <span x-text="savedCount"></span> box(es) changed
@@ -101,16 +101,16 @@
                             @php $locked = $score->isVerified() && ! $canOverride; @endphp
 
                             <tr data-row="{{ $index }}" data-match="{{ strtolower($score->applicant?->full_name . ' ' . $score->applicant?->registration_number) }}">
-                                <td class="text-center text-xs text-slate-400">{{ $index + 1 }}</td>
+                                <td class="text-center text-xs text-muted">{{ $index + 1 }}</td>
 
-                                <td class="font-mono text-xs font-medium text-slate-900">
+                                <td class="font-mono text-xs font-medium text-ink">
                                     {{ $score->applicant?->registration_number }}
                                 </td>
 
                                 <td>
-                                    <p class="font-medium text-slate-900">{{ $score->applicant?->full_name }}</p>
+                                    <p class="font-medium text-ink">{{ $score->applicant?->full_name }}</p>
                                     @if ($score->applicant?->levelAppliedFor)
-                                        <p class="text-xs text-slate-500">{{ $score->applicant->levelAppliedFor->name }}</p>
+                                        <p class="text-xs text-muted">{{ $score->applicant->levelAppliedFor->name }}</p>
                                     @endif
                                 </td>
 
@@ -130,14 +130,14 @@
                                            @class([
                                                'input py-2 text-center text-sm',
                                                'input-error' => $errors->has('scores.' . $score->id),
-                                               'bg-slate-50 text-slate-500' => $locked || ! $editable,
+                                               'bg-surface-2 text-muted' => $locked || ! $editable,
                                            ])
                                            placeholder="—">
 
                                     <span data-feedback class="mt-1 block text-center text-[11px] font-semibold"></span>
 
                                     @if ($locked)
-                                        <p class="mt-0.5 text-center text-[11px] text-slate-400">Verified</p>
+                                        <p class="mt-0.5 text-center text-[11px] text-muted">Verified</p>
                                     @endif
 
                                     @error('scores.' . $score->id)
@@ -155,29 +155,29 @@
                                            @checked(old('absent.' . $score->id, $score->is_absent))
                                            @readonly($locked || ! $editable)
                                            @disabled($locked || ! $editable)
-                                           class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+                                           class="h-4 w-4 rounded border-line text-rose-600 dark:text-rose-400 focus:ring-rose-500">
                                 </td>
 
                                 <td class="align-top">
                                     @if ($score->score !== null || $score->is_absent)
                                         <span class="badge {{ $score->source->badge() }}">{{ $score->source->label() }}</span>
                                     @else
-                                        <span class="text-xs text-slate-400">Not captured</span>
+                                        <span class="text-xs text-muted">Not captured</span>
                                     @endif
                                 </td>
 
                                 <td class="align-top">
                                     @if ($score->isVerified())
-                                        <span class="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                                        <span class="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
                                             </svg>
                                             Verified
                                         </span>
                                     @elseif ($score->needsVerification())
-                                        <span class="badge bg-gold-50 text-gold-700 ring-gold-600/20">Check</span>
+                                        <span class="badge bg-gold-50 dark:bg-gold-950/40 text-gold-700 dark:text-gold-300 ring-gold-600/20 dark:ring-gold-400/20">Check</span>
                                     @else
-                                        <span class="text-xs text-slate-400">Awaiting</span>
+                                        <span class="text-xs text-muted">Awaiting</span>
                                     @endif
                                 </td>
                             </tr>
@@ -186,8 +186,8 @@
                 </table>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4">
-                <p class="max-w-2xl text-xs text-slate-500">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-2 px-5 py-4">
+                <p class="max-w-2xl text-xs text-muted">
                     @if ($mayVerify ?? false)
                         Marks you save are verified straight away, because you hold the verification
                         permission.
@@ -205,20 +205,20 @@
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2">
         <div class="card-pad">
-            <h3 class="text-sm font-semibold text-slate-900">Reading the marks</h3>
-            <p class="mt-2 text-sm text-slate-600">
+            <h3 class="text-sm font-semibold text-ink">Reading the marks</h3>
+            <p class="mt-2 text-sm text-ink-soft">
                 Scores are saved as a percentage of this subject's total for the merit list, so
                 subjects can carry different total marks and still be compared fairly.
             </p>
         </div>
 
         <div class="card-pad">
-            <h3 class="text-sm font-semibold text-slate-900">Grade boundaries</h3>
+            <h3 class="text-sm font-semibold text-ink">Grade boundaries</h3>
             <div class="mt-3 flex flex-wrap gap-2">
                 @foreach ($gradeScale as $grade)
-                    <span class="badge bg-slate-100 text-slate-700 ring-slate-500/20">
+                    <span class="badge bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20">
                         {{ $grade->grade }}
-                        <span class="font-normal text-slate-500">
+                        <span class="font-normal text-muted">
                             {{ rtrim(rtrim(number_format((float) $grade->min_score, 0), '0'), '.') }}–{{ rtrim(rtrim(number_format((float) $grade->max_score, 0), '0'), '.') }}
                         </span>
                     </span>

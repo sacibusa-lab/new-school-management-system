@@ -80,13 +80,13 @@
         <div class="panel-header">
             <div>
                 <p class="panel-title">{{ $exam->displayTitle() }}</p>
-                <p class="mt-0.5 text-xs text-slate-500">
+                <p class="mt-0.5 text-xs text-muted">
                     {{ $candidates->count() }} candidate(s) across {{ $examSubjects->count() }} paper(s)
                 </p>
             </div>
 
             <div class="flex items-center gap-3">
-                <p class="hidden text-xs text-slate-500 sm:block">
+                <p class="hidden text-xs text-muted sm:block">
                     <span x-text="savedCount"></span> box(es) changed
                 </p>
                 <button type="submit" class="btn-primary btn-sm" @disabled(! $editable)>Save all marks</button>
@@ -95,22 +95,22 @@
 
         {{-- Search narrows the rows without touching what has been typed: the form
              still submits every box, including the hidden ones. --}}
-        <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-3">
+        <div class="border-b border-line bg-surface-2 px-5 py-3">
             <div class="flex flex-wrap items-center gap-3">
                 <label for="candidate-filter" class="sr-only">Find a candidate</label>
                 <input id="candidate-filter" type="search" placeholder="Find a candidate by name or number"
                        @input="filter = $event.target.value; applyFilter()"
                        class="input max-w-xs py-2 text-sm">
 
-                <p class="text-xs text-slate-500" x-show="filter !== ''" x-cloak>
+                <p class="text-xs text-muted" x-show="filter !== ''" x-cloak>
                     Showing <span x-text="visibleRows"></span> of {{ $candidates->count() }}
                 </p>
 
-                <p class="ml-auto text-xs text-slate-500">
+                <p class="ml-auto text-xs text-muted">
                     Passing mark:
                     @foreach ($examSubjects as $i => $s)
                         {{ $i > 0 ? ' · ' : '' }}{{ $s->subject?->name }}
-                        <span class="font-medium text-slate-700">{{ rtrim(rtrim(number_format((float) $s->effectivePassMark(), 2), '0'), '.') }}%</span>
+                        <span class="font-medium text-ink-soft">{{ rtrim(rtrim(number_format((float) $s->effectivePassMark(), 2), '0'), '.') }}%</span>
                     @endforeach
                 </p>
             </div>
@@ -120,12 +120,12 @@
             <table class="table score-grid">
                 <thead>
                     <tr>
-                        <th class="sticky left-0 z-10 bg-white">Candidate</th>
+                        <th class="sticky left-0 z-10 bg-surface">Candidate</th>
 
                         @foreach ($examSubjects as $index => $examSubject)
                             <th class="w-40 text-center" data-column="{{ $index + 1 }}">
-                                <span class="block text-slate-900">{{ $examSubject->subject?->name }}</span>
-                                <span class="block font-normal text-slate-400">
+                                <span class="block text-ink">{{ $examSubject->subject?->name }}</span>
+                                <span class="block font-normal text-muted">
                                     out of {{ rtrim(rtrim(number_format((float) $examSubject->total_marks, 2), '0'), '.') }}
                                 </span>
                             </th>
@@ -145,9 +145,9 @@
                         <tr data-row="{{ $rowIndex }}"
                             data-cutoff="{{ (float) $exam->cutoff_mark }}"
                             data-match="{{ strtolower($candidate->full_name . ' ' . $candidate->registration_number) }}">
-                            <td class="sticky left-0 z-10 bg-white">
-                                <p class="font-medium text-slate-900">{{ $candidate->full_name }}</p>
-                                <p class="font-mono text-xs text-slate-500">{{ $candidate->registration_number }}</p>
+                            <td class="sticky left-0 z-10 bg-surface">
+                                <p class="font-medium text-ink">{{ $candidate->full_name }}</p>
+                                <p class="font-mono text-xs text-muted">{{ $candidate->registration_number }}</p>
                             </td>
 
                             @foreach ($examSubjects as $columnIndex => $examSubject)
@@ -173,7 +173,7 @@
                                                @class([
                                                    'input w-full py-2 text-center text-sm',
                                                    'input-error' => $errors->has('scores.' . $cell->id),
-                                                   'bg-slate-50 text-slate-500' => $locked || ! $editable,
+                                                   'bg-surface-2 text-muted' => $locked || ! $editable,
                                                ])
                                                placeholder="—">
 
@@ -184,7 +184,7 @@
                                               class="mt-1 block text-center text-[11px] font-semibold"></span>
 
                                         @if ($locked)
-                                            <p class="mt-0.5 text-center text-[11px] text-slate-400">
+                                            <p class="mt-0.5 text-center text-[11px] text-muted">
                                                 Verified
                                             </p>
                                         @endif
@@ -193,7 +193,7 @@
                                             <p class="error-text text-center">{{ $message }}</p>
                                         @enderror
                                     @else
-                                        <span class="block py-2 text-center text-xs text-slate-300">—</span>
+                                        <span class="block py-2 text-center text-xs text-muted">—</span>
                                     @endif
                                 </td>
                             @endforeach
@@ -202,10 +202,10 @@
                                  sees the figure move as the marks go in. The starting values
                                  are rendered here, so they are right before any script runs. --}}
                             <td class="text-right align-top pt-3">
-                                <span data-total class="font-semibold text-slate-900">
+                                <span data-total class="font-semibold text-ink">
                                     {{ rtrim(rtrim(number_format($summary['total'], 2), '0'), '.') }}
                                 </span>
-                                <span data-count class="block text-[11px] text-slate-400">
+                                <span data-count class="block text-[11px] text-muted">
                                     {{ $summary['marked'] === 1 ? '1 paper' : $summary['marked'] . ' papers' }}
                                 </span>
                             </td>
@@ -216,9 +216,9 @@
                                      desk measures against cutoff_mark. --}}
                                 <span data-average @class([
                                     'font-semibold',
-                                    'text-emerald-700' => $summary['marked'] > 0 && $summary['average'] >= (float) $exam->cutoff_mark,
-                                    'text-amber-700' => $summary['marked'] > 0 && $summary['average'] < (float) $exam->cutoff_mark,
-                                    'text-slate-400' => $summary['marked'] === 0,
+                                    'text-emerald-700 dark:text-emerald-300' => $summary['marked'] > 0 && $summary['average'] >= (float) $exam->cutoff_mark,
+                                    'text-amber-700 dark:text-amber-300' => $summary['marked'] > 0 && $summary['average'] < (float) $exam->cutoff_mark,
+                                    'text-muted' => $summary['marked'] === 0,
                                 ])>
                                     {{ rtrim(rtrim(number_format($summary['average'], 2), '0'), '.') }}%
                                 </span>
@@ -229,8 +229,8 @@
             </table>
         </div>
 
-        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4">
-            <p class="max-w-2xl text-xs text-slate-500">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-2 px-5 py-4">
+            <p class="max-w-2xl text-xs text-muted">
                 @if ($mayVerify)
                     Marks you type are marked verified straight away, because you hold the verification
                     permission. Correcting one afterwards needs the override permission.

@@ -9,7 +9,7 @@
 
     <div class="space-y-6 lg:col-span-2">
         <div class="card-pad">
-            <h2 class="text-base font-semibold text-slate-900">Examination details</h2>
+            <h2 class="text-base font-semibold text-ink">Examination details</h2>
 
             <div class="mt-6 grid gap-5 sm:grid-cols-2">
                 <div class="sm:col-span-2">
@@ -34,8 +34,8 @@
         </div>
 
         <div class="card-pad">
-            <h2 class="text-base font-semibold text-slate-900">Subjects examined</h2>
-            <p class="mt-1 text-sm text-slate-500">
+            <h2 class="text-base font-semibold text-ink">Subjects examined</h2>
+            <p class="mt-1 text-sm text-muted">
                 Every candidate sits all selected subjects. You can add or remove subjects later.
             </p>
 
@@ -52,16 +52,16 @@
                     <label @class([
                         'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 transition',
                         'border-gold-300 bg-gold-50/50 hover:border-gold-400' => $isStandard,
-                        'border-slate-200 hover:border-brand-300 hover:bg-brand-50/40' => ! $isStandard,
+                        'border-line hover:border-brand-300 hover:bg-brand-50/40' => ! $isStandard,
                     ])>
                         <input type="checkbox" name="subjects[]" value="{{ $subject->id }}"
                                @checked(in_array($subject->id, $selectedSubjects, true))
-                               class="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                               class="h-4 w-4 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
 
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate text-sm text-slate-700">{{ $subject->name }}</span>
+                            <span class="block truncate text-sm text-ink-soft">{{ $subject->name }}</span>
                             @if ($isStandard)
-                                <span class="block text-[11px] font-medium uppercase tracking-wider text-gold-700">
+                                <span class="block text-[11px] font-medium uppercase tracking-wider text-gold-700 dark:text-gold-300">
                                     Entrance paper
                                 </span>
                             @endif
@@ -70,17 +70,17 @@
                 @endforeach
             </div>
 
-            <p class="mt-4 text-xs text-slate-500">
+            <p class="mt-4 text-xs text-muted">
                 The entrance papers your school sits
                 ({{ \App\Models\Subject::query()->whereIn('id', $standardPapers)->pluck('name')->implode(', ') ?: 'none configured' }})
                 are ticked for you. Change them in
-                <a href="{{ route('admin.settings.index') }}" class="font-semibold text-brand-700 underline decoration-brand-300 underline-offset-2">Settings</a>
+                <a href="{{ route('admin.settings.index') }}" class="font-semibold text-brand-700 dark:text-brand-200 underline decoration-brand-300 underline-offset-2">Settings</a>
                 if your entrance papers change.
             </p>
         </div>
 
         <div class="card-pad">
-            <h2 class="text-base font-semibold text-slate-900">Marking scheme</h2>
+            <h2 class="text-base font-semibold text-ink">Marking scheme</h2>
 
             <div class="mt-6 grid gap-5 sm:grid-cols-3">
                 <x-field name="total_marks" label="Marks per subject" type="number" required
@@ -111,7 +111,7 @@
     {{-- ================= Guidance ================= --}}
     <aside class="space-y-6">
         <div class="card-pad">
-            <h3 class="text-sm font-semibold text-slate-900">What happens next</h3>
+            <h3 class="text-sm font-semibold text-ink">What happens next</h3>
             <ol class="mt-4 space-y-4">
                 @foreach ([
                     'Register the candidates — this creates a blank score row for every candidate and subject.',
@@ -120,18 +120,18 @@
                     'Transfer the successful applicants into the results and fees portals.',
                 ] as $index => $step)
                     <li class="flex gap-3">
-                        <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                        <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-xs font-semibold text-ink-soft">
                             {{ $index + 1 }}
                         </span>
-                        <span class="text-sm text-slate-600">{{ $step }}</span>
+                        <span class="text-sm text-ink-soft">{{ $step }}</span>
                     </li>
                 @endforeach
             </ol>
         </div>
 
         <div class="card-pad bg-brand-50/60">
-            <h3 class="text-sm font-semibold text-brand-900">Tip</h3>
-            <p class="mt-2 text-sm text-brand-800">
+            <h3 class="text-sm font-semibold text-brand-900 dark:text-brand-100">Tip</h3>
+            <p class="mt-2 text-sm text-brand-800 dark:text-brand-200">
                 Set the status to <strong>Draft</strong> while you are preparing. Switch it to
                 <strong>Scheduled</strong> once the date is confirmed so it appears on the public website.
             </p>

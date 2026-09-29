@@ -31,14 +31,14 @@
                     <td>
                         <div class="flex flex-wrap items-center gap-2">
                             {{-- Resits carry their round so two sittings never look identical. --}}
-                            <p class="font-medium text-slate-900">{{ $exam->displayTitle() }}</p>
+                            <p class="font-medium text-ink">{{ $exam->displayTitle() }}</p>
 
                             @if ($exam->is_resit)
-                                <span class="badge bg-gold-50 text-gold-700 ring-gold-600/20">Resit</span>
+                                <span class="badge bg-gold-50 dark:bg-gold-950/40 text-gold-700 dark:text-gold-300 ring-gold-600/20 dark:ring-gold-400/20">Resit</span>
                             @endif
                         </div>
 
-                        <p class="text-xs text-slate-500">{{ $exam->academicSession?->name }}</p>
+                        <p class="text-xs text-muted">{{ $exam->academicSession?->name }}</p>
                     </td>
 
                     <td class="text-sm">{{ $exam->level?->name ?? 'All levels' }}</td>
@@ -46,7 +46,7 @@
                     <td class="text-sm">
                         {{ $exam->exam_date?->format('j M Y') ?? '—' }}
                         @if ($exam->starts_at)
-                            <p class="text-xs text-slate-500">{{ \Illuminate\Support\Str::of($exam->starts_at)->substr(0, 5) }}</p>
+                            <p class="text-xs text-muted">{{ \Illuminate\Support\Str::of($exam->starts_at)->substr(0, 5) }}</p>
                         @endif
                     </td>
 
@@ -62,8 +62,8 @@
             @empty
                 <tr>
                     <td colspan="7" class="py-16 text-center">
-                        <p class="text-sm font-medium text-slate-900">No examinations yet</p>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="text-sm font-medium text-ink">No examinations yet</p>
+                        <p class="mt-1 text-sm text-muted">
                             Create the entrance examination, add its subjects, then register the candidates.
                         </p>
                         @can('exams.manage')

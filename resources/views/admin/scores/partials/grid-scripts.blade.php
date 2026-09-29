@@ -78,13 +78,13 @@
 
                 if (parsed.state === 'absent') {
                     badge.textContent = 'absent';
-                    badge.className = base + 'text-rose-600';
+                    badge.className = base + 'text-rose-600 dark:text-rose-400';
                     return;
                 }
 
                 if (parsed.state === 'invalid' || parsed.value < 0 || (max > 0 && parsed.value > max)) {
                     badge.textContent = max > 0 && parsed.state === 'mark' ? 'over ' + max : 'not a mark';
-                    badge.className = base + 'text-rose-600';
+                    badge.className = base + 'text-rose-600 dark:text-rose-400';
                     input.classList.add('ring-2', 'ring-rose-400');
                     return;
                 }
@@ -93,7 +93,7 @@
                 const grade = this.gradeFor(percentage);
 
                 badge.textContent = (grade ? grade + ' · ' : '') + percentage.toFixed(0) + '%';
-                badge.className = base + (percentage < pass ? 'text-amber-600' : 'text-emerald-600');
+                badge.className = base + (percentage < pass ? 'text-amber-600' : 'text-emerald-600 dark:text-emerald-400');
             },
 
             /** Two decimals at most, with trailing zeros dropped: 225, 74.33. */
@@ -142,7 +142,7 @@
 
                 averageCell.textContent = this.trim(average) + '%';
                 averageCell.className = 'font-semibold '
-                    + (marked === 0 ? 'text-slate-400' : (average >= cutoff ? 'text-emerald-700' : 'text-amber-700'));
+                    + (marked === 0 ? 'text-muted' : (average >= cutoff ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'));
 
                 const countCell = row.querySelector('[data-count]');
                 if (countCell) {

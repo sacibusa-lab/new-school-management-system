@@ -38,14 +38,14 @@
     {{-- ================= Profile ================= --}}
     <div class="space-y-6 lg:col-span-2">
         <div class="card">
-            <div class="flex flex-wrap items-center gap-4 border-b border-slate-200 p-5">
+            <div class="flex flex-wrap items-center gap-4 border-b border-line p-5">
                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-900 font-display text-lg font-semibold text-gold-300">
                     {{ $applicant->initials }}
                 </span>
 
                 <div class="min-w-0 flex-1">
-                    <p class="font-display text-lg font-semibold text-slate-900">{{ $applicant->full_name }}</p>
-                    <p class="mt-0.5 font-mono text-sm text-slate-500">{{ $applicant->registration_number }}</p>
+                    <p class="font-display text-lg font-semibold text-ink">{{ $applicant->full_name }}</p>
+                    <p class="mt-0.5 font-mono text-sm text-muted">{{ $applicant->registration_number }}</p>
                 </div>
 
                 <x-status-pill :status="$applicant->status" />
@@ -68,8 +68,8 @@
                     ['Guardian relationship', $applicant->guardian_relationship ?? '—'],
                 ] as [$label, $value])
                     <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</dt>
-                        <dd class="mt-1 text-sm text-slate-800">{{ $value }}</dd>
+                        <dt class="text-xs font-semibold uppercase tracking-wider text-muted">{{ $label }}</dt>
+                        <dd class="mt-1 text-sm text-ink-soft">{{ $value }}</dd>
                     </div>
                 @endforeach
 
@@ -80,16 +80,16 @@
                     ['Applicant email', $applicant->email],
                 ], fn ($row) => filled($row[1])) as [$label, $value])
                     <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</dt>
-                        <dd class="mt-1 text-sm text-slate-800">{{ $value }}</dd>
+                        <dt class="text-xs font-semibold uppercase tracking-wider text-muted">{{ $label }}</dt>
+                        <dd class="mt-1 text-sm text-ink-soft">{{ $value }}</dd>
                     </div>
                 @endforeach
             </dl>
 
             @if ($applicant->admin_notes)
-                <div class="border-t border-slate-200 bg-slate-50/70 p-5">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Office notes</p>
-                    <p class="mt-1.5 text-sm text-slate-700">{{ $applicant->admin_notes }}</p>
+                <div class="border-t border-line bg-surface-2 p-5">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-muted">Office notes</p>
+                    <p class="mt-1.5 text-sm text-ink-soft">{{ $applicant->admin_notes }}</p>
                 </div>
             @endif
         </div>
@@ -106,13 +106,13 @@
             <div class="panel-header">
                 <div>
                     <p class="panel-title">Passport and documents</p>
-                    <p class="mt-0.5 text-xs text-slate-500">
+                    <p class="mt-0.5 text-xs text-muted">
                         Held against this applicant
                     </p>
                 </div>
 
                 @if ($documents !== [])
-                    <span class="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20">
+                    <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">
                         {{ count($documents) }} document(s)
                     </span>
                 @endif
@@ -125,15 +125,15 @@
                         {{-- asset() rather than Storage::url(): the disk URL is built from
                              APP_URL, which is not the host the office actually browses on. --}}
                         <a href="{{ asset('storage/' . $applicant->photo_path) }}" target="_blank"
-                           class="block overflow-hidden rounded-xl ring-1 ring-slate-200 transition hover:ring-brand-400">
+                           class="block overflow-hidden rounded-xl ring-1 ring-line transition hover:ring-brand-400">
                             <img src="{{ asset('storage/' . $applicant->photo_path) }}"
                                  alt="Passport photograph of {{ $applicant->full_name }}"
                                  class="h-36 w-32 object-cover">
                         </a>
-                        <p class="mt-2 text-center text-xs text-slate-500">Passport photograph</p>
+                        <p class="mt-2 text-center text-xs text-muted">Passport photograph</p>
                     @else
-                        <div class="flex h-36 w-32 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50">
-                            <span class="text-xs text-slate-400">No photograph</span>
+                        <div class="flex h-36 w-32 items-center justify-center rounded-xl border border-dashed border-line bg-surface-2">
+                            <span class="text-xs text-muted">No photograph</span>
                         </div>
                     @endif
 
@@ -147,10 +147,10 @@
                             <label for="applicant-photo" class="sr-only">Passport photograph</label>
                             <input id="applicant-photo" name="photo" type="file" required
                                    accept=".jpg,.jpeg,.png,.webp"
-                                   class="block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2.5 file:py-1.5 file:text-xs">
+                                   class="block w-full text-xs text-ink-soft file:mr-2 file:rounded-md file:border-0 file:bg-surface-3 file:px-2.5 file:py-1.5 file:text-xs">
 
                             @error('photo')
-                                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                                <p class="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
                             @enderror
 
                             <button type="submit" class="btn-secondary btn-sm mt-2 w-full">
@@ -164,7 +164,7 @@
                                   onsubmit="return confirm('Remove {{ $applicant->full_name }}\'s photograph?')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn-ghost btn-sm w-full text-rose-600">
+                                <button type="submit" class="btn-ghost btn-sm w-full text-rose-600 dark:text-rose-400">
                                     Remove
                                 </button>
                             </form>
@@ -179,14 +179,14 @@
                             @foreach ($documents as $document)
                                 @php $path = $document['path'] ?? null; @endphp
 
-                                <li class="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+                                <li class="flex items-center gap-3 rounded-xl border border-line p-3">
                                     <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-medium text-slate-800">
+                                        <p class="truncate text-sm font-medium text-ink-soft">
                                             {{ $document['name'] ?? 'Document' }}
                                         </p>
 
                                         @if (! empty($document['size']))
-                                            <p class="text-xs text-slate-500">
+                                            <p class="text-xs text-muted">
                                                 {{ number_format(((int) $document['size']) / 1024, 0) }} KB
                                             </p>
                                         @endif
@@ -196,7 +196,7 @@
                                         <a href="{{ asset('storage/' . $path) }}" target="_blank"
                                            class="btn-ghost btn-sm">Open</a>
                                     @else
-                                        <span class="text-xs text-slate-400">Missing</span>
+                                        <span class="text-xs text-muted">Missing</span>
                                     @endif
 
                                     @can('admissions.update')
@@ -207,7 +207,7 @@
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="path" value="{{ $path }}">
-                                                <button type="submit" class="btn-ghost btn-sm text-rose-600">Remove</button>
+                                                <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Remove</button>
                                             </form>
                                         @endif
                                     @endcan
@@ -221,26 +221,26 @@
                     @can('admissions.update')
                         <form method="POST" action="{{ route('admin.applicants.documents.store', $applicant) }}"
                               enctype="multipart/form-data"
-                              class="{{ $documents !== [] ? 'mt-4' : '' }} rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                              class="{{ $documents !== [] ? 'mt-4' : '' }} rounded-xl border border-dashed border-line bg-surface-2 p-3">
                             @csrf
 
-                            <label for="applicant-documents" class="block text-xs font-semibold text-slate-700">
+                            <label for="applicant-documents" class="block text-xs font-semibold text-ink-soft">
                                 Attach documents
                             </label>
-                            <p class="mt-1 text-xs text-slate-500">
+                            <p class="mt-1 text-xs text-muted">
                                 Birth certificate, testimonial, baptismal card — PDF, JPG, PNG or WEBP,
                                 up to {{ (int) (\App\Services\Admissions\ApplicantDocumentService::MAX_KB / 1024) }} MB each.
                             </p>
 
                             <input id="applicant-documents" name="documents[]" type="file" multiple
                                    accept=".pdf,.jpg,.jpeg,.png,.webp"
-                                   class="mt-2 block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-2.5 file:py-1.5 file:text-xs">
+                                   class="mt-2 block w-full text-xs text-ink-soft file:mr-2 file:rounded-md file:border-0 file:bg-surface file:px-2.5 file:py-1.5 file:text-xs">
 
                             @error('documents')
-                                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                                <p class="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
                             @enderror
                             @error('documents.*')
-                                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                                <p class="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
                             @enderror
 
                             <button type="submit" class="btn-secondary btn-sm mt-2">Attach</button>
@@ -255,15 +255,15 @@
             <div class="panel-header">
                 <div>
                     <p class="panel-title">Examination scores</p>
-                    <p class="mt-0.5 text-xs text-slate-500">Marks captured against this applicant</p>
+                    <p class="mt-0.5 text-xs text-muted">Marks captured against this applicant</p>
                 </div>
 
                 @if ($decision)
                     <div class="text-right">
-                        <p class="font-display text-xl font-semibold text-slate-900">
+                        <p class="font-display text-xl font-semibold text-ink">
                             {{ rtrim(rtrim(number_format((float) $decision->average_score, 2), '0'), '.') }}%
                         </p>
-                        <p class="text-xs text-slate-500">
+                        <p class="text-xs text-muted">
                             position {{ $decision->position ?? '—' }} of {{ $decision->subjects_offered ? '' : '' }}candidates
                         </p>
                     </div>
@@ -271,7 +271,7 @@
             </div>
 
             @if ($applicant->scores->isEmpty())
-                <p class="px-5 py-10 text-center text-sm text-slate-500">
+                <p class="px-5 py-10 text-center text-sm text-muted">
                     No scores have been captured for this applicant yet.
                 </p>
             @else
@@ -292,13 +292,13 @@
                         <tbody>
                             @foreach ($applicant->scores as $score)
                                 <tr>
-                                    <td class="font-medium text-slate-900">{{ $score->examSubject?->subject?->name ?? '—' }}</td>
+                                    <td class="font-medium text-ink">{{ $score->examSubject?->subject?->name ?? '—' }}</td>
 
                                     <td class="text-right font-medium">
                                         {{ $score->is_absent ? 'Absent' : ($score->score !== null ? rtrim(rtrim(number_format((float) $score->score, 2), '0'), '.') : '—') }}
                                     </td>
 
-                                    <td class="text-right text-sm text-slate-500">
+                                    <td class="text-right text-sm text-muted">
                                         {{ rtrim(rtrim(number_format((float) ($score->examSubject?->total_marks ?? 0), 2), '0'), '.') }}
                                     </td>
 
@@ -312,11 +312,11 @@
 
                                     <td class="text-sm">
                                         @if ($score->isVerified())
-                                            <span class="text-emerald-700">Yes</span>
+                                            <span class="text-emerald-700 dark:text-emerald-300">Yes</span>
                                         @elseif ($score->needsVerification())
-                                            <span class="badge bg-gold-50 text-gold-700 ring-gold-600/20">Check</span>
+                                            <span class="badge bg-gold-50 dark:bg-gold-950/40 text-gold-700 dark:text-gold-300 ring-gold-600/20 dark:ring-gold-400/20">Check</span>
                                         @else
-                                            <span class="text-slate-400">—</span>
+                                            <span class="text-muted">—</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -332,14 +332,14 @@
     <aside class="space-y-6">
         @if ($decision)
             <div class="card-pad">
-                <h3 class="text-sm font-semibold text-slate-900">Admission decision</h3>
+                <h3 class="text-sm font-semibold text-ink">Admission decision</h3>
 
                 <div class="mt-4 flex items-center justify-between">
                     <x-status-pill :status="$decision->decision" />
                     @if ($decision->is_auto)
-                        <span class="text-xs text-slate-500">Automatic</span>
+                        <span class="text-xs text-muted">Automatic</span>
                     @elseif ($decision->decider)
-                        <span class="text-xs text-slate-500">by {{ $decision->decider->name }}</span>
+                        <span class="text-xs text-muted">by {{ $decision->decider->name }}</span>
                     @endif
                 </div>
 
@@ -351,15 +351,15 @@
                         ['Position', $decision->position ?? '—'],
                         ['Subjects passed', $decision->subjects_passed . ' / ' . $decision->subjects_offered],
                     ] as [$label, $value])
-                        <div class="flex justify-between border-b border-slate-100 pb-2.5 last:border-0">
-                            <dt class="text-slate-500">{{ $label }}</dt>
-                            <dd class="font-semibold text-slate-900">{{ $value }}</dd>
+                        <div class="flex justify-between border-b border-line-soft pb-2.5 last:border-0">
+                            <dt class="text-muted">{{ $label }}</dt>
+                            <dd class="font-semibold text-ink">{{ $value }}</dd>
                         </div>
                     @endforeach
                 </dl>
 
                 @if ($decision->remarks)
-                    <p class="mt-4 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-600 ring-1 ring-slate-200">
+                    <p class="mt-4 rounded-xl bg-surface-2 p-3.5 text-xs text-ink-soft ring-1 ring-line">
                         {{ $decision->remarks }}
                     </p>
                 @endif
@@ -368,15 +368,15 @@
 
         @if ($applicant->student)
             <div class="card-pad bg-emerald-50/60">
-                <h3 class="text-sm font-semibold text-emerald-900">Transferred to student record</h3>
+                <h3 class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Transferred to student record</h3>
 
                 <dl class="mt-4 space-y-3 text-sm">
                     <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Admission number</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Admission number</dt>
                         <dd class="mt-1 font-mono font-semibold text-emerald-950">{{ $applicant->student->student_number }}</dd>
                     </div>
                     <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Class</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Class</dt>
                         <dd class="mt-1 text-emerald-950">{{ $applicant->student->schoolClass?->name ?? 'Not assigned' }}</dd>
                     </div>
                 </dl>
@@ -389,25 +389,25 @@
                     @php $invoiceCount = $applicant->student->invoices()->count(); @endphp
 
                     @if ($invoiceCount > 0)
-                        <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20">
+                        <span class="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-200 ring-brand-600/20">
                             {{ $invoiceCount }} invoice(s) raised
                         </span>
                     @else
-                        <span class="badge bg-gold-50 text-gold-700 ring-gold-600/20">No invoice raised</span>
+                        <span class="badge bg-gold-50 dark:bg-gold-950/40 text-gold-700 dark:text-gold-300 ring-gold-600/20 dark:ring-gold-400/20">No invoice raised</span>
                     @endif
                 </div>
             </div>
         @endif
 
         <div class="card-pad">
-            <h3 class="text-sm font-semibold text-slate-900">Application timeline</h3>
+            <h3 class="text-sm font-semibold text-ink">Application timeline</h3>
 
             <ol class="mt-4 space-y-4 text-sm">
                 <li class="flex gap-3">
                     <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500"></span>
                     <span>
-                        <span class="block font-medium text-slate-800">Registered</span>
-                        <span class="text-xs text-slate-500">{{ $applicant->submitted_at?->format('j M Y, g:ia') ?? $applicant->created_at->format('j M Y') }}</span>
+                        <span class="block font-medium text-ink-soft">Registered</span>
+                        <span class="text-xs text-muted">{{ $applicant->submitted_at?->format('j M Y, g:ia') ?? $applicant->created_at->format('j M Y') }}</span>
                     </span>
                 </li>
 
@@ -415,14 +415,14 @@
                     <li class="flex gap-3">
                         <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500"></span>
                         <span>
-                            <span class="block font-medium text-slate-800">Admitted</span>
-                            <span class="text-xs text-slate-500">{{ $applicant->admitted_at->format('j M Y, g:ia') }}</span>
+                            <span class="block font-medium text-ink-soft">Admitted</span>
+                            <span class="text-xs text-muted">{{ $applicant->admitted_at->format('j M Y, g:ia') }}</span>
                         </span>
                     </li>
                 @else
                     <li class="flex gap-3">
-                        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-300"></span>
-                        <span class="text-slate-500">Admission decision pending</span>
+                        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-muted"></span>
+                        <span class="text-muted">Admission decision pending</span>
                     </li>
                 @endif
             </ol>
@@ -436,8 +436,8 @@
                     @csrf
                     @method('DELETE')
 
-                    <h3 class="text-sm font-semibold text-slate-900">Delete record</h3>
-                    <p class="mt-1.5 text-xs text-slate-500">
+                    <h3 class="text-sm font-semibold text-ink">Delete record</h3>
+                    <p class="mt-1.5 text-xs text-muted">
                         Only possible while the applicant has not been admitted.
                     </p>
                     <button type="submit" class="btn-danger btn-sm mt-4 w-full">Delete applicant</button>

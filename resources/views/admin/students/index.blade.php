@@ -36,7 +36,7 @@
             <a href="{{ route('admin.students.index') }}" class="btn-ghost btn-sm">Clear</a>
         @endif
 
-        <p class="ml-auto text-xs text-slate-500">{{ number_format($students->total()) }} student(s)</p>
+        <p class="ml-auto text-xs text-muted">{{ number_format($students->total()) }} student(s)</p>
     </div>
 </form>
 
@@ -60,18 +60,18 @@
             @forelse ($students as $student)
                 <tr>
                     <td>
-                        <p class="font-mono text-xs font-semibold text-brand-800">{{ $student->student_number }}</p>
-                        <p class="text-xs text-slate-500">{{ $student->admitted_at?->format('j M Y') }}</p>
+                        <p class="font-mono text-xs font-semibold text-brand-800 dark:text-brand-200">{{ $student->student_number }}</p>
+                        <p class="text-xs text-muted">{{ $student->admitted_at?->format('j M Y') }}</p>
                     </td>
 
                     <td>
                         <div class="flex items-center gap-3">
-                            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-[11px] font-semibold text-brand-800">
+                            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-900/30 text-[11px] font-semibold text-brand-800 dark:text-brand-200">
                                 {{ $student->initials }}
                             </span>
                             <div class="min-w-0">
-                                <p class="truncate font-medium text-slate-900">{{ $student->full_name }}</p>
-                                <p class="text-xs text-slate-500">
+                                <p class="truncate font-medium text-ink">{{ $student->full_name }}</p>
+                                <p class="text-xs text-muted">
                                     {{ $student->gender?->label() }}
                                     @if ($student->admission_average)
                                         · admitted on {{ rtrim(rtrim(number_format((float) $student->admission_average, 1), '0'), '.') }}%
@@ -83,14 +83,14 @@
 
                     <td class="text-sm">
                         {{ $student->schoolClass?->name ?? '—' }}
-                        <p class="text-xs text-slate-500">{{ $student->level?->name }}</p>
+                        <p class="text-xs text-muted">{{ $student->level?->name }}</p>
                     </td>
 
-                    <td class="font-mono text-xs text-slate-500">{{ $student->admission_number ?? '—' }}</td>
+                    <td class="font-mono text-xs text-muted">{{ $student->admission_number ?? '—' }}</td>
 
                     <td class="text-center text-sm">{{ $student->invoices_count }}</td>
 
-                    <td class="text-right text-sm font-medium {{ ($student->balance_due ?? 0) > 0 ? 'text-rose-600' : 'text-emerald-700' }}">
+                    <td class="text-right text-sm font-medium {{ ($student->balance_due ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-300' }}">
                         {{ $school->currency }}{{ number_format((float) ($student->balance_due ?? 0), 2) }}
                     </td>
 
@@ -103,8 +103,8 @@
             @empty
                 <tr>
                     <td colspan="8" class="py-16 text-center">
-                        <p class="text-sm font-medium text-slate-900">No students yet</p>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="text-sm font-medium text-ink">No students yet</p>
+                        <p class="mt-1 text-sm text-muted">
                             Students appear here automatically once you transfer admitted applicants
                             from the cutoff desk.
                         </p>

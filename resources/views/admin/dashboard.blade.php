@@ -61,7 +61,7 @@
         <div class="panel-header">
             <div>
                 <p class="panel-title">Current examination</p>
-                <p class="mt-0.5 text-xs text-slate-500">Score capture progress</p>
+                <p class="mt-0.5 text-xs text-muted">Score capture progress</p>
             </div>
 
             @if ($activeExam)
@@ -73,8 +73,8 @@
             <div class="p-5 sm:p-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p class="font-display text-lg font-semibold text-slate-900">{{ $activeExam->title }}</p>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="font-display text-lg font-semibold text-ink">{{ $activeExam->title }}</p>
+                        <p class="mt-1 text-sm text-muted">
                             {{ $activeExam->level?->name ?? 'All levels' }}
                             @if ($activeExam->exam_date)
                                 · {{ $activeExam->exam_date->format('j M Y') }}
@@ -91,31 +91,31 @@
                 @if ($scoreProgress)
                     <div class="mt-6">
                         <div class="flex items-center justify-between text-sm">
-                            <span class="font-medium text-slate-700">Scores captured</span>
-                            <span class="font-semibold text-slate-900">
+                            <span class="font-medium text-ink-soft">Scores captured</span>
+                            <span class="font-semibold text-ink">
                                 {{ number_format($scoreProgress['captured']) }} / {{ number_format($scoreProgress['expected']) }}
-                                <span class="ml-1 text-slate-500">({{ $scoreProgress['percent'] }}%)</span>
+                                <span class="ml-1 text-muted">({{ $scoreProgress['percent'] }}%)</span>
                             </span>
                         </div>
 
-                        <div class="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div class="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
                             <div class="h-full rounded-full bg-brand-700 transition-all"
                                  style="width: {{ min($scoreProgress['percent'], 100) }}%"></div>
                         </div>
 
-                        <p class="mt-2.5 text-xs text-slate-500">
+                        <p class="mt-2.5 text-xs text-muted">
                             {{ number_format($scoreProgress['verified']) }} of them verified.
                         </p>
                     </div>
                 @else
-                    <p class="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                    <p class="mt-6 rounded-xl bg-surface-2 p-4 text-sm text-ink-soft ring-1 ring-line">
                         No candidates have been registered for this examination yet.
-                        <a href="{{ route('admin.exams.show', $activeExam) }}" class="font-semibold text-brand-700 underline decoration-brand-300 underline-offset-2">Register the candidates</a>
+                        <a href="{{ route('admin.exams.show', $activeExam) }}" class="font-semibold text-brand-700 dark:text-brand-200 underline decoration-brand-300 underline-offset-2">Register the candidates</a>
                         to start capturing scores.
                     </p>
                 @endif
 
-                <div class="mt-6 flex flex-wrap gap-2.5 border-t border-slate-200 pt-5">
+                <div class="mt-6 flex flex-wrap gap-2.5 border-t border-line pt-5">
                     <a href="{{ route('admin.scores.index', ['exam' => $activeExam->id]) }}" class="btn-secondary btn-sm">Type scores</a>
                     <a href="{{ route('admin.imports.index', ['exam' => $activeExam->id]) }}" class="btn-secondary btn-sm">Upload scoresheet</a>
                     <a href="{{ route('admin.admissions.index', ['exam' => $activeExam->id]) }}" class="btn-gold btn-sm">Cutoff &amp; decisions</a>
@@ -140,26 +140,26 @@
         <div class="panel-header">
             <p class="panel-title">Needs attention</p>
             @if ($admissions['open_imports'] > 0)
-                <span class="badge bg-gold-50 text-gold-700 ring-gold-600/20">{{ $admissions['open_imports'] }} open</span>
+                <span class="badge bg-gold-50 dark:bg-gold-950/40 text-gold-700 dark:text-gold-300 ring-gold-600/20 dark:ring-gold-400/20">{{ $admissions['open_imports'] }} open</span>
             @endif
         </div>
 
-        <div class="divide-y divide-slate-100">
+        <div class="divide-y divide-line-soft">
             @forelse ($pendingImports as $import)
                 <a href="{{ route('admin.imports.show', $import) }}"
-                   class="block px-5 py-4 transition hover:bg-slate-50">
+                   class="block px-5 py-4 transition hover:bg-surface-2">
                     <div class="flex items-start justify-between gap-3">
-                        <p class="truncate text-sm font-medium text-slate-900">{{ $import->original_name }}</p>
+                        <p class="truncate text-sm font-medium text-ink">{{ $import->original_name }}</p>
                         <x-status-pill :status="$import->status" />
                     </div>
-                    <p class="mt-1 text-xs text-slate-500">
+                    <p class="mt-1 text-xs text-muted">
                         {{ $import->examSubject?->subject?->name ?? 'Whole examination' }}
                         · {{ $import->driver->label() }}
                         · {{ $import->created_at->diffForHumans() }}
                     </p>
                 </a>
             @empty
-                <p class="px-5 py-8 text-center text-sm text-slate-500">
+                <p class="px-5 py-8 text-center text-sm text-muted">
                     Nothing is waiting on you. Uploaded scoresheets appear here until they are reviewed and committed.
                 </p>
             @endforelse
@@ -173,26 +173,26 @@
     <div class="card">
         <div class="panel-header">
             <p class="panel-title">Latest applicants</p>
-            <a href="{{ route('admin.applicants.index') }}" class="text-sm font-semibold text-brand-700 hover:text-brand-800">View all</a>
+            <a href="{{ route('admin.applicants.index') }}" class="text-sm font-semibold text-brand-700 dark:text-brand-200 hover:text-brand-800 dark:text-brand-200">View all</a>
         </div>
 
-        <div class="divide-y divide-slate-100">
+        <div class="divide-y divide-line-soft">
             @forelse ($recentApplicants as $applicant)
                 <a href="{{ route('admin.applicants.show', $applicant) }}"
-                   class="flex items-center gap-3.5 px-5 py-3.5 transition hover:bg-slate-50">
-                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600">
+                   class="flex items-center gap-3.5 px-5 py-3.5 transition hover:bg-surface-2">
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-xs font-semibold text-ink-soft">
                         {{ $applicant->initials }}
                     </span>
 
                     <span class="min-w-0 flex-1">
-                        <span class="block truncate text-sm font-medium text-slate-900">{{ $applicant->full_name }}</span>
-                        <span class="block font-mono text-xs text-slate-500">{{ $applicant->registration_number }}</span>
+                        <span class="block truncate text-sm font-medium text-ink">{{ $applicant->full_name }}</span>
+                        <span class="block font-mono text-xs text-muted">{{ $applicant->registration_number }}</span>
                     </span>
 
                     <x-status-pill :status="$applicant->status" />
                 </a>
             @empty
-                <p class="px-5 py-8 text-center text-sm text-slate-500">No applicants have registered yet.</p>
+                <p class="px-5 py-8 text-center text-sm text-muted">No applicants have registered yet.</p>
             @endforelse
         </div>
     </div>
@@ -201,17 +201,17 @@
     <div class="card">
         <div class="panel-header">
             <p class="panel-title">Recent decisions</p>
-            <a href="{{ route('admin.admissions.index') }}" class="text-sm font-semibold text-brand-700 hover:text-brand-800">Cutoff desk</a>
+            <a href="{{ route('admin.admissions.index') }}" class="text-sm font-semibold text-brand-700 dark:text-brand-200 hover:text-brand-800 dark:text-brand-200">Cutoff desk</a>
         </div>
 
-        <div class="divide-y divide-slate-100">
+        <div class="divide-y divide-line-soft">
             @forelse ($recentDecisions as $decision)
                 <div class="flex items-center gap-3.5 px-5 py-3.5">
                     <span class="min-w-0 flex-1">
-                        <span class="block truncate text-sm font-medium text-slate-900">
+                        <span class="block truncate text-sm font-medium text-ink">
                             {{ $decision->applicant?->full_name ?? 'Unknown applicant' }}
                         </span>
-                        <span class="block text-xs text-slate-500">
+                        <span class="block text-xs text-muted">
                             {{ $decision->exam?->title }}
                             · avg {{ rtrim(rtrim(number_format((float) $decision->average_score, 1), '0'), '.') }}%
                             (cutoff {{ rtrim(rtrim(number_format((float) $decision->cutoff_mark, 1), '0'), '.') }}%)
@@ -221,7 +221,7 @@
                     <x-status-pill :status="$decision->decision" />
                 </div>
             @empty
-                <p class="px-5 py-8 text-center text-sm text-slate-500">
+                <p class="px-5 py-8 text-center text-sm text-muted">
                     No decisions have been made yet. They appear here once the cutoff is applied.
                 </p>
             @endforelse
@@ -327,14 +327,14 @@
     @if ($fees['billed'] > 0)
         <div class="card-pad mt-6">
             <div class="flex items-center justify-between text-sm">
-                <span class="font-medium text-slate-700">Collected against billed</span>
-                <span class="font-semibold text-slate-900">
+                <span class="font-medium text-ink-soft">Collected against billed</span>
+                <span class="font-semibold text-ink">
                     {{ $school->currency }}{{ number_format($fees['collected'], 2) }}
-                    <span class="text-slate-500">of {{ $school->currency }}{{ number_format($fees['billed'], 2) }}</span>
+                    <span class="text-muted">of {{ $school->currency }}{{ number_format($fees['billed'], 2) }}</span>
                 </span>
             </div>
 
-            <div class="mt-3 h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="mt-3 h-3 w-full overflow-hidden rounded-full bg-surface-3">
                 <div class="h-full rounded-full bg-emerald-500 transition-all"
                      style="width: {{ min($fees['rate'], 100) }}%"></div>
             </div>
@@ -345,28 +345,28 @@
         <div class="card">
             <div class="panel-header">
                 <p class="panel-title">Largest outstanding balances</p>
-                <a href="{{ route('admin.invoices.index', ['status' => 'unpaid']) }}" class="text-sm font-semibold text-brand-700 hover:text-brand-800">All invoices</a>
+                <a href="{{ route('admin.invoices.index', ['status' => 'unpaid']) }}" class="text-sm font-semibold text-brand-700 dark:text-brand-200 hover:text-brand-800 dark:text-brand-200">All invoices</a>
             </div>
 
-            <div class="divide-y divide-slate-100">
+            <div class="divide-y divide-line-soft">
                 @forelse ($topDebtors as $invoice)
-                    <a href="{{ route('admin.invoices.show', $invoice) }}" class="flex items-center gap-3.5 px-5 py-3.5 transition hover:bg-slate-50">
+                    <a href="{{ route('admin.invoices.show', $invoice) }}" class="flex items-center gap-3.5 px-5 py-3.5 transition hover:bg-surface-2">
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate text-sm font-medium text-slate-900">
+                            <span class="block truncate text-sm font-medium text-ink">
                                 {{ $invoice->student?->full_name ?? 'Unknown student' }}
                             </span>
-                            <span class="block font-mono text-xs text-slate-500">
+                            <span class="block font-mono text-xs text-muted">
                                 {{ $invoice->student?->student_number }} · {{ $invoice->invoice_number }}
                             </span>
                         </span>
                         <span class="shrink-0 text-right">
-                            <span class="block text-sm font-semibold text-rose-600">
+                            <span class="block text-sm font-semibold text-rose-600 dark:text-rose-400">
                                 {{ $school->currency }}{{ number_format((float) $invoice->balance, 2) }}
                             </span>
                         </span>
                     </a>
                 @empty
-                    <p class="px-5 py-8 text-center text-sm text-slate-500">
+                    <p class="px-5 py-8 text-center text-sm text-muted">
                         Nothing outstanding — every invoice raised has been paid.
                     </p>
                 @endforelse
@@ -376,26 +376,26 @@
         <div class="card">
             <div class="panel-header">
                 <p class="panel-title">Recent payments</p>
-                <a href="{{ route('admin.payments.index') }}" class="text-sm font-semibold text-brand-700 hover:text-brand-800">All payments</a>
+                <a href="{{ route('admin.payments.index') }}" class="text-sm font-semibold text-brand-700 dark:text-brand-200 hover:text-brand-800 dark:text-brand-200">All payments</a>
             </div>
 
-            <div class="divide-y divide-slate-100">
+            <div class="divide-y divide-line-soft">
                 @forelse ($recentPayments as $payment)
                     <div class="flex items-center gap-3.5 px-5 py-3.5">
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate text-sm font-medium text-slate-900">
+                            <span class="block truncate text-sm font-medium text-ink">
                                 {{ $payment->student?->full_name ?? 'Unknown student' }}
                             </span>
-                            <span class="block font-mono text-xs text-slate-500">
+                            <span class="block font-mono text-xs text-muted">
                                 {{ $payment->receipt_number }} · {{ $payment->methodLabel() }}
                             </span>
                         </span>
-                        <span class="shrink-0 text-sm font-semibold text-emerald-700">
+                        <span class="shrink-0 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                             {{ $school->currency }}{{ number_format((float) $payment->amount, 2) }}
                         </span>
                     </div>
                 @empty
-                    <p class="px-5 py-8 text-center text-sm text-slate-500">
+                    <p class="px-5 py-8 text-center text-sm text-muted">
                         No payments recorded yet. They appear here as the bursary receives money.
                     </p>
                 @endforelse

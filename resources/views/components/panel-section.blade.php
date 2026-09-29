@@ -10,7 +10,7 @@
      generous breathing room either side. --}}
 <section {{ $attributes->merge([
     'class' => $divider
-        ? 'mt-16 border-t border-slate-300 pt-10 sm:mt-20 sm:pt-12'
+        ? 'mt-16 border-t border-line pt-10 sm:mt-20 sm:pt-12'
         : '',
 ]) }}>
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -18,17 +18,17 @@
             {{ $number }}
         </span>
 
-        <h2 class="font-display text-xl font-semibold text-slate-900">{{ $title }}</h2>
+        <h2 class="font-display text-xl font-semibold text-ink">{{ $title }}</h2>
 
-        <span class="hidden h-px flex-1 bg-slate-200 sm:block"></span>
+        <span class="hidden h-px flex-1 bg-line sm:block"></span>
 
         @if ($meta)
-            <p class="text-xs font-medium uppercase tracking-wider text-slate-500">{{ $meta }}</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-muted">{{ $meta }}</p>
         @endif
     </div>
 
     @if ($description)
-        <p class="mt-2.5 max-w-3xl text-sm leading-relaxed text-slate-600">{{ $description }}</p>
+        <p class="mt-2.5 max-w-3xl text-sm leading-relaxed text-ink-soft">{{ $description }}</p>
     @endif
 
     <div class="mt-8">

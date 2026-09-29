@@ -26,10 +26,10 @@ enum ResultStatus: string
     public function badge(): string
     {
         return match ($this) {
-            self::Draft => 'bg-slate-100 text-slate-600 ring-slate-500/20',
-            self::Computed => 'bg-sky-50 text-sky-700 ring-sky-600/20',
+            self::Draft => 'bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20',
+            self::Computed => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 ring-sky-600/20 dark:ring-sky-400/20',
             self::Approved => 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
-            self::Published => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            self::Published => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20',
         };
     }
 

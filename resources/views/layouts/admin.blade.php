@@ -13,9 +13,10 @@
     @endif
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.theme')
     @stack('head')
 </head>
-<body class="h-full bg-slate-100" x-data="{ sidebar: false }">
+<body class="h-full bg-surface-2" x-data="{ sidebar: false }">
 
 <div class="flex min-h-full">
 
@@ -153,7 +154,7 @@
     {{-- ================= Content ================= --}}
     <div class="flex min-w-0 flex-1 flex-col">
 
-        <header class="sticky top-0 z-30 flex h-18 shrink-0 items-center gap-4 border-b border-slate-200 bg-white/85 px-4 backdrop-blur-lg sm:px-6 lg:px-8">
+        <header class="sticky top-0 z-30 flex h-18 shrink-0 items-center gap-4 border-b border-line bg-surface/85 px-4 backdrop-blur-lg sm:px-6 lg:px-8">
             <button type="button" @click="sidebar = true" class="btn-ghost -ml-2 p-2 lg:hidden" aria-label="Open menu">
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
@@ -163,11 +164,11 @@
             <div class="min-w-0 flex-1">
                 {{-- Read from the section, not a $title variable: every page sets
                      @section('title', ...) and none of them pass $title. --}}
-                <p class="truncate text-sm font-semibold text-slate-900">
+                <p class="truncate text-sm font-semibold text-ink">
                     {{ trim($__env->yieldContent('title')) ?: 'Dashboard' }}
                 </p>
                 @hasSection('subtitle')
-                    <p class="truncate text-xs text-slate-500">@yield('subtitle')</p>
+                    <p class="truncate text-xs text-muted">@yield('subtitle')</p>
                 @endif
             </div>
 
@@ -175,31 +176,33 @@
                 <div class="hidden items-center gap-2 sm:flex">@yield('actions')</div>
             @endif
 
+            <x-theme-toggle />
+
             <div x-data="{ open: false }" class="relative">
                 <button type="button" @click="open = ! open" @click.outside="open = false"
-                        class="flex items-center gap-2.5 rounded-xl p-1.5 pr-2.5 transition hover:bg-slate-100">
+                        class="flex items-center gap-2.5 rounded-xl p-1.5 pr-2.5 transition hover:bg-surface-3">
                     <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-900 text-xs font-semibold text-gold-300">
                         {{ auth()->user()->initials }}
                     </span>
                     <span class="hidden text-left sm:block">
-                        <span class="block text-xs font-semibold text-slate-900">{{ auth()->user()->name }}</span>
-                        <span class="block text-[11px] text-slate-500">{{ auth()->user()->primaryRole() }}</span>
+                        <span class="block text-xs font-semibold text-ink">{{ auth()->user()->name }}</span>
+                        <span class="block text-[11px] text-muted">{{ auth()->user()->primaryRole() }}</span>
                     </span>
-                    <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <svg class="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
                     </svg>
                 </button>
 
                 <div x-show="open" x-cloak x-transition.origin.top.right
-                     class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-float">
-                    <div class="border-b border-slate-100 px-4 py-3">
-                        <p class="text-sm font-semibold text-slate-900">{{ auth()->user()->name }}</p>
-                        <p class="truncate text-xs text-slate-500">{{ auth()->user()->email }}</p>
+                     class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-float">
+                    <div class="border-b border-line-soft px-4 py-3">
+                        <p class="text-sm font-semibold text-ink">{{ auth()->user()->name }}</p>
+                        <p class="truncate text-xs text-muted">{{ auth()->user()->email }}</p>
                     </div>
-                    <a href="{{ route('profile.edit') }}" class="block px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50">My profile</a>
+                    <a href="{{ route('profile.edit') }}" class="block px-4 py-2.5 text-sm text-ink-soft transition hover:bg-surface-2">My profile</a>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="block w-full px-4 py-2.5 text-left text-sm text-rose-600 transition hover:bg-rose-50">
+                        <button type="submit" class="block w-full px-4 py-2.5 text-left text-sm text-rose-600 dark:text-rose-400 transition hover:bg-rose-50 dark:bg-rose-950/40">
                             Sign out
                         </button>
                     </form>

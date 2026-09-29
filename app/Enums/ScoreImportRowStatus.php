@@ -34,13 +34,13 @@ enum ScoreImportRowStatus: string
     public function badge(): string
     {
         return match ($this) {
-            self::Pending => 'bg-slate-100 text-slate-600 ring-slate-500/20',
-            self::Matched => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-            self::Ambiguous => 'bg-amber-50 text-amber-700 ring-amber-600/20',
-            self::Unmatched => 'bg-rose-50 text-rose-700 ring-rose-600/20',
+            self::Pending => 'bg-surface-3 text-ink-soft ring-slate-500/20 dark:ring-slate-400/20',
+            self::Matched => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20',
+            self::Ambiguous => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 ring-amber-600/20 dark:ring-amber-400/20',
+            self::Unmatched => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 ring-rose-600/20 dark:ring-rose-400/20',
             self::Duplicate => 'bg-orange-50 text-orange-700 ring-orange-600/20',
-            self::Invalid => 'bg-rose-50 text-rose-700 ring-rose-600/20',
-            self::Ignored => 'bg-slate-100 text-slate-500 ring-slate-500/20',
+            self::Invalid => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 ring-rose-600/20 dark:ring-rose-400/20',
+            self::Ignored => 'bg-surface-3 text-muted ring-slate-500/20 dark:ring-slate-400/20',
             self::Committed => 'bg-teal-50 text-teal-700 ring-teal-600/20',
         };
     }

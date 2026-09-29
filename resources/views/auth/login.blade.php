@@ -1,8 +1,8 @@
 @extends('layouts.guest')
 
 @section('content')
-    <h1 class="font-display text-2xl font-semibold text-slate-900">Welcome back</h1>
-    <p class="mt-2 text-sm text-slate-500">
+    <h1 class="font-display text-2xl font-semibold text-ink">Welcome back</h1>
+    <p class="mt-2 text-sm text-muted">
         Sign in to manage admissions, results and fees.
     </p>
 
@@ -31,9 +31,9 @@
             placeholder="••••••••" />
 
         <div class="flex items-center justify-between">
-            <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+            <label class="inline-flex items-center gap-2 text-sm text-ink-soft">
                 <input type="checkbox" name="remember" value="1"
-                       class="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                       class="h-4 w-4 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
                 Remember me
             </label>
         </div>
@@ -41,11 +41,11 @@
         <button type="submit" class="btn-primary w-full">Sign in</button>
     </form>
 
-    <div class="mt-8 rounded-xl bg-slate-50 p-4 text-xs text-slate-600 ring-1 ring-slate-200">
-        <p class="font-semibold text-slate-700">Are you a student or parent?</p>
+    <div class="mt-8 rounded-xl bg-surface-2 p-4 text-xs text-ink-soft ring-1 ring-line">
+        <p class="font-semibold text-ink-soft">Are you a student or parent?</p>
         <p class="mt-1">
             You do not need an account to check your admission status.
-            <a href="{{ route('public.status') }}" class="font-medium text-brand-700 underline decoration-brand-300 underline-offset-2">Check your status here</a>.
+            <a href="{{ route('public.status') }}" class="font-medium text-brand-700 dark:text-brand-200 underline decoration-brand-300 underline-offset-2">Check your status here</a>.
         </p>
     </div>
 @endsection

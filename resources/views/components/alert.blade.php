@@ -5,10 +5,10 @@
 
 @php
     $tones = [
-        'info' => 'bg-brand-50 text-brand-900 ring-brand-600/15 [&_svg]:text-brand-600',
-        'success' => 'bg-emerald-50 text-emerald-900 ring-emerald-600/15 [&_svg]:text-emerald-600',
-        'warning' => 'bg-gold-50 text-gold-900 ring-gold-600/20 [&_svg]:text-gold-600',
-        'danger' => 'bg-rose-50 text-rose-900 ring-rose-600/15 [&_svg]:text-rose-600',
+        'info' => 'bg-brand-50 dark:bg-brand-900/30 text-brand-900 dark:text-brand-100 ring-brand-600/15 [&_svg]:text-brand-600',
+        'success' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 ring-emerald-600/15 [&_svg]:text-emerald-600 dark:text-emerald-400',
+        'warning' => 'bg-gold-50 dark:bg-gold-950/40 text-gold-900 ring-gold-600/20 dark:ring-gold-400/20 [&_svg]:text-gold-600',
+        'danger' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100 ring-rose-600/15 [&_svg]:text-rose-600 dark:text-rose-400',
     ];
 @endphp
 

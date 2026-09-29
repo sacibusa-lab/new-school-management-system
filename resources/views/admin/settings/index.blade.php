@@ -12,8 +12,8 @@
 <div class="card-pad">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-            <h2 class="text-base font-semibold text-slate-900">Academic session</h2>
-            <p class="mt-1 max-w-2xl text-sm text-slate-500">
+            <h2 class="text-base font-semibold text-ink">Academic session</h2>
+            <p class="mt-1 max-w-2xl text-sm text-muted">
                 The session the school is in and the term that is active. Every figure the
                 school reports hangs off these two answers — an invoice, a result, an
                 attendance register — so only one of each can be current at a time.
@@ -23,11 +23,11 @@
         {{-- The state as it stands, so the answer is readable without opening a
              select. The term dates come with it because "Second Term" means
              nothing on its own in April. --}}
-        <div class="rounded-xl bg-slate-50 px-4 py-3 text-right ring-1 ring-slate-200">
-            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        <div class="rounded-xl bg-surface-2 px-4 py-3 text-right ring-1 ring-line">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-muted">
                 Currently
             </p>
-            <p class="mt-0.5 text-sm font-semibold text-slate-900">
+            <p class="mt-0.5 text-sm font-semibold text-ink">
                 {{ $currentSession?->name ?? 'No session set' }}
                 @if ($currentTerm)
                     · {{ $currentTerm->name }}
@@ -35,7 +35,7 @@
             </p>
 
             @if ($currentTerm && ($currentTerm->starts_on || $currentTerm->ends_on))
-                <p class="mt-0.5 text-xs text-slate-500">
+                <p class="mt-0.5 text-xs text-muted">
                     {{ $currentTerm->starts_on?->format('j M Y') ?? '—' }}
                     to
                     {{ $currentTerm->ends_on?->format('j M Y') ?? '—' }}
@@ -104,11 +104,11 @@
     {{-- ================= The calendar itself =================
          One card for the whole job: which session and term the school is in, and
          the sessions and terms that exist to choose between. --}}
-    <div class="mt-8 border-t border-slate-200 pt-6">
+    <div class="mt-8 border-t border-line pt-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-                <h3 class="text-sm font-semibold text-slate-900">Sessions and terms</h3>
-                <p class="mt-1 max-w-2xl text-xs text-slate-500">
+                <h3 class="text-sm font-semibold text-ink">Sessions and terms</h3>
+                <p class="mt-1 max-w-2xl text-xs text-muted">
                     A session and its terms can be deleted only while nothing is written against
                     them. Applicants, students, examinations, invoices and results all disappear
                     with the session they belong to, so the office is told what is in the way
@@ -129,18 +129,18 @@
                     $blockers = $academic->blockers($session);
                 @endphp
 
-                <div class="rounded-2xl border border-slate-200">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
+                <div class="rounded-2xl border border-line">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft p-4">
                         <div>
-                            <p class="flex items-center gap-2 font-display text-sm font-semibold text-slate-900">
+                            <p class="flex items-center gap-2 font-display text-sm font-semibold text-ink">
                                 {{ $session->name }}
 
                                 @if ($session->is_current)
-                                    <span class="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20">Current</span>
+                                    <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">Current</span>
                                 @endif
                             </p>
 
-                            <p class="mt-0.5 text-xs text-slate-500">
+                            <p class="mt-0.5 text-xs text-muted">
                                 @if ($session->starts_on || $session->ends_on)
                                     {{ $session->starts_on?->format('j M Y') ?? '—' }}
                                     to
@@ -151,42 +151,42 @@
                             </p>
 
                             @if ($blockers !== [])
-                                <p class="mt-1 text-xs text-slate-400">
+                                <p class="mt-1 text-xs text-muted">
                                     Holds {{ $academic->describe($blockers) }}
                                 </p>
                             @endif
                         </div>
 
                         @if ($session->is_current)
-                            <p class="text-xs text-slate-400">The session the school is in cannot be deleted</p>
+                            <p class="text-xs text-muted">The session the school is in cannot be deleted</p>
                         @elseif ($blockers !== [])
-                            <p class="text-xs text-slate-400">Has records against it, so it cannot be deleted</p>
+                            <p class="text-xs text-muted">Has records against it, so it cannot be deleted</p>
                         @else
                             <form method="POST"
                                   action="{{ route('admin.settings.academic.sessions.destroy', $session) }}"
                                   onsubmit="return confirm('Delete {{ $session->name }} and its {{ $session->terms->count() }} term(s)?')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn-ghost btn-sm text-rose-600">Delete session</button>
+                                <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Delete session</button>
                             </form>
                         @endif
                     </div>
 
-                    <ul class="divide-y divide-slate-100">
+                    <ul class="divide-y divide-line-soft">
                         @forelse ($session->terms as $term)
                             @php $termBlockers = $academic->termBlockers($term); @endphp
 
                             <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                                 <div class="min-w-0">
-                                    <p class="flex items-center gap-2 text-sm text-slate-800">
+                                    <p class="flex items-center gap-2 text-sm text-ink-soft">
                                         {{ $term->name }}
 
                                         @if ($term->is_current)
-                                            <span class="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20">Active</span>
+                                            <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">Active</span>
                                         @endif
                                     </p>
 
-                                    <p class="mt-0.5 text-xs text-slate-500">
+                                    <p class="mt-0.5 text-xs text-muted">
                                         @if ($term->starts_on || $term->ends_on)
                                             {{ $term->starts_on?->format('j M Y') ?? '—' }}
                                             to
@@ -198,28 +198,28 @@
                                 </div>
 
                                 @if ($term->is_current)
-                                    <p class="text-xs text-slate-400">The active term cannot be deleted</p>
+                                    <p class="text-xs text-muted">The active term cannot be deleted</p>
                                 @elseif ($termBlockers !== [])
-                                    <p class="text-xs text-slate-400">Holds {{ $academic->describe($termBlockers) }}</p>
+                                    <p class="text-xs text-muted">Holds {{ $academic->describe($termBlockers) }}</p>
                                 @else
                                     <form method="POST"
                                           action="{{ route('admin.settings.academic.terms.destroy', $term) }}"
                                           onsubmit="return confirm('Delete {{ $term->name }} from {{ $session->name }}?')">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn-ghost btn-sm text-rose-600">Delete</button>
+                                        <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Delete</button>
                                     </form>
                                 @endif
                             </li>
                         @empty
-                            <li class="px-4 py-3 text-xs text-slate-500">
+                            <li class="px-4 py-3 text-xs text-muted">
                                 No terms yet — add one below, or set this session as current and the
                                 standard three will be created for it.
                             </li>
                         @endforelse
 
                         {{-- Add a term, in place, under the terms it joins. --}}
-                        <li class="bg-slate-50/60 px-4 py-3">
+                        <li class="bg-surface-2 px-4 py-3">
                             <form method="POST" action="{{ route('admin.settings.academic.terms.store') }}"
                                   class="flex flex-wrap items-end gap-3">
                                 @csrf
@@ -254,11 +254,11 @@
         {{-- Add a session. The name is suggested from the last one, so the common
              case is one click and no arithmetic. --}}
         <form method="POST" action="{{ route('admin.settings.academic.sessions.store') }}"
-              class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              class="mt-4 rounded-2xl border border-dashed border-line bg-surface-2 p-4">
             @csrf
 
-            <p class="text-sm font-semibold text-slate-900">Add an academic session</p>
-            <p class="mt-1 text-xs text-slate-500">
+            <p class="text-sm font-semibold text-ink">Add an academic session</p>
+            <p class="mt-1 text-xs text-muted">
                 It is added without becoming the session the school is in — moving the school is a
                 separate step, so a session can be set up before it starts.
             </p>
@@ -283,9 +283,9 @@
                            value="{{ old('ends_on') }}" class="input @error('ends_on') input-error @enderror">
                 </div>
 
-                <label class="flex items-center gap-2 pb-2 text-xs text-slate-600">
+                <label class="flex items-center gap-2 pb-2 text-xs text-ink-soft">
                     <input type="checkbox" name="with_terms" value="1" checked
-                           class="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                           class="h-4 w-4 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
                     Create First, Second and Third Term for it
                 </label>
 
@@ -318,7 +318,7 @@
                  Address above its own Name and scattered the groups. --}}
             @foreach ($groups as $group)
                 <div class="card-pad">
-                    <h2 class="text-base font-semibold text-slate-900">
+                    <h2 class="text-base font-semibold text-ink">
                         {{ $group['label'] }}
                     </h2>
 
@@ -333,18 +333,18 @@
 
                             <div @class(['sm:col-span-2' => $spansTwo])>
                                 @if ($setting->type === 'bool')
-                                    <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
+                                    <label class="flex items-start gap-3 rounded-xl border border-line p-4">
                                         <input type="hidden" name="settings[{{ $setting->key }}][value]" value="">
                                         <input type="checkbox"
                                                name="settings[{{ $setting->key }}][value]"
                                                value="1"
                                                @checked((bool) $setting->value)
-                                               class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                               class="mt-0.5 h-4 w-4 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
                                         <span>
-                                            <span class="block text-sm font-medium text-slate-700">
+                                            <span class="block text-sm font-medium text-ink-soft">
                                                 {{ $setting->label ?? $setting->key }}
                                             </span>
-                                            <span class="mt-0.5 block text-xs text-slate-500">
+                                            <span class="mt-0.5 block text-xs text-muted">
                                                 @if ($setting->key === 'registration_open')
                                                     Turn off to close the public application form.
                                                 @else
@@ -417,14 +417,14 @@
 
             <div class="flex items-center gap-3">
                 <button type="submit" class="btn-primary btn-lg">Save settings</button>
-                <p class="text-xs text-slate-500">Changes take effect immediately.</p>
+                <p class="text-xs text-muted">Changes take effect immediately.</p>
             </div>
         </div>
 
         {{-- ================= Numbering preview ================= --}}
         <aside class="space-y-6">
             <div class="card-pad">
-                <h3 class="text-sm font-semibold text-slate-900">Next numbers to be issued</h3>
+                <h3 class="text-sm font-semibold text-ink">Next numbers to be issued</h3>
 
                 <dl class="mt-4 space-y-3.5 text-sm">
                     @foreach ([
@@ -433,14 +433,14 @@
                         ['Invoice', $previews['invoice']],
                         ['Receipt', $previews['receipt']],
                     ] as [$label, $value])
-                        <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                            <dt class="text-slate-500">{{ $label }}</dt>
-                            <dd class="font-mono text-xs font-semibold text-slate-900">{{ $value }}</dd>
+                        <div class="flex items-center justify-between gap-3 border-b border-line-soft pb-3 last:border-0 last:pb-0">
+                            <dt class="text-muted">{{ $label }}</dt>
+                            <dd class="font-mono text-xs font-semibold text-ink">{{ $value }}</dd>
                         </div>
                     @endforeach
                 </dl>
 
-                <p class="mt-4 text-xs text-slate-500">
+                <p class="mt-4 text-xs text-muted">
                     Registration numbers ascend forever. Admission, invoice and receipt
                     numbers restart each academic year.
                 </p>
@@ -451,8 +451,8 @@
 
 {{-- ================= Number series ================= --}}
 <div class="mt-6 card-pad">
-    <h2 class="text-base font-semibold text-slate-900">Move a number series forward</h2>
-    <p class="mt-1 text-sm text-slate-500">
+    <h2 class="text-base font-semibold text-ink">Move a number series forward</h2>
+    <p class="mt-1 text-sm text-muted">
         Only needed when migrating from an older system — for example, so the next
         registration number continues where your previous records stopped.
     </p>
