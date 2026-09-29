@@ -63,15 +63,36 @@ class SettingsSeeder extends Seeder
         ];
 
         foreach ($settings as $setting) {
-            Setting::updateOrCreate(
-                ['key' => $setting['key']],
-                [
-                    'value' => $setting['value'],
-                    'group' => $setting['group'],
-                    'type' => $setting['type'] ?? 'string',
-                    'label' => $setting['label'] ?? null,
-                ],
-            );
+            $metadata = [
+                'group' => $setting['group'],
+                'type' => $setting['type'] ?? 'string',
+                'label' => $setting['label'] ?? null,
+            ];
+
+            $existing = Setting::query()->where('key', $setting['key'])->first();
+
+            /*
+             * This seeder is run against live databases — `migrate --seed` on a
+             * fresh clone, as the README says — so it must never write a VALUE
+             * over one that is already there. Doing that would silently reset the
+             * school's name, phone number, number prefixes and admission-letter
+             * wording back to these defaults, and nobody would know until a parent
+             * saw the wrong address on a letter.
+             *
+             * So it only creates what is missing. The metadata (label, group,
+             * type) is still kept in step, because that is how a corrected type or
+             * a renamed label reaches an installation that already has the row.
+             */
+            if ($existing) {
+                $existing->update($metadata);
+
+                continue;
+            }
+
+            Setting::create($metadata + [
+                'key' => $setting['key'],
+                'value' => $setting['value'],
+            ]);
         }
 
         Setting::flush();
