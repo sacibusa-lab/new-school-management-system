@@ -55,10 +55,12 @@
                     @php
                         // $decision and $papers arrive from the controller.
                         $rejected = $applicant->status === \App\Enums\ApplicantStatus::Rejected;
-                        $marked = in_array($applicant->status, [
-                            \App\Enums\ApplicantStatus::ExamCompleted,
-                            \App\Enums\ApplicantStatus::Shortlisted,
-                        ], true);
+                        // Shortlisted means the cutoff was applied and they are waiting
+                        // for a place — NOT that their scripts are still being marked.
+                        // The two used to share a message, and it contradicted the
+                        // marks sitting right above it on the page.
+                        $waiting = $applicant->status === \App\Enums\ApplicantStatus::Shortlisted;
+                        $marked = $applicant->status === \App\Enums\ApplicantStatus::ExamCompleted;
                     @endphp
 
                     <div class="card overflow-hidden print:break-inside-avoid">
@@ -246,6 +248,25 @@
                                 <p class="mx-auto mt-3 max-w-md text-sm text-rose-800">
                                     Please contact the school office if you would like feedback or to
                                     discuss your options.
+                                </p>
+                            </div>
+
+                        @elseif ($waiting)
+                            <div class="bg-sky-50 p-6 text-center sm:p-8 print:py-4">
+                                <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-600 text-white">
+                                    <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                                    </svg>
+                                </span>
+
+                                <p class="mt-4 font-display text-2xl font-semibold text-sky-900">
+                                    You are on the waiting list
+                                </p>
+                                <p class="mx-auto mt-3 max-w-md text-sm text-sky-900">
+                                    You passed the cutoff mark, but the places in
+                                    {{ $applicant->levelAppliedFor?->name ?? 'your class' }} were filled before
+                                    your name came up. Please watch this page — the school will contact you if a
+                                    place becomes free, so keep your phone reachable.
                                 </p>
                             </div>
 

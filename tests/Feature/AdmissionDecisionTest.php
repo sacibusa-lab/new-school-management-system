@@ -164,6 +164,29 @@ class AdmissionDecisionTest extends TestCase
         $this->assertSame(AdmissionDecisionStatus::Admitted, $decision->decision);
     }
 
+    /**
+     * A child who never turns up has to stop being counted as admitted — on their
+     * parent's page, in the intake figures, and at the enrolment hand-off.
+     */
+    public function test_marking_a_candidate_withdrawn_follows_through_to_the_applicant(): void
+    {
+        $applicant = $this->sitExam('SAC-00001', ['MTH' => 90, 'ENG' => 80, 'GPR' => 55]);
+
+        $this->admissions->compute($this->exam, $this->admin);
+        $this->admissions->applyCutoff($this->exam, $this->admin);
+
+        $this->assertSame(ApplicantStatus::Admitted, $applicant->refresh()->status);
+
+        $this->admissions->override(
+            $this->decisionFor($applicant),
+            AdmissionDecisionStatus::Withdrawn,
+            'Never reported.',
+            $this->admin,
+        );
+
+        $this->assertSame(ApplicantStatus::Withdrawn, $applicant->refresh()->status);
+    }
+
     public function test_a_brand_new_merit_row_starts_out_pending(): void
     {
         $this->sitExam('SAC-00001', ['MTH' => 90, 'ENG' => 80, 'GPR' => 55]);

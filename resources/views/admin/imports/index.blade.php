@@ -185,7 +185,26 @@
                             <td><x-status-pill :status="$import->status" /></td>
 
                             <td class="text-right">
-                                <a href="{{ route('admin.imports.show', $import) }}" class="btn-ghost btn-sm">Review</a>
+                                <div class="flex items-center justify-end gap-1">
+                                    <a href="{{ route('admin.imports.show', $import) }}" class="btn-ghost btn-sm">Review</a>
+
+                                    @can('scores.import')
+                                        {{-- Offered only where it would work: a committed
+                                             import is kept for audit and the controller
+                                             refuses to delete it, so a button that
+                                             always errored would be worse than none. --}}
+                                        @if ($import->status !== \App\Enums\ScoreImportStatus::Committed)
+                                            <form method="POST" action="{{ route('admin.imports.destroy', $import) }}"
+                                                  onsubmit="return confirm('Delete this upload? The file and its review list are removed. No marks have been committed from it yet.')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn-ghost btn-sm text-rose-600 hover:bg-rose-50">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                </div>
                             </td>
                         </tr>
                     @empty

@@ -421,6 +421,11 @@ class AdmissionService
                 $decision->applicant?->forceFill(['status' => ApplicantStatus::Rejected])->save();
             } elseif ($status === AdmissionDecisionStatus::Deferred) {
                 $decision->applicant?->forceFill(['status' => ApplicantStatus::Shortlisted])->save();
+            } elseif ($status === AdmissionDecisionStatus::Withdrawn) {
+                // The applicant record has to follow, or a child who never turned up
+                // stays marked Admitted: their parent's page keeps congratulating
+                // them, and every count of the intake is wrong by one.
+                $decision->applicant?->forceFill(['status' => ApplicantStatus::Withdrawn])->save();
             }
 
             ActivityLog::record(

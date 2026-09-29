@@ -185,6 +185,22 @@ class PublicAdmissionStatusTest extends TestCase
             ->assertDontSee('Not admitted');
     }
 
+    /**
+     * Shortlisted means the cutoff was applied and the places went first. Saying
+     * "your scripts have been marked" to a waiting-list parent contradicts the
+     * marks printed directly above it, and they will ring the office about it.
+     */
+    public function test_a_candidate_on_the_waiting_list_is_told_so(): void
+    {
+        $this->decide(ApplicantStatus::Shortlisted, 75);
+
+        $this->search()
+            ->assertOk()
+            ->assertSee('You are on the waiting list')
+            ->assertSee('You passed the cutoff mark')
+            ->assertDontSee('Your scripts have been marked');
+    }
+
     public function test_a_candidate_with_no_marks_at_all_is_told_they_are_registered(): void
     {
         $this->applicant->update(['status' => ApplicantStatus::Registered]);
