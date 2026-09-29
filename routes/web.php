@@ -128,6 +128,12 @@ Route::middleware(['auth'])
         Route::delete('applicants/{applicant}/photo', [ApplicantController::class, 'destroyPhoto'])
             ->name('applicants.photo.destroy');
 
+        // The papers a family brings in, attached to their own record.
+        Route::post('applicants/{applicant}/documents', [ApplicantController::class, 'storeDocuments'])
+            ->name('applicants.documents.store');
+        Route::delete('applicants/{applicant}/documents', [ApplicantController::class, 'destroyDocument'])
+            ->name('applicants.documents.destroy');
+
         /* ---------------- Examinations ---------------- */
         Route::resource('exams', ExamController::class);
         Route::post('exams/{exam}/subjects', [ExamController::class, 'storeSubject'])->name('exams.subjects.store');

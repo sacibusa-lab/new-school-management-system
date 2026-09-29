@@ -198,10 +198,54 @@
                                     @else
                                         <span class="text-xs text-slate-400">Missing</span>
                                     @endif
+
+                                    @can('admissions.update')
+                                        @if ($path)
+                                            <form method="POST"
+                                                  action="{{ route('admin.applicants.documents.destroy', $applicant) }}"
+                                                  onsubmit="return confirm('Remove {{ addslashes($document['name'] ?? 'this document') }}?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="path" value="{{ $path }}">
+                                                <button type="submit" class="btn-ghost btn-sm text-rose-600">Remove</button>
+                                            </form>
+                                        @endif
+                                    @endcan
                                 </li>
                             @endforeach
                         </ul>
                     @endif
+
+                    {{-- The papers arrive as paper, days after the child was registered
+                         from a spreadsheet, so this has to be usable at any time. --}}
+                    @can('admissions.update')
+                        <form method="POST" action="{{ route('admin.applicants.documents.store', $applicant) }}"
+                              enctype="multipart/form-data"
+                              class="{{ $documents !== [] ? 'mt-4' : '' }} rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                            @csrf
+
+                            <label for="applicant-documents" class="block text-xs font-semibold text-slate-700">
+                                Attach documents
+                            </label>
+                            <p class="mt-1 text-xs text-slate-500">
+                                Birth certificate, testimonial, baptismal card — PDF, JPG, PNG or WEBP,
+                                up to {{ (int) (\App\Services\Admissions\ApplicantDocumentService::MAX_KB / 1024) }} MB each.
+                            </p>
+
+                            <input id="applicant-documents" name="documents[]" type="file" multiple
+                                   accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                   class="mt-2 block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-2.5 file:py-1.5 file:text-xs">
+
+                            @error('documents')
+                                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                            @enderror
+                            @error('documents.*')
+                                <p class="mt-1 text-xs font-medium text-rose-600">{{ $message }}</p>
+                            @enderror
+
+                            <button type="submit" class="btn-secondary btn-sm mt-2">Attach</button>
+                        </form>
+                    @endcan
                 </div>
             </div>
         </div>

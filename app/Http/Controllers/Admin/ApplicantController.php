@@ -11,6 +11,7 @@ use App\Models\Exam;
 use App\Models\SchoolLevel;
 use App\Models\Score;
 use App\Services\AdmissionLetterService;
+use App\Services\Admissions\ApplicantDocumentService;
 use App\Services\Admissions\ApplicantImportService;
 use App\Services\Admissions\ApplicantPhotoService;
 use App\Services\Admissions\DuplicateApplicantService;
@@ -33,6 +34,7 @@ class ApplicantController extends Controller
         private readonly ApplicantRegistrationService $registration,
         private readonly ApplicantImportService $imports,
         private readonly ApplicantPhotoService $photos,
+        private readonly ApplicantDocumentService $documents,
         private readonly DuplicateApplicantService $duplicates,
     ) {
     }
@@ -607,6 +609,68 @@ class ApplicantController extends Controller
         $this->photos->remove($applicant);
 
         return back()->with('status', 'Photograph removed from ' . $applicant->full_name . '.');
+    }
+
+    /**
+     * Attach the papers a family brings in — birth certificate, testimonial, and
+     * the like — to this applicant's record.
+     */
+    public function storeDocuments(Request $request, Applicant $applicant): RedirectResponse
+    {
+        $this->authorize('admissions.update');
+
+        $request->validate([
+            'documents' => ['required', 'array', 'min:1', 'max:' . ApplicantDocumentService::MAX_PER_UPLOAD],
+            'documents.*' => [
+                'file',
+                'mimes:' . ApplicantDocumentService::EXTENSIONS,
+                'max:' . ApplicantDocumentService::MAX_KB,
+            ],
+        ], [
+            'documents.required' => 'Choose the file(s) to attach.',
+            'documents.*.mimes' => 'Documents have to be a PDF, JPG, PNG or WEBP.',
+            'documents.*.max' => 'A document may not be over ' . (int) (ApplicantDocumentService::MAX_KB / 1024) . ' MB.',
+            'documents.max' => 'Attach at most ' . ApplicantDocumentService::MAX_PER_UPLOAD . ' files at a time.',
+        ]);
+
+        $count = 0;
+
+        try {
+            foreach ($request->file('documents') as $file) {
+                $this->documents->store($applicant, $file, $request->user());
+                $count++;
+            }
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if ($count === 0) {
+            return back()->with('error', 'No file was attached. Choose the document and try again.');
+        }
+
+        return back()->with('status', sprintf(
+            '%d document(s) attached to %s.',
+            $count,
+            $applicant->full_name,
+        ));
+    }
+
+    /** Take one document off this applicant. */
+    public function destroyDocument(Request $request, Applicant $applicant): RedirectResponse
+    {
+        $this->authorize('admissions.update');
+
+        $validated = $request->validate([
+            'path' => ['required', 'string'],
+        ]);
+
+        $removed = $this->documents->remove($applicant, $validated['path'], $request->user());
+
+        if (! $removed) {
+            return back()->with('error', 'That document is not held against this applicant.');
+        }
+
+        return back()->with('status', 'Document removed from ' . $applicant->full_name . '.');
     }
 
     /** Drop the previous batch's parked files so nothing is left behind. */
