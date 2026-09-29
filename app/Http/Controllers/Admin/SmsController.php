@@ -40,6 +40,35 @@ class SmsController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /* SMS centre                                                          */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The SMS centre.
+     *
+     * Deliberately a placeholder. The messaging that works today lives on the
+     * other two screens, and this one is reserved for the hub that will sit on top
+     * of them — so rather than invent it now, the page says so and shows the one
+     * thing worth knowing before anything is built here: whether the Termii
+     * credentials in Settings can actually send.
+     *
+     * The connection details are read from Settings, not from .env, so the school
+     * can change them without anyone touching the server.
+     */
+    public function center(): View
+    {
+        $this->authorize('sms.view');
+
+        return view('admin.sms.center', [
+            'configured' => $this->gateway->isConfigured(),
+            'enabled' => $this->gateway->isEnabled(),
+            'senderId' => (string) Setting::get('termii_sender_id', ''),
+            'channel' => (string) Setting::get('termii_channel', ''),
+            'provider' => TermiiSmsService::PROVIDER,
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Message log                                                         */
     /* ------------------------------------------------------------------ */
 

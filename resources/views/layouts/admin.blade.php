@@ -75,7 +75,13 @@
                         ['route' => 'admin.payments.*', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view'],
                     ],
                     'Communication' => [
-                        ['route' => 'admin.sms.*', 'label' => 'Text messages', 'icon' => 'chat', 'can' => 'sms.view'],
+                        ['route' => 'admin.sms.center', 'label' => 'SMS center', 'icon' => 'chat', 'can' => 'sms.view',
+                         'matches' => ['admin.sms.center']],
+
+                        // `matches` is spelled out because admin.sms.* would also
+                        // light this up on the SMS centre screen.
+                        ['route' => 'admin.sms.*', 'label' => 'Text messages', 'icon' => 'envelope', 'can' => 'sms.view',
+                         'matches' => ['admin.sms.index', 'admin.sms.batch', 'admin.sms.batch.store', 'admin.sms.templates', 'admin.sms.templates.*']],
                     ],
                     'Administration' => [
                         ['route' => 'admin.users.*', 'label' => 'Staff & roles', 'icon' => 'shield', 'can' => 'users.manage'],

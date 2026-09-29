@@ -190,6 +190,10 @@ Route::middleware(['auth'])
         Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
 
         /* ---------------- Messaging ---------------- */
+        // Declared before the other sms routes so the literal path can never be
+        // read as part of something else.
+        Route::get('sms/center', [SmsController::class, 'center'])->name('sms.center');
+
         Route::get('sms', [SmsController::class, 'index'])->name('sms.index');
         Route::post('sms/flush', [SmsController::class, 'flush'])->name('sms.flush');
         Route::post('sms/{log}/resend', [SmsController::class, 'resend'])->name('sms.resend');
