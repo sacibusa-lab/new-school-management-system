@@ -5,7 +5,7 @@
 
 @section('actions')
     <a href="{{ route('admin.scores.grid', $exam) }}" class="btn-secondary btn-sm">Open the grid</a>
-    <a href="{{ route('admin.scores.index', ['exam' => $exam->id]) }}" class="btn-secondary btn-sm">&larr; Subjects</a>
+    <a href="{{ route('admin.scores.index', ['exam' => $exam->id]) }}" class="btn-secondary btn-sm">&larr; Score entry</a>
 @endsection
 
 @section('content')

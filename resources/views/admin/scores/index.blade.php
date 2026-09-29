@@ -1,146 +1,128 @@
 @extends('layouts.admin')
 
 @section('title', 'Score entry')
-@section('subtitle', 'Type marks straight from the marked scripts')
+@section('subtitle', 'Choose the class and the batch, then type the marks')
 
 @section('content')
 
-@if ($exams->isEmpty())
-    <x-empty-state
-        title="No examination is open for marking"
-        description="Create an examination and register its candidates first, then come back to capture the marks."
-        icon="pencil">
-        @can('exams.manage')
-            <a href="{{ route('admin.exams.create') }}" class="btn-primary">Create an examination</a>
-        @endcan
-    </x-empty-state>
-@else
-    <div class="grid gap-6 lg:grid-cols-3">
+@php
+    $row = fn ($examSubject) => $progress[$examSubject->id] ?? null;
+    $total = fn ($examSubject) => (int) ($row($examSubject)->total ?? 0);
+    $captured = fn ($examSubject) => (int) ($row($examSubject)->captured ?? 0);
+@endphp
 
-        {{-- ================= Pick an examination ================= --}}
-        <div class="lg:col-span-2">
-            <div class="card">
-                <div class="panel-header">
-                    <div>
-                        <p class="panel-title">Examinations open for marking</p>
-                        <p class="mt-0.5 text-xs text-slate-500">Choose an examination to see its subjects</p>
-                    </div>
-                </div>
-
-                <div class="divide-y divide-slate-100">
-                    @foreach ($exams as $item)
-                        @php $selected = $selectedExam && $selectedExam->id === $item->id; @endphp
-
-                        <a href="{{ route('admin.scores.index', ['exam' => $item->id]) }}"
-                           @class([
-                               'block px-5 py-4 transition',
-                               'bg-brand-50/70' => $selected,
-                               'hover:bg-slate-50' => ! $selected,
-                           ])>
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-semibold text-slate-900">{{ $item->title }}</p>
-                                    <p class="mt-0.5 text-xs text-slate-500">
-                                        {{ $item->level?->name ?? 'All levels' }}
-                                        @if ($item->exam_date) · {{ $item->exam_date->format('j M Y') }} @endif
-                                        · {{ $item->examSubjects->count() }} subject(s)
-                                    </p>
-                                </div>
-
-                                <x-status-pill :status="$item->status" />
-                            </div>
-                        </a>
-                    @endforeach
-                </div>
-            </div>
+{{-- ================= Class and batch ================= --}}
+{{-- Two choices, then the names. Changing the class re-submits so its batches
+     appear, and drops the batch that belonged to the class we just left. --}}
+<form method="GET" class="card-pad">
+    <div class="flex flex-wrap items-end gap-4">
+        <div class="min-w-40 flex-1">
+            <label for="level" class="label">Class</label>
+            <select id="level" name="level" class="input"
+                    onchange="document.getElementById('exam').value = ''; this.form.submit()">
+                @forelse ($levels as $level)
+                    <option value="{{ $level->id }}" @selected((int) $levelId === $level->id)>
+                        {{ $level->name }}
+                    </option>
+                @empty
+                    <option value="">No classes set up</option>
+                @endforelse
+            </select>
         </div>
 
-        {{-- ================= Subjects ================= --}}
-        <aside>
-            @if ($selectedExam && $subjects->isNotEmpty())
-                {{-- Marks read off a photograph are a guess until a person agrees
-                     with them, so this is put in front of everything else. --}}
-                @if (($awaitingVerification ?? 0) > 0)
-                    <a href="{{ route('admin.scores.verify', $selectedExam) }}"
-                       class="card-pad mb-6 block bg-gold-500 transition hover:bg-gold-400">
-                        <p class="font-display text-sm font-semibold text-gold-950">
-                            {{ $awaitingVerification }} mark(s) waiting to be verified
-                        </p>
-                        <p class="mt-1 text-xs text-gold-900">
-                            These were read from a sheet by machine. Check them against the scripts
-                            and sign them off before they count.
-                        </p>
-                    </a>
-                @endif
+        <div class="min-w-56 flex-[2]">
+            <label for="exam" class="label">Batch</label>
+            <select id="exam" name="exam" class="input" @disabled($batches->isEmpty())
+                    onchange="this.form.submit()">
+                @forelse ($batches as $batch)
+                    <option value="{{ $batch->id }}" @selected($selectedExam?->id === $batch->id)>
+                        {{ $batch->title }}@if ($batch->exam_date) — {{ $batch->exam_date->format('j M Y') }}@endif
+                    </option>
+                @empty
+                    <option value="">No batch for this class yet</option>
+                @endforelse
+            </select>
+            <p class="hint">One batch is one sitting of the examination.</p>
+        </div>
 
-                {{-- Keying a whole class off paper is the common case, so the grid is
-                     offered first. --}}
-                <a href="{{ route('admin.scores.grid', $selectedExam) }}"
-                   class="card-pad mb-6 block bg-brand-900 transition hover:bg-brand-800">
-                    <p class="font-display text-sm font-semibold text-white">Enter all subjects at once</p>
-                    <p class="mt-1 text-xs text-brand-200">
-                        One row per candidate, one column per paper, saved together — with
-                        support for pasting a whole column straight out of Excel.
-                    </p>
-                </a>
-            @endif
+        <button type="submit" class="btn-primary btn-sm">Show the names</button>
+    </div>
+</form>
 
-            <div class="card">
-                <div class="panel-header">
-                    <p class="panel-title">Subjects</p>
-                </div>
+@if (! $selectedExam)
+    <div class="mt-6">
+        <x-empty-state
+            title="No batch to mark yet"
+            description="A batch is one sitting of the examination. Create one for this class, register its candidates, and the names will appear here ready for their marks."
+            icon="pencil">
+            @can('exams.manage')
+                <a href="{{ route('admin.exams.create') }}" class="btn-primary">Create an examination</a>
+            @endcan
+        </x-empty-state>
+    </div>
+@else
 
-                @if ($selectedExam && $subjects->isNotEmpty())
-                    <div class="divide-y divide-slate-100">
-                        @foreach ($subjects as $examSubject)
-                            @php
-                                $row = $progress[$examSubject->id] ?? null;
-                                $total = (int) ($row->total ?? 0);
-                                $captured = (int) ($row->captured ?? 0);
-                            @endphp
+    @if (($awaitingVerification ?? 0) > 0)
+        {{-- Marks read off a photograph are a guess until a person agrees with
+             them, so this goes in front of the grid. --}}
+        <a href="{{ route('admin.scores.verify', $selectedExam) }}"
+           class="card-pad mt-6 block bg-gold-500 transition hover:bg-gold-400">
+            <p class="font-display text-sm font-semibold text-gold-950">
+                {{ $awaitingVerification }} mark(s) on this batch are waiting to be verified
+            </p>
+            <p class="mt-1 text-xs text-gold-900">
+                They were read from a sheet by machine. Check them against the scripts and sign them
+                off before they count.
+            </p>
+        </a>
+    @endif
+
+    <div class="mt-6">
+        @include('admin.scores.partials.grid')
+    </div>
+
+    @if ($examSubjects->isNotEmpty() && $candidates->isNotEmpty())
+        {{-- Capture progress, kept out of the way: the grid above is the job, and
+             this is only here to answer "how much is left?". --}}
+        <details class="card-pad mt-6">
+            <summary class="cursor-pointer text-sm font-medium text-slate-700">
+                Captured so far, paper by paper
+            </summary>
+
+            <div class="mt-4 divide-y divide-slate-100">
+                @foreach ($examSubjects as $examSubject)
+                    <div class="flex flex-wrap items-center justify-between gap-3 py-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-slate-900">{{ $examSubject->subject?->name }}</p>
+                            <p class="text-xs text-slate-500">
+                                {{ $captured($examSubject) }}/{{ $total($examSubject) }} captured
+                                @if ((int) ($row($examSubject)->absent ?? 0) > 0)
+                                    · {{ (int) $row($examSubject)->absent }} absent
+                                @endif
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <span @class([
+                                'badge',
+                                'bg-emerald-50 text-emerald-700 ring-emerald-600/20' => $total($examSubject) > 0 && $captured($examSubject) === $total($examSubject),
+                                'bg-gold-50 text-gold-700 ring-gold-600/20' => $total($examSubject) === 0 || $captured($examSubject) < $total($examSubject),
+                            ])>
+                                {{ $total($examSubject) > 0 ? (int) round(($captured($examSubject) / $total($examSubject)) * 100) : 0 }}%
+                            </span>
 
                             <a href="{{ route('admin.scores.entry', [$selectedExam, $examSubject]) }}"
-                               class="flex items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50">
-                                <span class="min-w-0">
-                                    <span class="block truncate text-sm font-medium text-slate-900">
-                                        {{ $examSubject->subject?->name }}
-                                    </span>
-                                    <span class="block text-xs text-slate-500">
-                                        {{ $captured }}/{{ $total }} captured
-                                    </span>
-                                </span>
-
-                                <span @class([
-                                    'badge',
-                                    'bg-emerald-50 text-emerald-700 ring-emerald-600/20' => $total > 0 && $captured === $total,
-                                    'bg-gold-50 text-gold-700 ring-gold-600/20' => $total === 0 || $captured < $total,
-                                ])>
-                                    {{ $total > 0 ? (int) round(($captured / $total) * 100) : 0 }}%
-                                </span>
+                               class="text-xs font-medium text-brand-700 hover:text-brand-900">
+                                Mark this paper alone
                             </a>
-                        @endforeach
+                        </div>
                     </div>
-                @elseif ($selectedExam)
-                    <p class="px-5 py-8 text-center text-sm text-slate-500">
-                        This examination has no subjects yet.
-                    </p>
-                @else
-                    <p class="px-5 py-8 text-center text-sm text-slate-500">
-                        Select an examination to see its subjects.
-                    </p>
-                @endif
+                @endforeach
             </div>
-
-            <div class="card-pad mt-6 bg-brand-50/60">
-                <h3 class="text-sm font-semibold text-brand-900">Prefer to upload instead?</h3>
-                <p class="mt-2 text-sm text-brand-800">
-                    If the marks are already in a spreadsheet, or written on paper, upload the sheet
-                    and the system will read it for you — you just review and approve.
-                </p>
-                <a href="{{ route('admin.imports.index') }}" class="btn-primary btn-sm mt-4">Upload a scoresheet</a>
-            </div>
-        </aside>
-    </div>
+        </details>
+    @endif
 @endif
 
 @endsection
+
+@include('admin.scores.partials.grid-scripts')

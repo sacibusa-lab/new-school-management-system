@@ -8,6 +8,7 @@ use App\Models\Applicant;
 use App\Models\Exam;
 use App\Models\ExamSubject;
 use App\Models\GradeScale;
+use App\Models\SchoolLevel;
 use App\Models\Score;
 use App\Services\Scores\ScoreEntryService;
 use Illuminate\Http\RedirectResponse;
@@ -24,40 +25,78 @@ differently depending on where it was typed.
  */
 class ScoreEntryController extends Controller
 {
+    /**
+     * Statuses in which a batch still has marks to give or to check.
+     *
+     * @var array<int,string>
+     */
+    private const MARKABLE_STATUSES = [
+        ExamStatus::Scheduled->value,
+        ExamStatus::Ongoing->value,
+        ExamStatus::Marking->value,
+        ExamStatus::AwaitingReview->value,
+        ExamStatus::Completed->value,
+    ];
+
     public function __construct(
         private readonly ScoreEntryService $entry,
     ) {
     }
 
+    /**
+     * Score entry, in the order the office actually works: class, then batch, then
+     * the names.
+     *
+     * A batch is one sitting of an examination — the entrance examination run as
+     * Batch A, then Batch B — so choosing a batch is choosing which sitting to
+     * mark. There is deliberately no subject step: the grid lays the candidates
+     * out against the papers set on that batch, which for the entrance
+     * examination are Mathematics, English Language and General Paper.
+     */
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', Exam::class);
+        // Rendering is reading; changing a mark is what needs scores.enter, and
+        // that is enforced on the save routes and again in the editability flag.
+        $this->authorize('scores.view');
 
         $exams = Exam::query()
             ->with(['level', 'academicSession', 'examSubjects.subject'])
-            ->whereIn('status', [
-                ExamStatus::Scheduled->value,
-                ExamStatus::Ongoing->value,
-                ExamStatus::Marking->value,
-                ExamStatus::AwaitingReview->value,
-                ExamStatus::Completed->value,
-            ])
+            ->whereIn('status', self::MARKABLE_STATUSES)
             ->orderByDesc('exam_date')
+            ->orderByDesc('id')
             ->get();
 
-        $selectedExam = $request->filled('exam')
+        // A batch picked by hand wins over everything else and brings its own
+        // class with it, so a link straight to a batch always lands correctly.
+        $selected = $request->filled('exam')
             ? $exams->firstWhere('id', $request->integer('exam'))
-            : $exams->first();
+            : null;
 
-        return view('admin.scores.index', [
-            'exams' => $exams,
-            'selectedExam' => $selectedExam,
-            'subjects' => $selectedExam?->examSubjects ?? collect(),
-            'progress' => $selectedExam ? $this->progressFor($selectedExam) : collect(),
-            'awaitingVerification' => $selectedExam && request()->user()?->can('scores.verify')
-                ? $this->entry->awaitingCount($selectedExam)
-                : 0,
-        ]);
+        $levelId = $request->integer('level') ?: null;
+
+        // If the class was changed after a batch had been chosen, the old batch
+        // belongs to the class we just left and must not win.
+        if ($levelId && $selected && $selected->level_id !== $levelId) {
+            $selected = null;
+        }
+
+        $levelId ??= $selected?->level_id ?: $exams->first()?->level_id;
+
+        $selected ??= $exams->where('level_id', $levelId)->first();
+
+        return view('admin.scores.index', array_merge(
+            $selected ? $this->gridData($selected) : ['examSubjects' => collect(), 'candidates' => collect()],
+            [
+                'levels' => SchoolLevel::query()->where('is_active', true)->orderBy('order')->get(),
+                'batches' => $exams->where('level_id', $levelId)->values(),
+                'levelId' => $levelId,
+                'selectedExam' => $selected,
+                'progress' => $selected ? $this->progressFor($selected) : collect(),
+                'awaitingVerification' => $selected && request()->user()?->can('scores.verify')
+                    ? $this->entry->awaitingCount($selected)
+                    : 0,
+            ],
+        ));
     }
 
     /**
@@ -77,6 +116,45 @@ class ScoreEntryController extends Controller
             ->groupBy('exam_subject_id')
             ->get()
             ->keyBy('exam_subject_id');
+    }
+
+    /**
+     * Everything the grid needs for one batch.
+     *
+     * Shared so the landing screen and the dedicated grid screen can never drift
+     * apart — a mark that renders on one and not the other is a mark that gets
+     * silently overwritten.
+     *
+     * @return array<string,mixed>
+     */
+    protected function gridData(Exam $exam): array
+    {
+        $exam->loadMissing(['level', 'academicSession']);
+
+        $scores = Score::query()
+            ->where('exam_id', $exam->id)
+            ->with('verifiedBy')
+            ->get();
+
+        return [
+            'exam' => $exam,
+            'examSubjects' => $exam->examSubjects()->with('subject')->get(),
+            'candidates' => Applicant::query()
+                ->whereIn('id', $scores->pluck('applicant_id')->unique())
+                ->with('levelAppliedFor')
+                ->orderBy('registration_number')
+                ->get(),
+            // [applicant id][exam subject id] => the score row, so the view can
+            // render a cell without hunting for it.
+            'cells' => $scores->groupBy('applicant_id')
+                ->map(fn ($rows) => $rows->keyBy('exam_subject_id')),
+            'gradeScale' => GradeScale::query()->orderByDesc('min_score')->get(),
+            // Locked for a read-only viewer as well as for a locked examination.
+            'editable' => $exam->isEditable() && (bool) request()->user()?->can('scores.enter'),
+            'canEnter' => (bool) request()->user()?->can('scores.enter'),
+            'canOverride' => $this->canOverride(),
+            'mayVerify' => (bool) request()->user()?->can('scores.verify'),
+        ];
     }
 
     /** One paper at a time, for working down a single marked script stack. */
@@ -117,30 +195,7 @@ class ScoreEntryController extends Controller
     {
         $this->authorize('scores.enter');
 
-        $exam->load(['level', 'academicSession']);
-
-        $scores = Score::query()
-            ->where('exam_id', $exam->id)
-            ->with('verifiedBy')
-            ->get();
-
-        return view('admin.scores.grid', [
-            'exam' => $exam,
-            'examSubjects' => $exam->examSubjects()->with('subject')->get(),
-            'candidates' => Applicant::query()
-                ->whereIn('id', $scores->pluck('applicant_id')->unique())
-                ->with('levelAppliedFor')
-                ->orderBy('registration_number')
-                ->get(),
-            // [applicant id][exam subject id] => the score row, so the view can
-            // render a cell without hunting for it.
-            'cells' => $scores->groupBy('applicant_id')
-                ->map(fn ($rows) => $rows->keyBy('exam_subject_id')),
-            'gradeScale' => GradeScale::query()->orderByDesc('min_score')->get(),
-            'editable' => $exam->isEditable(),
-            'canOverride' => $this->canOverride(),
-            'mayVerify' => (bool) request()->user()?->can('scores.verify'),
-        ]);
+        return view('admin.scores.grid', $this->gridData($exam));
     }
 
     public function saveGrid(Request $request, Exam $exam): RedirectResponse

@@ -4,7 +4,7 @@
 @section('subtitle', $exam->title . ' · out of ' . rtrim(rtrim(number_format((float) $examSubject->total_marks, 2), '0'), '.'))
 
 @section('actions')
-    <a href="{{ route('admin.scores.index', ['exam' => $exam->id]) }}" class="btn-secondary btn-sm">&larr; All subjects</a>
+    <a href="{{ route('admin.scores.index', ['exam' => $exam->id]) }}" class="btn-secondary btn-sm">&larr; Score entry</a>
 @endsection
 
 @section('content')

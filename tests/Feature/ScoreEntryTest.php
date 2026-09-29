@@ -23,6 +23,7 @@ use App\Services\Scores\ScoreEntryService;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -75,7 +76,13 @@ class ScoreEntryTest extends TestCase
             'status' => ExamStatus::Ongoing,
         ]);
 
-        foreach ([['MTH', 'Mathematics'], ['ENG', 'English Language']] as $i => [$code, $name]) {
+        // The three standard entrance papers, so the screen is exercised against
+        // the examination the school actually runs.
+        foreach ([
+            ['MTH', 'Mathematics'],
+            ['ENG', 'English Language'],
+            ['GPR', 'General Paper'],
+        ] as $i => [$code, $name]) {
             $subject = Subject::create(['name' => $name, 'code' => $code, 'is_active' => true]);
 
             $this->papers[$code] = ExamSubject::create([
@@ -259,6 +266,191 @@ class ScoreEntryTest extends TestCase
 
         $this->assertSame('95.00', $score->score);
         $this->assertSame($this->officer->id, $score->verified_by);
+    }
+
+    /**
+     * Register the candidate for every paper on a batch, the way the "Register
+     * candidates" button does. Without a mark slot there is no row to type into,
+     * so a name only appears once this has run.
+     */
+    private function registerFor(Exam $exam, ?Applicant $applicant = null): void
+    {
+        foreach ($exam->examSubjects as $paper) {
+            Score::create([
+                'exam_id' => $exam->id,
+                'exam_subject_id' => $paper->id,
+                'applicant_id' => ($applicant ?? $this->candidate)->id,
+            ]);
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Choosing the class and the batch                                     */
+    /* ------------------------------------------------------------------ */
+
+    /** A second class with its own sitting, so the two can be told apart. */
+    private function secondBatch(string $levelName = 'SS1', string $title = 'Second Sitting, 12 October'): Exam
+    {
+        $level = SchoolLevel::create(['name' => $levelName, 'order' => 9]);
+
+        $exam = Exam::create([
+            'title' => $title,
+            'academic_session_id' => $this->session->id,
+            'level_id' => $level->id,
+            'cutoff_mark' => 50,
+            'status' => ExamStatus::Ongoing,
+        ]);
+
+        foreach ($this->papers as $code => $paper) {
+            ExamSubject::create([
+                'exam_id' => $exam->id,
+                'subject_id' => $paper->subject_id,
+                'total_marks' => $paper->total_marks,
+                'pass_mark' => $paper->pass_mark,
+                'sort_order' => $paper->sort_order,
+            ]);
+        }
+
+        return $exam;
+    }
+
+    public function test_the_screen_opens_on_the_class_and_batch_with_the_names_already_there(): void
+    {
+        $this->registerFor($this->exam);
+
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index'))
+            ->assertOk();
+
+        // The two choices, then the names.
+        $response->assertSee('Class');
+        $response->assertSee('Batch');
+        $response->assertSee($this->exam->title);
+
+        $response->assertSee('Chidera Okafor');
+        $response->assertSee('SAC-00001');
+    }
+
+    public function test_there_is_no_subject_step_between_the_batch_and_the_marks(): void
+    {
+        $this->registerFor($this->exam);
+
+        // The whole point of the screen: pick class and batch, and the three
+        // entrance papers are already columns waiting for marks.
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $this->exam->id]))
+            ->assertOk();
+
+        foreach (['Mathematics', 'English Language', 'General Paper'] as $paper) {
+            $response->assertSee($paper);
+        }
+
+        // Mark boxes are on this screen, not one click away.
+        $response->assertSee('name="scores[', false);
+        $response->assertSee(route('admin.scores.grid.store', $this->exam), false);
+    }
+
+    public function test_choosing_a_class_shows_that_class_batches(): void
+    {
+        $other = $this->secondBatch();
+
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['level' => $other->level_id]))
+            ->assertOk();
+
+        $response->assertSee($other->title);
+        $response->assertDontSee($this->exam->title);
+    }
+
+    public function test_a_link_straight_to_a_batch_brings_its_class_with_it(): void
+    {
+        $other = $this->secondBatch();
+
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $other->id]))
+            ->assertOk();
+
+        $response->assertSee($other->title);
+
+        // The class picker is showing the class that batch belongs to.
+        $response->assertSee('SS1');
+    }
+
+    public function test_changing_the_class_drops_the_batch_belonging_to_the_old_one(): void
+    {
+        $other = $this->secondBatch();
+
+        // Both parameters together: the class wins, because the batch was chosen
+        // before the class was changed and belongs to the class we just left.
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['level' => $this->level->id, 'exam' => $other->id]))
+            ->assertOk();
+
+        $response->assertSee($this->exam->title);
+        $response->assertDontSee($other->title);
+    }
+
+    public function test_a_class_with_no_batch_says_so_instead_of_showing_an_empty_grid(): void
+    {
+        $empty = SchoolLevel::create(['name' => 'JSS2', 'order' => 8]);
+
+        $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['level' => $empty->id]))
+            ->assertOk()
+            ->assertSee('No batch to mark yet')
+            ->assertDontSee('Save all marks');
+    }
+
+    public function test_the_three_entrance_papers_are_read_from_the_batch_not_hard_coded(): void
+    {
+        // A resit carries only the papers that were failed. Hard-coding the three
+        // entrance papers would open a column for a paper this sitting has no slot
+        // for, and the mark would have nowhere to go.
+        $retake = $this->secondBatch('SS2', 'Resit, Mathematics only');
+
+        $retake->examSubjects()
+            ->whereHas('subject', fn ($q) => $q->where('code', '!=', 'MTH'))
+            ->delete();
+
+        $this->registerFor($retake->refresh());
+
+        $response = $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $retake->id]))
+            ->assertOk();
+
+        $response->assertSee('Mathematics');
+        $response->assertDontSee('General Paper');
+    }
+
+    public function test_a_batch_with_nobody_registered_tells_you_what_to_do_next(): void
+    {
+        $this->actingAs($this->officer)
+            ->get(route('admin.scores.index', ['exam' => $this->exam->id]))
+            ->assertOk()
+            ->assertSee('No candidates registered')
+            ->assertSee('Register candidates now');
+    }
+
+    public function test_someone_who_may_read_but_not_enter_cannot_save(): void
+    {
+        $role = Role::create(['name' => 'Auditor', 'guard_name' => 'web']);
+        $role->givePermissionTo('scores.view');
+
+        $auditor = User::factory()->create();
+        $auditor->assignRole('Auditor');
+
+        $this->actingAs($auditor)
+            ->get(route('admin.scores.index', ['exam' => $this->exam->id]))
+            ->assertOk()
+            ->assertSee('not change them');
+
+        $score = $this->slot();
+
+        $this->actingAs($auditor)
+            ->post(route('admin.scores.grid.store', $this->exam), ['scores' => [$score->id => '10']])
+            ->assertForbidden();
+
+        $this->assertNull($score->refresh()->score);
     }
 
     public function test_the_grid_saves_every_paper_in_one_go(): void
