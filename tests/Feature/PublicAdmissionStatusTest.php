@@ -4,13 +4,19 @@ namespace Tests\Feature;
 
 use App\Enums\AdmissionDecisionStatus;
 use App\Enums\ApplicantStatus;
+use App\Enums\ExamStatus;
+use App\Enums\ScoreSource;
 use App\Models\AcademicSession;
 use App\Models\AdmissionDecision;
 use App\Models\Applicant;
 use App\Models\Exam;
+use App\Models\ExamSubject;
 use App\Models\SchoolLevel;
+use App\Models\Score;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\Subject;
+use App\Services\Admissions\AdmissionService;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -52,7 +58,7 @@ class PublicAdmissionStatusTest extends TestCase
             'academic_session_id' => $this->session->id,
             'level_id' => $this->level->id,
             'cutoff_mark' => 50,
-            'status' => \App\Enums\ExamStatus::Completed,
+            'status' => ExamStatus::Completed,
         ]);
 
         $this->applicant = Applicant::create([
@@ -95,6 +101,36 @@ class PublicAdmissionStatusTest extends TestCase
     private function search(string $number = 'SAC-00001')
     {
         return $this->get(route('public.status', ['registration_number' => $number]));
+    }
+
+    /**
+     * Sit the candidate in front of some papers.
+     *
+     * @param  array<int,array{0:string,1:string,2:float|null,3:bool}>  $marks
+     *         [code, name, mark, absent]
+     */
+    private function satPapers(array $marks): void
+    {
+        foreach ($marks as $i => [$code, $name, $mark, $absent]) {
+            $subject = Subject::create(['name' => $name, 'code' => $code, 'is_active' => true]);
+
+            $paper = ExamSubject::create([
+                'exam_id' => $this->exam->id,
+                'subject_id' => $subject->id,
+                'total_marks' => 100,
+                'pass_mark' => 50,
+                'sort_order' => $i,
+            ]);
+
+            Score::create([
+                'exam_id' => $this->exam->id,
+                'exam_subject_id' => $paper->id,
+                'applicant_id' => $this->applicant->id,
+                'score' => $mark,
+                'is_absent' => $absent,
+                'source' => ScoreSource::Manual,
+            ]);
+        }
     }
 
     public function test_an_admitted_candidate_is_told_so_plainly(): void
@@ -217,5 +253,98 @@ class PublicAdmissionStatusTest extends TestCase
         $this->search()
             ->assertOk()
             ->assertSee('Print or save this page');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The papers behind the total                                         */
+    /* ------------------------------------------------------------------ */
+
+    public function test_the_marks_are_listed_paper_by_paper(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75, 225);
+
+        $this->satPapers([
+            ['MTH', 'Mathematics', 90, false],
+            ['ENG', 'English Language', 80, false],
+            ['GPR', 'General Paper', 55, false],
+        ]);
+
+        $this->search()
+            ->assertOk()
+            ->assertSee('Mathematics')
+            ->assertSee('90 / 100')
+            ->assertSee('English Language')
+            ->assertSee('80 / 100')
+            ->assertSee('General Paper')
+            ->assertSee('55 / 100')
+            // The examination lists the papers in its own order, not by score.
+            ->assertSeeInOrder(['Mathematics', 'English Language', 'General Paper']);
+    }
+
+    /**
+     * The whole point of listing the papers is that a parent can add them up.
+     * If the list and the total are built separately they will drift apart.
+     */
+    public function test_the_papers_listed_add_up_to_the_total_beside_them(): void
+    {
+        $this->satPapers([
+            ['MTH', 'Mathematics', 90, false],
+            ['ENG', 'English Language', 80, false],
+            ['GPR', 'General Paper', 55, false],
+        ]);
+
+        app(AdmissionService::class)->compute($this->exam);
+
+        $decision = AdmissionDecision::query()->sole();
+
+        $this->assertSame(225.0, (float) $decision->total_score);
+
+        $this->search()
+            ->assertOk()
+            ->assertSee('Total over 3 paper(s)')
+            ->assertSee('225');
+    }
+
+    public function test_a_paper_sat_as_absent_says_so_and_is_held_out_of_the_average(): void
+    {
+        $this->decide(ApplicantStatus::Rejected, 30, 60);
+
+        $this->satPapers([
+            ['MTH', 'Mathematics', null, true],
+            ['ENG', 'English Language', 60, false],
+        ]);
+
+        $this->search()
+            ->assertOk()
+            ->assertSee('Absent')
+            ->assertSee('60 / 100');
+    }
+
+    /** A paper nobody entered a mark for must not appear as a failure. */
+    public function test_a_paper_with_no_mark_at_all_is_not_listed(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75, 90);
+
+        $this->satPapers([
+            ['MTH', 'Mathematics', 90, false],
+            ['GPR', 'General Paper', null, false],
+        ]);
+
+        $this->search()
+            ->assertOk()
+            ->assertSee('Mathematics')
+            ->assertDontSee('General Paper');
+    }
+
+    /** These were asked for and removed: parents want the record, not two more doors. */
+    public function test_the_page_no_longer_offers_the_results_and_fees_buttons_or_the_progress_tracker(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75);
+
+        $this->search()
+            ->assertOk()
+            ->assertDontSee('Check your results')
+            ->assertDontSee('View your fees')
+            ->assertDontSee('Where you are in the process');
     }
 }

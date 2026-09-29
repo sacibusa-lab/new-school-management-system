@@ -42,14 +42,12 @@
             <div class="mx-auto mt-8 max-w-2xl">
                 @if ($applicant)
                     @php
-                        $decision = $applicant->decisions->sortByDesc('id')->first();
+                        // $decision and $papers arrive from the controller.
                         $rejected = $applicant->status === \App\Enums\ApplicantStatus::Rejected;
                         $marked = in_array($applicant->status, [
                             \App\Enums\ApplicantStatus::ExamCompleted,
                             \App\Enums\ApplicantStatus::Shortlisted,
                         ], true);
-                        $stage = $applicant->status->stage();
-                        $steps = ['Registered', 'Exam scheduled', 'Exam completed', 'Cutoff applied', 'Decision'];
                     @endphp
 
                     <div class="card overflow-hidden">
@@ -85,6 +83,94 @@
 
                             <x-status-pill :status="$applicant->status" />
                         </div>
+
+                        {{-- ============ Entrance examination ============ --}}
+                        {{-- The figures first, then the papers they were added up from,
+                             so a parent can check the arithmetic for themselves. --}}
+                        @if ($decision)
+                            <div class="p-5 sm:p-6">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Entrance examination
+                                </p>
+
+                                <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
+                                        <p class="font-display text-2xl font-semibold text-slate-900">
+                                            {{ $fmt($decision->total_score) }}
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-slate-500">
+                                            Total over {{ $decision->subjects_offered }} paper(s)
+                                        </p>
+                                    </div>
+
+                                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
+                                        <p class="font-display text-2xl font-semibold text-slate-900">
+                                            {{ $fmt($decision->average_score) }}%
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-slate-500">Average</p>
+                                    </div>
+
+                                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
+                                        <p class="font-display text-2xl font-semibold text-slate-900">
+                                            {{ $fmt($decision->cutoff_mark) }}%
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-slate-500">Cutoff mark</p>
+                                    </div>
+                                </div>
+
+                                @if ($decision->subjects_failed > 0)
+                                    <p class="mt-3 text-center text-xs text-slate-500">
+                                        {{ $decision->subjects_passed }} paper(s) passed,
+                                        {{ $decision->subjects_failed }} not passed{{ $decision->has_absent ? ', including a paper sat as absent' : '' }}.
+                                    </p>
+                                @endif
+
+                                @if ($papers->isNotEmpty())
+                                    <div class="mt-5 overflow-hidden rounded-xl ring-1 ring-slate-200">
+                                        <table class="w-full text-sm">
+                                            <thead class="bg-slate-50">
+                                                <tr>
+                                                    <th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                                        Paper
+                                                    </th>
+                                                    <th scope="col" class="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                                        Mark
+                                                    </th>
+                                                    <th scope="col" class="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                                        %
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100 bg-white">
+                                                @foreach ($papers as $paper)
+                                                    <tr>
+                                                        <td class="px-4 py-2.5 text-slate-800">{{ $paper['name'] }}</td>
+                                                        <td class="px-4 py-2.5 text-right">
+                                                            @if ($paper['is_absent'])
+                                                                <span class="font-medium text-rose-600">Absent</span>
+                                                            @else
+                                                                <span class="font-mono text-slate-600">{{ $fmt($paper['score']) }} / {{ $fmt($paper['total_marks']) }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-4 py-2.5 text-right font-semibold">
+                                                            {{-- A paper the school never recorded cannot be graded,
+                                                                 so it says nothing rather than showing 0%. --}}
+                                                            @if ($paper['is_absent'] || ! $paper['gradeable'])
+                                                                <span class="text-slate-400">—</span>
+                                                            @else
+                                                                <span class="{{ $paper['passed'] ? 'text-emerald-700' : 'text-rose-600' }}">
+                                                                    {{ $fmt($paper['percentage']) }}%
+                                                                </span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
 
                         {{-- ============ The verdict ============ --}}
                         @if ($applicant->isAdmitted())
@@ -122,11 +208,6 @@
                                             Use this from now on — it replaces your registration number
                                             ({{ $applicant->registration_number }}) for results and fees.
                                         </p>
-                                    </div>
-
-                                    <div class="mt-5 grid gap-3 sm:grid-cols-2 print:hidden">
-                                        <a href="{{ route('public.results') }}" class="btn-primary">Check your results</a>
-                                        <a href="{{ route('public.fees') }}" class="btn-secondary">View your fees</a>
                                     </div>
                                 </div>
                             @endif
@@ -190,47 +271,6 @@
                             </div>
                         @endif
 
-                        {{-- ============ The numbers ============ --}}
-                        @if ($decision)
-                            <div class="border-t border-slate-200 p-5 sm:p-6">
-                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                    Entrance examination
-                                </p>
-
-                                <div class="mt-4 grid gap-4 sm:grid-cols-3">
-                                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
-                                        <p class="font-display text-2xl font-semibold text-slate-900">
-                                            {{ $fmt($decision->total_score) }}
-                                        </p>
-                                        <p class="mt-0.5 text-xs text-slate-500">
-                                            Total over {{ $decision->subjects_offered }} paper(s)
-                                        </p>
-                                    </div>
-
-                                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
-                                        <p class="font-display text-2xl font-semibold text-slate-900">
-                                            {{ $fmt($decision->average_score) }}%
-                                        </p>
-                                        <p class="mt-0.5 text-xs text-slate-500">Average</p>
-                                    </div>
-
-                                    <div class="rounded-xl bg-slate-50 px-4 py-3 text-center ring-1 ring-slate-200">
-                                        <p class="font-display text-2xl font-semibold text-slate-900">
-                                            {{ $fmt($decision->cutoff_mark) }}%
-                                        </p>
-                                        <p class="mt-0.5 text-xs text-slate-500">Cutoff mark</p>
-                                    </div>
-                                </div>
-
-                                @if ($decision->subjects_failed > 0)
-                                    <p class="mt-3 text-center text-xs text-slate-500">
-                                        {{ $decision->subjects_passed }} paper(s) passed,
-                                        {{ $decision->subjects_failed }} not passed{{ $decision->has_absent ? ', including a paper sat as absent' : '' }}.
-                                    </p>
-                                @endif
-                            </div>
-                        @endif
-
                         {{-- ============ Next steps ============ --}}
                         @if ($rejected)
                             <div class="border-t border-slate-200 p-5 sm:p-6">
@@ -284,16 +324,6 @@
                                 @endif
                             </div>
                         @endif
-
-                        {{-- ============ Progress ============ --}}
-                        <div class="border-t border-slate-200 bg-slate-50/70 p-5 sm:p-6">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                Where you are in the process
-                            </p>
-                            <div class="mt-4">
-                                <x-stepper :steps="$steps" :current="max($stage, 1)" />
-                            </div>
-                        </div>
 
                         {{-- ============ Details ============ --}}
                         <div class="border-t border-slate-200 p-5 sm:p-6">

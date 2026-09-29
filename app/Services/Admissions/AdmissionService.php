@@ -122,67 +122,112 @@ class AdmissionService
     }
 
     /**
+     * One row per paper that counted, in the order the examination lists them.
+     *
+     * The merit calculation and the parent-facing breakdown on the admission
+     * status page both read these rows, so the papers a parent is shown always
+     * add up to the total they are shown. Adding them up twice, in two places,
+     * is how the two screens would come to disagree.
+     *
+     * A paper carrying no mark at all is NOT a row: an unfilled grid cell means
+     * the mark was never entered, and printing it as a zero would invent a
+     * failure the candidate never had. A paper sat as absent IS a row, because
+     * it counts as a paper offered and not passed.
+     *
+     * @param  Collection<int,Score>  $scores
+     * @param  Collection<int,ExamSubject>  $examSubjects  keyed by id
+     * @return Collection<int,array<string,mixed>>
+     */
+    protected function markedRows(Collection $scores, Collection $examSubjects): Collection
+    {
+        return $scores
+            ->map(function (Score $score) use ($examSubjects) {
+                $examSubject = $examSubjects->get($score->exam_subject_id);
+
+                if (! $examSubject) {
+                    return null;
+                }
+
+                $absent = (bool) $score->is_absent;
+
+                if (! $absent && $score->score === null) {
+                    return null;
+                }
+
+                $gradeable = (float) $examSubject->total_marks > 0;
+
+                // Absent papers are held out of the average entirely; everything
+                // else contributes the figure the merit list added up.
+                $percentage = $absent ? null : (float) $examSubject->toPercentage($score->score);
+
+                return [
+                    'exam_subject_id' => (int) $score->exam_subject_id,
+                    'name' => $examSubject->label(),
+                    'score' => $absent ? null : (float) $score->score,
+                    'total_marks' => (float) $examSubject->total_marks,
+                    'percentage' => $percentage,
+                    'gradeable' => $gradeable,
+                    'is_absent' => $absent,
+                    'passed' => $percentage !== null && $percentage >= $examSubject->effectivePassMark(),
+                    'sort_order' => (int) ($examSubject->sort_order ?? 0),
+                ];
+            })
+            ->filter()
+            ->sortBy([['sort_order', 'asc'], ['exam_subject_id', 'asc']])
+            ->values();
+    }
+
+    /**
+     * The papers behind one candidate's merit row.
+     *
+     * Read by the public admission status page. Deliberately derived from the
+     * same rows the merit total is built from, so a parent is never shown a list
+     * of papers that does not add up to the total printed beside it.
+     *
+     * @return Collection<int,array<string,mixed>>
+     */
+    public function breakdownFor(Applicant $applicant, Exam $exam): Collection
+    {
+        $examSubjects = $exam->examSubjects()->with('subject')->get()->keyBy('id');
+
+        if ($examSubjects->isEmpty()) {
+            return collect();
+        }
+
+        $scores = Score::query()
+            ->where('applicant_id', $applicant->id)
+            ->where('exam_id', $exam->id)
+            ->get();
+
+        return $this->markedRows($scores, $examSubjects);
+    }
+
+    /**
      * @param  Collection<int,Score>  $scores
      * @param  Collection<int,ExamSubject>  $examSubjects
      * @return array<string,mixed>
      */
     protected function summarise(Collection $scores, Collection $examSubjects, int $applicantId): array
     {
-        $total = 0.0;
-        $percentages = [];
-        $offered = 0;
-        $passed = 0;
-        $failed = 0;
-        $hasAbsent = false;
-        $name = '';
-        $registration = '';
+        $rows = $this->markedRows($scores, $examSubjects);
 
-        foreach ($scores as $score) {
-            $examSubject = $examSubjects->get($score->exam_subject_id);
-
-            if (! $examSubject) {
-                continue;
-            }
-
-            $applicant = $score->applicant;
-            $name = $applicant?->full_name ?? $name;
-            $registration = $applicant?->registration_number ?? $registration;
-
-            if ($score->is_absent) {
-                $hasAbsent = true;
-                $offered++;
-                $failed++;
-
-                continue;
-            }
-
-            if ($score->score === null) {
-                continue;
-            }
-
-            $percentage = (float) $examSubject->toPercentage($score->score);
-            $percentages[] = $percentage;
-            $total += $percentage;
-            $offered++;
-
-            if ($percentage >= $examSubject->effectivePassMark()) {
-                $passed++;
-            } else {
-                $failed++;
-            }
-        }
+        // Absent papers are the only rows without a percentage to add up.
+        $percentages = $rows->pluck('percentage')->filter(fn ($value) => $value !== null)->all();
+        $sum = array_sum($percentages);
+        $count = count($percentages);
+        $first = $scores->first();
 
         return [
             'applicant_id' => $applicantId,
-            'name' => $name,
-            'registration_number' => $registration,
-            'total' => round($total, 2),
-            'average' => $percentages === [] ? 0.0 : round(array_sum($percentages) / count($percentages), 2),
-            'highest' => $percentages === [] ? 0.0 : round(max($percentages), 2),
-            'subjects_offered' => $offered,
-            'subjects_passed' => $passed,
-            'subjects_failed' => $failed,
-            'has_absent' => $hasAbsent,
+            'name' => $first?->applicant?->full_name ?? '',
+            'registration_number' => $first?->applicant?->registration_number ?? '',
+            'total' => round($sum, 2),
+            'average' => $count === 0 ? 0.0 : round($sum / $count, 2),
+            'highest' => $count === 0 ? 0.0 : round(max($percentages), 2),
+            'subjects_offered' => $rows->count(),
+            'subjects_passed' => $rows->filter(fn ($row) => $row['passed'])->count(),
+            'subjects_failed' => $rows->reject(fn ($row) => $row['passed'])->count(),
+            'has_absent' => $rows->contains(fn ($row) => $row['is_absent']),
         ];
     }
 

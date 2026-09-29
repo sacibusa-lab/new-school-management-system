@@ -7,6 +7,7 @@ use App\Models\Applicant;
 use App\Models\ResultPublication;
 use App\Models\Setting;
 use App\Models\TermResult;
+use App\Services\Admissions\AdmissionService;
 use App\Services\Admissions\ResitService;
 use App\Support\Concerns\FindsRecordsByNumber;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class LookupController extends Controller
 
     public function __construct(
         private readonly ResitService $resits,
+        private readonly AdmissionService $admissions,
     ) {
     }
     /* ------------------------------------------------------------------ */
@@ -49,9 +51,19 @@ class LookupController extends Controller
             )->first();
         }
 
+        $decision = $applicant?->decisions->sortByDesc('id')->first();
+
+        // The papers behind the merit row, so the page can show a parent the
+        // marks the total was added up from rather than only the total.
+        $papers = $applicant && $decision?->exam
+            ? $this->admissions->breakdownFor($applicant, $decision->exam)
+            : collect();
+
         return view('public.status', [
             'applicant' => $applicant,
             'searched' => $searched,
+            'decision' => $decision,
+            'papers' => $papers,
             'resitEnabled' => $this->resits->isEnabled(),
             'openResit' => $applicant && ! $applicant->isAdmitted()
                 ? $this->resits->openResitFor($applicant)
