@@ -13,6 +13,7 @@ use App\Models\Score;
 use App\Services\AdmissionLetterService;
 use App\Services\Admissions\ApplicantImportService;
 use App\Services\Admissions\ApplicantPhotoService;
+use App\Services\Admissions\DuplicateApplicantService;
 use App\Services\ApplicantRegistrationService;
 use App\Services\NumberSequenceService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -32,6 +33,7 @@ class ApplicantController extends Controller
         private readonly ApplicantRegistrationService $registration,
         private readonly ApplicantImportService $imports,
         private readonly ApplicantPhotoService $photos,
+        private readonly DuplicateApplicantService $duplicates,
     ) {
     }
 
@@ -270,6 +272,8 @@ class ApplicantController extends Controller
             ['photo' => $request->file('photo')],
         );
 
+        $this->warnAboutDuplicates([$applicant]);
+
         return redirect()
             ->route('admin.applicants.slip', $applicant)
             ->with('status', sprintf(
@@ -277,6 +281,42 @@ class ApplicantController extends Controller
                 $applicant->full_name,
                 $applicant->registration_number,
             ));
+    }
+
+    /**
+     * Say something when the same child looks like they are already on file.
+     *
+     * A warning, never a refusal: the person at the desk can see whether these are
+     * two children or one, and the system cannot. The duplicate is still registered
+     * — blocking a real twin would be worse than a second record somebody can
+     * delete after looking.
+     *
+     * @param  array<int,Applicant>  $applicants
+     */
+    protected function warnAboutDuplicates(array $applicants): void
+    {
+        $found = [];
+
+        foreach ($applicants as $applicant) {
+            foreach ($this->duplicates->find(
+                $applicant->first_name,
+                $applicant->last_name,
+                $applicant->guardian_phone,
+                $applicant->id,
+            ) as $match) {
+                $found[] = sprintf(
+                    '%s looks like %s, who is already on file with the same name and parent phone number.',
+                    $applicant->registration_number,
+                    $this->duplicates->describe($match),
+                );
+            }
+        }
+
+        if ($found === []) {
+            return;
+        }
+
+        session()->flash('warning', 'Possible duplicate — ' . implode(' ', array_unique($found)) . ' Check it is not the same child, and delete one of the two if it is.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -317,6 +357,21 @@ class ApplicantController extends Controller
                 'file' => 'No candidate rows were found in that file. Rows need at least a surname, a first name, a class, and the parent\'s phone and email.',
             ]);
         }
+
+        // Mark the rows that look like somebody already on file. A note, not an
+        // error: the officer can see the list and decides, and a sheet of siblings
+        // must not read as a sheet of mistakes.
+        $parsed['rows'] = array_map(function (array $row): array {
+            if ($row['errors'] === []) {
+                $row['duplicates'] = $this->duplicates->find(
+                    $row['data']['first_name'] ?? null,
+                    $row['data']['last_name'] ?? null,
+                    $row['data']['guardian_phone'] ?? null,
+                )->map(fn ($match) => $this->duplicates->describe($match))->all();
+            }
+
+            return $row;
+        }, $parsed['rows']);
 
         $request->session()->put(self::IMPORT_SESSION_KEY, $parsed + [
             'filename' => $request->file('file')->getClientOriginalName(),

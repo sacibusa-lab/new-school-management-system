@@ -204,7 +204,18 @@
                                            checked x-bind:checked="all"
                                            class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                                 </td>
-                                <td class="font-medium text-slate-900">{{ $row['name'] }}</td>
+                                <td>
+                                    <span class="font-medium text-slate-900">{{ $row['name'] }}</span>
+
+                                    {{-- A note, not an error: brothers and sisters share a
+                                         parent's name and number, so this says "look",
+                                         and the row stays ticked. --}}
+                                    @if (! empty($row['duplicates']))
+                                        <span class="mt-1 block text-xs font-medium text-amber-700">
+                                            Possibly already on file as {{ implode(', ', $row['duplicates']) }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="text-sm">{{ $row['class'] ?? '—' }}</td>
                                 <td class="text-sm">{{ $row['gender'] ?? '—' }}</td>
                                 <td class="text-sm">{{ $row['dob'] ?? '—' }}</td>

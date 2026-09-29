@@ -203,6 +203,11 @@
                 <div class="mb-6"><x-alert tone="danger">{{ session('error') }}</x-alert></div>
             @endif
 
+            {{-- Between the two: something to look at, not something that failed. --}}
+            @if (session('warning'))
+                <div class="mb-6"><x-alert tone="warning" title="Check this">{{ session('warning') }}</x-alert></div>
+            @endif
+
             @if ($errors->any() && ! isset($suppressErrorSummary))
                 <div class="mb-6">
                     <x-alert tone="danger" title="Please fix the following:">
