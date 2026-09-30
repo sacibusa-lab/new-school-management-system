@@ -417,6 +417,41 @@ class PublicAdmissionStatusTest extends TestCase
 
         // The card is one object and must not be sliced across two sheets.
         $this->assertStringContainsString('print:break-inside-avoid', $html);
+
+        // The tightening that keeps it to one sheet, now that the letterhead takes
+        // 168px of the page. Measured: 822px admitted, 944px rejected.
+        $this->assertStringContainsString('@page { margin: 10mm 12mm; }', $html);
+        $this->assertStringContainsString('#record .verdict', $html);
+    }
+
+    /**
+     * Every verdict banner is tightened for paper through the same class, so a new
+     * banner added without it would quietly print at screen size and cost a second
+     * sheet. One test, five statuses.
+     */
+    public function test_every_verdict_banner_can_be_tightened_for_paper(): void
+    {
+        $statuses = [
+            ApplicantStatus::Admitted,
+            ApplicantStatus::Rejected,
+            ApplicantStatus::Shortlisted,
+            ApplicantStatus::ExamCompleted,
+            ApplicantStatus::Registered,
+        ];
+
+        foreach ($statuses as $status) {
+            AdmissionDecision::query()->where('applicant_id', $this->applicant->id)->delete();
+
+            $this->decide($status, $status === ApplicantStatus::Admitted ? 75.0 : 38.0);
+
+            $html = $this->search()->assertOk()->getContent();
+
+            $this->assertStringContainsString(
+                'class="verdict ',
+                $html,
+                "The {$status->value} record has no banner for the print rules to tighten.",
+            );
+        }
     }
 
     /**

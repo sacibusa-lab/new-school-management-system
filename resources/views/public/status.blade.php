@@ -7,6 +7,45 @@
     $fmt = fn ($value) => rtrim(rtrim(number_format((float) $value, 2), '0'), '.');
 @endphp
 
+@push('head')
+    {{-- One sheet, not two.
+
+         The record outgrew A4 the moment the letterhead went in: it is 168px of the
+         ~1047px printable height, and the screen's generous paddings and leading were
+         sized for a scrolling page. On paper the record has to give, so it does —
+         measured at 1094px before and 976px after, worst case (a rejected candidate,
+         whose banner carries two more lines than anyone else's). The letterhead
+         itself is not shrunk: it is the part the school asked for. --}}
+    <style>
+        @media print {
+            @page { margin: 10mm 12mm; }
+
+            #record { line-height: 1.35; }
+
+            /* The letterhead band: the picture, then the record's own label under it. */
+            #record-head { margin-bottom: 8px; padding-bottom: 4px; row-gap: 0; }
+
+            /* Every section of the card, whichever padding class it carries. */
+            #record .card > div { padding-top: 6px; padding-bottom: 6px; }
+
+            /* The papers table: four rows of twenty pixels each on screen. */
+            #record table th,
+            #record table td { padding-top: 2px; padding-bottom: 2px; }
+
+            /* The candidate's photograph, still recognisable at passport size. */
+            #record .card img { height: 52px; width: 39px; }
+
+            /* The verdict is a stamp on paper rather than the poster it is on screen —
+               the icon and the padding are what pushed a rejected record onto a second
+               sheet while an admitted one fitted. */
+            #record .verdict { padding: 6px 10px; }
+            #record .verdict > span:first-child { height: 34px; width: 34px; }
+            #record .verdict > span:first-child svg { height: 18px; width: 18px; }
+            #record .verdict > p:first-of-type { margin-top: 4px; font-size: 17px; }
+        }
+    </style>
+@endpush
+
 @section('content')
 <div class="bg-surface-2 py-12 print:bg-surface print:py-0">
     <div class="section max-w-4xl">
@@ -50,14 +89,14 @@
 
         {{-- ================= Result ================= --}}
         @if ($searched)
-            <div class="mx-auto mt-8 max-w-2xl print:mt-0">
+            <div id="record" class="mx-auto mt-8 max-w-2xl print:mt-0">
                 {{-- ============ Letterhead, on paper only ============ --}}
                 {{-- The site header carries the school's name and logo, but it is
                      deliberately hidden when printing — which left the printed record
                      anonymous: a sheet a parent hands to a relative or an employer with
                      nothing on it saying which school it came from. This is that
                      identity, restored for paper. --}}
-                <div class="hidden print:mb-5 print:flex print:flex-wrap print:items-start print:justify-between print:gap-6 print:border-b print:border-line print:pb-4">
+                <div id="record-head" class="hidden print:mb-5 print:flex print:flex-wrap print:items-start print:justify-between print:gap-6 print:border-b print:border-line print:pb-4">
                     @if ($school->letterhead)
                         {{-- Head paper: the school's own letterhead, across the whole width
                              of the sheet and nothing beside it. --}}
@@ -232,7 +271,7 @@
 
                         {{-- ============ The verdict ============ --}}
                         @if ($applicant->isAdmitted())
-                            <div class="bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center sm:p-8 print:py-4">
+                            <div class="verdict bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
@@ -271,7 +310,7 @@
                             @endif
 
                         @elseif ($rejected)
-                            <div class="bg-rose-50 dark:bg-rose-950/40 p-6 text-center sm:p-8 print:py-4">
+                            <div class="verdict bg-rose-50 dark:bg-rose-950/40 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-600 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
@@ -297,7 +336,7 @@
                             </div>
 
                         @elseif ($waiting)
-                            <div class="bg-sky-50 dark:bg-sky-950/40 p-6 text-center sm:p-8 print:py-4">
+                            <div class="verdict bg-sky-50 dark:bg-sky-950/40 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-600 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
@@ -316,7 +355,7 @@
                             </div>
 
                         @elseif ($marked)
-                            <div class="bg-gold-50 dark:bg-gold-950/40 p-6 text-center sm:p-8 print:py-4">
+                            <div class="verdict bg-gold-50 dark:bg-gold-950/40 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 text-white">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
@@ -333,7 +372,7 @@
                             </div>
 
                         @else
-                            <div class="bg-brand-50 dark:bg-brand-900/30 p-6 text-center sm:p-8 print:py-4">
+                            <div class="verdict bg-brand-50 dark:bg-brand-900/30 p-6 text-center sm:p-8 print:py-4">
                                 <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-700 text-white">
                                     <x-nav-icon name="clipboard" class="h-7 w-7" />
                                 </span>
