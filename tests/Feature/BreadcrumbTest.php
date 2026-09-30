@@ -63,6 +63,21 @@ class BreadcrumbTest extends TestCase
     }
 
     /**
+     * A detail screen names the record it is about as the last crumb, rather than
+     * repeating the page it came from.
+     */
+    public function test_a_page_about_one_record_ends_its_trail_with_that_record(): void
+    {
+        $teacher = User::factory()->create();
+        $teacher->assignRole('Teacher');
+
+        $this->assertSame(
+            ['Students & Results', 'Teachers', 'Edit Teacher'],
+            $this->trailOn(route('admin.students-results.teachers.edit', $teacher)),
+        );
+    }
+
+    /**
      * Where you are is drawn as text. A link to the page already on screen is a way
      * out that leads nowhere, and the trail above a page is the one place it always
      * looks like one.

@@ -233,6 +233,8 @@ Route::middleware(['auth'])
             Route::get('teachers/list', [TeachersController::class, 'index'])->name('teachers.list');
             Route::get('teachers/create', [TeachersController::class, 'create'])->name('teachers.create');
             Route::post('teachers', [TeachersController::class, 'store'])->name('teachers.store');
+            Route::get('teachers/{teacher}/edit', [TeachersController::class, 'edit'])->name('teachers.edit');
+            Route::put('teachers/{teacher}', [TeachersController::class, 'update'])->name('teachers.update');
 
             Route::get('academics', [StudentsResultsController::class, 'academics'])->name('academics');
 

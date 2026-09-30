@@ -364,11 +364,286 @@ class TeachersTest extends TestCase
             ->assertSee('Inactive');
     }
 
+    /** Every row on the register can be opened, which is what the pencil is for. */
+    public function test_the_register_offers_a_pencil_on_each_teacher(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.list'))
+            ->assertOk()
+            ->assertSee('Action')
+            ->assertSee(route('admin.students-results.teachers.edit', $teacher), false);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Editing a teacher */
+    /* ------------------------------------------------------------------ */
+
+    public function test_the_edit_page_opens_with_the_teacher_in_it(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.edit', $teacher))
+            ->assertOk()
+            ->assertSee('Edit Chidera Okafor')
+            ->assertSee('value="Chidera Okafor"', false)
+            ->assertSee('value="'.$teacher->email.'"', false)
+            ->assertSee('value="'.$teacher->phone.'"', false)
+            ->assertSee('name="avatar"', false)
+            // The password is not here, and neither is a field that would set one.
+            ->assertDontSee('name="password"', false);
+    }
+
+    /** A photograph cannot be taken off a teacher who has not got one. */
+    public function test_the_remove_photograph_box_is_only_there_when_there_is_a_photograph(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.edit', $teacher))
+            ->assertOk()
+            ->assertDontSee('name="remove_avatar"', false);
+
+        $teacher->update(['avatar_path' => 'photos/teachers/old.jpg']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.edit', $teacher))
+            ->assertOk()
+            ->assertSee('name="remove_avatar"', false)
+            ->assertSee('storage/photos/teachers/old.jpg', false);
+    }
+
+    public function test_a_teacher_is_edited_and_the_register_shows_the_change(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor-Eze',
+                'email' => 'chidera.eze@example.com',
+                'phone' => '080 9999 1111',
+                'is_active' => '1',
+            ])
+            ->assertRedirect(route('admin.students-results.teachers.list'))
+            ->assertSessionHas('status', 'Chidera Okafor-Eze saved.');
+
+        $teacher->refresh();
+
+        $this->assertSame('Chidera Okafor-Eze', $teacher->name);
+        $this->assertSame('chidera.eze@example.com', $teacher->email);
+        $this->assertSame('080 9999 1111', $teacher->phone);
+        $this->assertTrue($teacher->is_active);
+        // Still a teacher, and still only a teacher.
+        $this->assertSame(['Teacher'], $teacher->getRoleNames()->all());
+    }
+
+    /**
+     * A teacher who has left is deactivated rather than deleted: the classes they
+     * taught and the marks they entered are still theirs.
+     */
+    public function test_a_teacher_is_deactivated_rather_than_deleted(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor',
+                'email' => $teacher->email,
+                'phone' => $teacher->phone,
+                // No is_active: an unticked box means they no longer sign in.
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertFalse($teacher->refresh()->is_active);
+    }
+
+    /** Keeping their own email is not a clash with themselves. */
+    public function test_a_teacher_keeps_their_own_email_and_phone(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor',
+                'email' => $teacher->email,
+                'phone' => $teacher->phone,
+                'is_active' => '1',
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertSame($teacher->email, $teacher->refresh()->email);
+    }
+
+    public function test_a_teacher_cannot_take_an_email_that_belongs_to_another_account(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+        User::factory()->create(['email' => 'taken@example.com']);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor',
+                'email' => 'taken@example.com',
+                'phone' => $teacher->phone,
+                'is_active' => '1',
+            ])
+            ->assertSessionHasErrors(['email' => 'That email belongs to another account.']);
+
+        $this->assertNotSame('taken@example.com', $teacher->refresh()->email);
+    }
+
+    /** The school texts teachers, so the number cannot be emptied out afterwards. */
+    public function test_a_teacher_cannot_be_left_without_a_phone_number(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor',
+                'email' => $teacher->email,
+                'phone' => '',
+                'is_active' => '1',
+            ])
+            ->assertSessionHasErrors([
+                'phone' => 'A phone number is needed: the school reaches teachers by text message.',
+            ]);
+
+        $this->assertSame($teacher->phone, $teacher->refresh()->phone);
+    }
+
+    /**
+     * A new photograph replaces the old one and the old one is deleted: a replaced
+     * photograph is usually one somebody objected to, and leaving it on the disk
+     * leaves it readable by whoever still has the link.
+     */
+    public function test_a_new_photograph_replaces_the_old_one_and_the_old_one_is_deleted(): void
+    {
+        Storage::fake('public');
+
+        $teacher = $this->teacher('Chidera Okafor');
+        $old = UploadedFile::fake()->image('old.jpg')->store('photos/teachers', 'public');
+        $teacher->update(['avatar_path' => $old]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor',
+                'email' => $teacher->email,
+                'phone' => $teacher->phone,
+                'avatar' => UploadedFile::fake()->image('new.jpg'),
+                'is_active' => '1',
+            ])
+            ->assertSessionHas('status');
+
+        $now = $teacher->refresh()->avatar_path;
+
+        $this->assertNotNull($now);
+        $this->assertNotSame($old, $now);
+        Storage::disk('public')->assertExists($now);
+        Storage::disk('public')->assertMissing($old);
+    }
+
+    /**
+     * Keeping the photograph is what happens by default: the box is not ticked, so
+     * saving a name change must not quietly take the picture with it.
+     */
+    public function test_changing_a_name_keeps_the_photograph_that_was_there(): void
+    {
+        Storage::fake('public');
+
+        $teacher = $this->teacher('Chidera Okafor');
+        $path = UploadedFile::fake()->image('chidera.jpg')->store('photos/teachers', 'public');
+        $teacher->update(['avatar_path' => $path]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor-Eze',
+                'email' => $teacher->email,
+                'phone' => $teacher->phone,
+                'is_active' => '1',
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertSame($path, $teacher->refresh()->avatar_path);
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_a_photograph_can_be_taken_off_a_teacher(): void
+    {
+        Storage::fake('public');
+
+        $teacher = $this->teacher('Chidera Okafor');
+        $path = UploadedFile::fake()->image('chidera.jpg')->store('photos/teachers', 'public');
+        $teacher->update(['avatar_path' => $path]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Chidera Okafor',
+                'email' => $teacher->email,
+                'phone' => $teacher->phone,
+                'remove_avatar' => '1',
+                'is_active' => '1',
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertNull($teacher->refresh()->avatar_path);
+        Storage::disk('public')->assertMissing($path);
+    }
+
+    /**
+     * This page is the teachers register, not Staff & roles: an account that does
+     * not teach is not one it edits.
+     */
+    public function test_the_edit_page_does_not_open_for_an_account_that_is_not_a_teacher(): void
+    {
+        $bursar = User::factory()->create(['name' => 'Ngozi the bursar']);
+        $bursar->assignRole('Bursar / Accounts');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.edit', $bursar))
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.teachers.update', $bursar), [
+                'name' => 'Somebody else',
+                'email' => $bursar->email,
+                'phone' => '080 1234 5678',
+            ])
+            ->assertNotFound();
+
+        $this->assertSame('Ngozi the bursar', $bursar->refresh()->name);
+    }
+
+    public function test_editing_a_teacher_is_closed_to_a_role_without_the_permission(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $bursar = User::factory()->create();
+        $bursar->assignRole('Bursar / Accounts');
+
+        $this->actingAs($bursar)
+            ->get(route('admin.students-results.teachers.edit', $teacher))
+            ->assertForbidden();
+
+        $this->actingAs($bursar)
+            ->put(route('admin.students-results.teachers.update', $teacher), [
+                'name' => 'Somebody else',
+                'email' => $teacher->email,
+                'phone' => '080 1234 5678',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame('Chidera Okafor', $teacher->refresh()->name);
+    }
+
     /* ------------------------------------------------------------------ */
 
     private function teacher(string $name): User
     {
-        $teacher = User::factory()->create(['name' => $name]);
+        $teacher = User::factory()->create([
+            'name' => $name,
+            'phone' => '080 1234 5678',
+        ]);
         $teacher->assignRole('Teacher');
 
         return $teacher;

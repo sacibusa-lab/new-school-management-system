@@ -26,7 +26,8 @@
                         <th class="border-b border-r border-line p-3">Teacher</th>
                         <th class="border-b border-r border-line p-3">Contact</th>
                         <th class="border-b border-r border-line p-3">Class Teacher Of</th>
-                        <th class="w-28 border-b border-line p-3 text-center">Status</th>
+                        <th class="w-28 border-b border-r border-line p-3 text-center">Status</th>
+                        <th class="w-32 border-b border-line p-3 text-center">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-ink-soft">
@@ -71,7 +72,7 @@
                                     : $teacher->taughtClasses->pluck('name')->implode(', ') }}
                             </td>
 
-                            <td class="p-3 text-center align-top">
+                            <td class="border-r border-line p-3 text-center align-top">
                                 <span @class([
                                     'badge-neutral',
                                     'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900' => ! $teacher->is_active,
@@ -79,10 +80,20 @@
                                     {{ $teacher->is_active ? 'Active' : 'Inactive' }}
                                 </span>
                             </td>
+
+                            <td class="p-3 align-top">
+                                <div class="flex justify-center">
+                                    <a href="{{ route('admin.students-results.teachers.edit', $teacher) }}"
+                                       class="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-soft transition hover:bg-surface-3"
+                                       title="Edit {{ $teacher->name }}">
+                                        <x-nav-icon name="pencil" class="h-3.5 w-3.5" />
+                                    </a>
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="p-8 text-center text-sm text-muted">
+                            <td colspan="6" class="p-8 text-center text-sm text-muted">
                                 No teachers yet.
                                 <a href="{{ route('admin.students-results.teachers.create') }}"
                                    class="font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-200">
