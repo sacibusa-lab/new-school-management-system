@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SchoolClass extends Model
 {
-    protected $fillable = ['level_id', 'name', 'arm', 'capacity', 'form_teacher_id', 'is_active'];
+    protected $fillable = ['level_id', 'section_id', 'name', 'capacity', 'form_teacher_id', 'is_active'];
 
     protected function casts(): array
     {
@@ -22,6 +22,18 @@ class SchoolClass extends Model
     public function level(): BelongsTo
     {
         return $this->belongsTo(SchoolLevel::class, 'level_id');
+    }
+
+    /**
+     * The section this class is: A of JSS1.
+     *
+     * `name` is not derived from these two, but it is written from them when the
+     * class is created, so renaming either would leave it stale — which is one
+     * reason neither can be renamed yet.
+     */
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
     }
 
     public function formTeacher(): BelongsTo

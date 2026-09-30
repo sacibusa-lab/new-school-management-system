@@ -6,6 +6,7 @@ use App\Models\AcademicSession;
 use App\Models\GradeScale;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
+use App\Models\Section;
 use App\Models\SessionTerm;
 use App\Models\Subject;
 use App\Models\Term;
@@ -53,15 +54,26 @@ class AcademicSeeder extends Seeder
         }
 
         // ---------------------------------------------------------------
-        // Levels and class arms
+        // Sections, levels and the classes they make
         // ---------------------------------------------------------------
-        // The school does not run JSS3 or SS3, so they are not offered anywhere a
-        // class is chosen. `order` stays contiguous for the classes that exist.
+        // Sections first, because a class is named from one: JSS1 on its own is not
+        // a class anybody sits in until it has a section. The school does not run
+        // JSS3 or SS3, so they are not offered anywhere a class is chosen. `order`
+        // stays contiguous for the classes that exist.
+        $sections = ['A', 'B', 'C', 'D'];
+
+        foreach ($sections as $index => $section) {
+            Section::updateOrCreate(
+                ['name' => $section],
+                ['order' => $index + 1],
+            );
+        }
+
         $levels = [
-            ['name' => 'JSS1', 'order' => 1, 'arms' => ['A', 'B', 'C', 'D']],
-            ['name' => 'JSS2', 'order' => 2, 'arms' => ['A', 'B', 'C', 'D']],
-            ['name' => 'SS1', 'order' => 3, 'arms' => ['A', 'B', 'C', 'D']],
-            ['name' => 'SS2', 'order' => 4, 'arms' => ['A', 'B', 'C']],
+            ['name' => 'JSS1', 'order' => 1, 'sections' => ['A', 'B', 'C', 'D']],
+            ['name' => 'JSS2', 'order' => 2, 'sections' => ['A', 'B', 'C', 'D']],
+            ['name' => 'SS1', 'order' => 3, 'sections' => ['A', 'B', 'C', 'D']],
+            ['name' => 'SS2', 'order' => 4, 'sections' => ['A', 'B', 'C']],
         ];
 
         foreach ($levels as $levelData) {
@@ -70,12 +82,13 @@ class AcademicSeeder extends Seeder
                 ['order' => $levelData['order'], 'is_active' => true],
             );
 
-            foreach ($levelData['arms'] as $arm) {
+            foreach ($levelData['sections'] as $sectionName) {
+                $section = Section::query()->where('name', $sectionName)->sole();
+
                 SchoolClass::updateOrCreate(
-                    ['name' => $level->name . $arm],
+                    ['level_id' => $level->id, 'section_id' => $section->id],
                     [
-                        'level_id' => $level->id,
-                        'arm' => $arm,
+                        'name' => $level->name.$section->name,
                         'capacity' => 40,
                         'is_active' => true,
                     ],

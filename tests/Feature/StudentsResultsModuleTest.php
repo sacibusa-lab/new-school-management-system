@@ -198,15 +198,24 @@ class StudentsResultsModuleTest extends TestCase
 
     public function test_every_page_under_academic_opens_and_is_the_page_it_claims(): void
     {
-        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+        // Classes & Sections is built, so it is no longer one of the pages that says
+        // it has not been built; the three that are left still are, each with the
+        // note written for it — which is what proves the right one drew.
+        foreach (['subjects', 'schedule', 'promotion'] as $key) {
+            $child = collect(StudentsResultsController::ACADEMIC_PAGES)->firstWhere('key', $key);
+
             $this->actingAs($this->admin)
                 ->get(route($child['route']))
                 ->assertOk()
-                // The note is written per page, so finding it is what proves the
-                // right one drew rather than a shared placeholder looking alike.
                 ->assertSee($child['note'])
                 ->assertSee('This page has not been built yet');
         }
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes'))
+            ->assertOk()
+            ->assertSee('Create Class')
+            ->assertDontSee('This page has not been built yet');
     }
 
     public function test_the_academic_page_lists_the_four_things_it_holds(): void

@@ -23,6 +23,13 @@
     // directive compiles to an opening tag PHP does not recognise, which swallows
     // the markup after it and turns the whole page into an undefined variable.
     $menu = \App\Support\AdminMenu::class;
+
+    // Blade escapes a section's content when it is defined with
+    // @section('title', 'value'), so the page title arrives here already escaped
+    // once. Decoded and escaped again where it is printed, rather than printed as
+    // it arrives and doubled — "Classes & Sections" came out as "Classes &amp;
+    // Sections" on the page and in the browser tab.
+    $pageTitle = trim(html_entity_decode((string) $__env->yieldContent('title')));
 @endphp
 
 <div class="flex min-h-full">
@@ -138,9 +145,10 @@
 
             <div class="min-w-0 flex-1">
                 {{-- Read from the section, not a $title variable: every page sets
-                     @section('title', ...) and none of them pass $title. --}}
+                     @section('title', ...) and none of them pass $title. Decoded
+                     once above, escaped once here. --}}
                 <p class="truncate text-sm font-semibold text-ink">
-                    {{ trim($__env->yieldContent('title')) ?: 'Dashboard' }}
+                    {{ $pageTitle ?: 'Dashboard' }}
                 </p>
 
                 @hasSection('subtitle')
@@ -191,7 +199,7 @@
                  page, so it is right on every page that the menu holds and simply
                  absent on the few it does not. --}}
             <x-breadcrumb class="mb-5"
-                          :trail="$menu::trailFor(request()->route()?->getName(), trim($__env->yieldContent('title')))" />
+                          :trail="$menu::trailFor(request()->route()?->getName(), $pageTitle)" />
 
             @if (session('status'))
                 <div class="mb-6"><x-alert tone="success">{{ session('status') }}</x-alert></div>

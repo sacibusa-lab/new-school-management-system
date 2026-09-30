@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
 use App\Http\Controllers\Admin\CheckResultController;
+use App\Http\Controllers\Admin\ClassesAndSectionsController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ExamController;
 use App\Http\Controllers\Admin\FeeController;
@@ -228,7 +229,21 @@ Route::middleware(['auth'])
             | and a {page} wildcard under `academics` would have to be pulled
             | apart the first time one of them needs a child of its own.
             */
-            Route::get('academics/classes', [StudentsResultsController::class, 'academicClasses'])->name('academics.classes');
+            Route::get('academics/classes', [ClassesAndSectionsController::class, 'index'])->name('academics.classes');
+
+            // Sections are created first, then the class names, then a class out of
+            // the two of them — the order the page itself is laid out in. The
+            // literal segments are declared before {level} so that "sections" and
+            // "names" are never read as the id of a class.
+            Route::post('academics/classes/sections', [ClassesAndSectionsController::class, 'storeSection'])->name('academics.classes.sections.store');
+            Route::delete('academics/classes/sections/{section}', [ClassesAndSectionsController::class, 'destroySection'])->name('academics.classes.sections.destroy');
+
+            Route::post('academics/classes/names', [ClassesAndSectionsController::class, 'storeClass'])->name('academics.classes.names.store');
+            Route::put('academics/classes/names/{level}', [ClassesAndSectionsController::class, 'updateClass'])->name('academics.classes.names.update');
+            Route::delete('academics/classes/names/{level}', [ClassesAndSectionsController::class, 'destroyClass'])->name('academics.classes.names.destroy');
+
+            Route::post('academics/classes/{level}', [ClassesAndSectionsController::class, 'storeClassSection'])->name('academics.classes.store-class');
+            Route::delete('academics/classes/{schoolClass}', [ClassesAndSectionsController::class, 'destroyClassSection'])->name('academics.classes.destroy-class');
             Route::get('academics/subjects', [StudentsResultsController::class, 'academicSubjects'])->name('academics.subjects');
             Route::get('academics/schedule', [StudentsResultsController::class, 'academicSchedule'])->name('academics.schedule');
             Route::get('academics/promotion', [StudentsResultsController::class, 'academicPromotion'])->name('academics.promotion');

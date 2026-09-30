@@ -1,0 +1,326 @@
+<?php
+
+namespace App\Services\Academics;
+
+use App\Models\ActivityLog;
+use App\Models\Applicant;
+use App\Models\Assessment;
+use App\Models\Exam;
+use App\Models\FeeStructure;
+use App\Models\ResultPublication;
+use App\Models\SchoolClass;
+use App\Models\SchoolLevel;
+use App\Models\Section;
+use App\Models\Student;
+use App\Models\TermResult;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+
+/**
+ * The shape of the school: its class names, its sections, and the classes built
+ * from the two.
+ *
+ * The order matters and is the office's, not ours: sections first (A, B, C), then
+ * the class names (JSS1, SS1), then JSS1A and JSS1B by putting the two together. A
+ * class name on its own is not a class anybody sits in.
+ *
+ * Deleting follows the same rule as the rest of the platform: nothing that has
+ * something written against it disappears, and the office is told what is in the
+ * way instead of finding out afterwards. A class name is the stronger case — its
+ * classes go with it — so it is refused while any of them holds anything.
+ */
+class AcademicStructureService
+{
+    /**
+     * Written against a class, with the column that says so.
+     *
+     * The column is named per model rather than assumed: an applicant records the
+     * class they applied for in `level_applied_for_id`, and asking for `level_id`
+     * there is a query that fails rather than a count that is wrong.
+     */
+    private const CLASS_DEPENDENTS = [
+        'student' => [Student::class, 'school_class_id'],
+        'assessment' => [Assessment::class, 'school_class_id'],
+        'term result' => [TermResult::class, 'school_class_id'],
+        'published result' => [ResultPublication::class, 'school_class_id'],
+    ];
+
+    /** Written against a class name. Its own classes are counted separately. */
+    private const CLASS_NAME_DEPENDENTS = [
+        'student' => [Student::class, 'level_id'],
+        'applicant' => [Applicant::class, 'level_applied_for_id'],
+        'examination' => [Exam::class, 'level_id'],
+        'fee structure' => [FeeStructure::class, 'level_id'],
+    ];
+
+    /* ------------------------------------------------------------------ */
+    /* Sections */
+    /* ------------------------------------------------------------------ */
+
+    public function addSection(string $name, ?User $actor = null): Section
+    {
+        $section = Section::create([
+            'name' => $this->tidy($name),
+            'order' => (int) Section::query()->max('order') + 1,
+        ]);
+
+        $this->log($actor, 'section.created', $section, "Added section {$section->name}", [
+            'module' => 'academics',
+        ]);
+
+        return $section;
+    }
+
+    /**
+     * The classes using a section — what stops it being deleted, and what the page
+     * counts under it.
+     *
+     * @return array<string,int>
+     */
+    public function sectionHeld(Section $section): array
+    {
+        $total = SchoolClass::query()->where('section_id', $section->id)->count();
+
+        return $total > 0 ? ['class' => $total] : [];
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    public function deleteSection(Section $section): void
+    {
+        if (($blocked = $this->sectionHeld($section)) !== []) {
+            throw new RuntimeException(sprintf(
+                'Section %s is still used by %s. Delete or move those classes first.',
+                $section->name,
+                $this->describe($blocked),
+            ));
+        }
+
+        $section->delete();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Class names */
+    /* ------------------------------------------------------------------ */
+
+    public function addClassName(string $name, ?int $order = null): SchoolLevel
+    {
+        return SchoolLevel::create([
+            'name' => $this->tidy($name),
+            'order' => $order ?? (int) SchoolLevel::query()->max('order') + 1,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
+     * Rename a class, and take its classes with it.
+     *
+     * JSS1A is JSS1 and section A put together, so renaming JSS1 to JSS2 has to
+     * rename JSS1A to JSS2A — otherwise the classes of a class called JSS2 would go
+     * on being called JSS1A, and every list in the school would show the old name.
+     * The two happen together or not at all.
+     *
+     * @throws RuntimeException when the name is already taken
+     */
+    public function renameClassName(SchoolLevel $level, string $name, ?User $actor = null): SchoolLevel
+    {
+        $name = $this->tidy($name);
+
+        if ($name === $level->name) {
+            return $level;
+        }
+
+        if (SchoolLevel::query()->where('name', $name)->whereKeyNot($level->id)->exists()) {
+            throw new RuntimeException("{$name} is already there.");
+        }
+
+        $was = $level->name;
+
+        DB::transaction(function () use ($level, $name): void {
+            $level->update(['name' => $name]);
+
+            foreach ($level->classes()->with('section')->get() as $class) {
+                $class->update(['name' => $name.$class->section?->name]);
+            }
+        });
+
+        $this->log($actor, 'class.renamed', $level, "Renamed class {$was} to {$name}", [
+            'module' => 'academics',
+            'was' => $was,
+        ]);
+
+        return $level;
+    }
+
+    /**
+     * What is written against a class name in its own right.
+     *
+     * @return array<string,int>
+     */
+    public function classNameHeld(SchoolLevel $level): array
+    {
+        $counts = [];
+
+        foreach (self::CLASS_NAME_DEPENDENTS as $key => [$model, $column]) {
+            $total = $model::query()->where($column, $level->id)->count();
+
+            if ($total > 0) {
+                $counts[$key] = $total;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * A class name with nothing written against it, and none of its classes
+     * holding anything, can go — and takes its classes with it, which is what
+     * deleting the name of a class means.
+     *
+     * @throws RuntimeException
+     */
+    public function deleteClassName(SchoolLevel $level): void
+    {
+        if (($blocked = $this->classNameHeld($level)) !== []) {
+            throw new RuntimeException(sprintf(
+                '%s still has %s against it. Move them before deleting the class.',
+                $level->name,
+                $this->describe($blocked),
+            ));
+        }
+
+        // Its classes are about to go with it, so they have to be empty too.
+        $held = $this->classHeld($level->classes()->get());
+
+        if ($held !== []) {
+            throw new RuntimeException(sprintf(
+                '%s holds %s. Empty its classes before deleting the class name.',
+                $level->name,
+                $this->describe($held),
+            ));
+        }
+
+        DB::transaction(function () use ($level): void {
+            $level->classes()->delete();
+            $level->delete();
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Classes: a class name and a section */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Build the class a class name and a section make between them: JSS1 + A.
+     *
+     * @throws RuntimeException when that class is already there
+     */
+    public function addClass(SchoolLevel $level, Section $section, ?User $actor = null): SchoolClass
+    {
+        $name = $level->name.$section->name;
+
+        if (SchoolClass::query()->where('level_id', $level->id)->where('section_id', $section->id)->exists()) {
+            throw new RuntimeException("{$name} is already there.");
+        }
+
+        $class = SchoolClass::create([
+            'level_id' => $level->id,
+            'section_id' => $section->id,
+            'name' => $name,
+            'is_active' => true,
+        ]);
+
+        $this->log($actor, 'class.created', $class, "Added class {$class->name}", [
+            'module' => 'academics',
+            'section' => $section->name,
+        ]);
+
+        return $class;
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    public function deleteClass(SchoolClass $class): void
+    {
+        $blocked = $this->classHeld([$class]);
+
+        if ($blocked !== []) {
+            throw new RuntimeException(sprintf(
+                '%s still holds %s. Move them before deleting the class.',
+                $class->name,
+                $this->describe($blocked),
+            ));
+        }
+
+        $class->delete();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* What is in the way */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Everything counted against a set of classes — the count the office is shown
+     * before a delete is refused.
+     *
+     * @param  iterable<SchoolClass>  $classes
+     * @return array<string,int>
+     */
+    public function classHeld(iterable $classes): array
+    {
+        $ids = collect($classes)->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $counts = [];
+
+        foreach (self::CLASS_DEPENDENTS as $key => [$model, $column]) {
+            $total = $model::query()->whereIn($column, $ids)->count();
+
+            if ($total > 0) {
+                $counts[$key] = $total;
+            }
+        }
+
+        return $counts;
+    }
+
+    /** "12 students, 3 examinations and 40 invoices" */
+    public function describe(array $blocked): string
+    {
+        $parts = [];
+
+        foreach ($blocked as $key => $total) {
+            $parts[] = $total.' '.($total === 1 ? $key : $key.'s');
+        }
+
+        if (count($parts) === 1) {
+            return $parts[0];
+        }
+
+        $last = array_pop($parts);
+
+        return implode(', ', $parts).' and '.$last;
+    }
+
+    /** "jss 1" and "a" are the same class name and section as "JSS 1" and "A". */
+    private function tidy(string $name): string
+    {
+        return strtoupper(trim(preg_replace('/\s+/', ' ', $name) ?? ''));
+    }
+
+    private function log(?User $actor, string $action, Model $subject, string $description, array $properties = []): void
+    {
+        if ($actor === null) {
+            return;
+        }
+
+        ActivityLog::record($action, $subject, $description, $properties);
+    }
+}
