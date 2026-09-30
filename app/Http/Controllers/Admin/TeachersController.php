@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Teachers\TeacherImportService;
+use App\Services\Teachers\TeacherRegisterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -34,19 +35,28 @@ class TeachersController extends Controller
 
     public function __construct(
         private readonly TeacherImportService $imports,
+        private readonly TeacherRegisterService $register,
     ) {}
 
     public function index(): View
     {
         $this->authorize('teachers.manage');
 
+        $teachers = User::query()
+            ->role('Teacher')
+            ->with('taughtClasses.level')
+            ->orderBy('name')
+            ->get();
+
         return view('admin.students-results.teachers.list', [
             'page' => collect(StudentsResultsController::TEACHER_PAGES)->firstWhere('key', 'teachers-list'),
-            'teachers' => User::query()
-                ->role('Teacher')
-                ->with('taughtClasses.level')
-                ->orderBy('name')
-                ->get(),
+            'teachers' => $teachers,
+            // What each removal takes with it, so the page can say so in the confirmation
+            // instead of the office finding out from a blank column weeks later. Read from
+            // the relation the list has already loaded.
+            'held' => $teachers
+                ->mapWithKeys(fn (User $teacher) => [$teacher->id => $this->register->heldClassesFor($teacher)])
+                ->all(),
         ]);
     }
 
@@ -172,6 +182,129 @@ class TeachersController extends Controller
     private function assertIsTeacher(User $teacher): void
     {
         abort_unless($teacher->hasRole('Teacher'), 404);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Removing a teacher */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Take one teacher off the register.
+     *
+     * A teacher who has left is normally deactivated, which keeps the record and
+     * takes away the login. Deleting is for the record that should not be there at
+     * all — a duplicate, somebody taken on and never taken up, a name typed by
+     * mistake — so it asks no questions beyond whose account it is. The classes they
+     * were class teacher of are named in the confirmation before this runs, and named
+     * again in the flash, because those classes are left without one.
+     */
+    public function destroy(User $teacher): RedirectResponse
+    {
+        $this->authorize('teachers.manage');
+
+        $this->assertIsTeacher($teacher);
+
+        if (($refusal = $this->refusal($teacher)) !== null) {
+            return back()->with('error', $refusal);
+        }
+
+        $classes = $this->register->heldClassesFor($teacher);
+
+        $this->register->delete($teacher);
+
+        $message = "{$teacher->name} removed from the teaching staff.";
+
+        if ($classes !== '') {
+            $message .= " They were the class teacher of {$classes} — give those classes somebody else.";
+        }
+
+        return redirect()
+            ->route('admin.students-results.teachers.list')
+            ->with('status', $message);
+    }
+
+    /**
+     * Take several off at once, which is what the end of a session looks like.
+     *
+     * One account that cannot go does not stop the rest, and whoever was left behind
+     * is named with the reason: an office that ticks six boxes and sees five leave
+     * has to be told which one stayed.
+     */
+    public function destroySelected(Request $request): RedirectResponse
+    {
+        $this->authorize('teachers.manage');
+
+        $validated = $request->validate([
+            'teachers' => ['required', 'array', 'min:1'],
+            'teachers.*' => ['integer'],
+        ], [
+            'teachers.required' => 'Tick the teacher(s) to remove.',
+            'teachers.min' => 'Tick the teacher(s) to remove.',
+        ]);
+
+        $teachers = User::query()
+            ->role('Teacher')
+            ->whereIn('id', $validated['teachers'])
+            ->orderBy('name')
+            ->get();
+
+        if ($teachers->isEmpty()) {
+            return back()->with('error', 'None of those accounts is on the teachers register.');
+        }
+
+        $removed = [];
+        $freed = [];
+        $kept = [];
+
+        foreach ($teachers as $teacher) {
+            if (($refusal = $this->refusal($teacher)) !== null) {
+                $kept[] = "{$teacher->name} — {$refusal}";
+
+                continue;
+            }
+
+            $classes = $this->register->heldClassesFor($teacher);
+
+            $this->register->delete($teacher);
+
+            $removed[] = $teacher->name;
+
+            if ($classes !== '') {
+                $freed[] = $classes;
+            }
+        }
+
+        if ($removed === []) {
+            return back()->with('error', 'Nobody was removed. '.implode('; ', $kept).'.');
+        }
+
+        $message = count($removed) === 1
+            ? "{$removed[0]} removed from the teaching staff."
+            : count($removed).' teachers removed: '.implode(', ', $removed).'.';
+
+        if ($freed !== []) {
+            $message .= ' Class teacher of '.implode('; ', $freed).' — those classes need somebody new.';
+        }
+
+        if ($kept !== []) {
+            $message .= ' Left alone: '.implode('; ', $kept).'.';
+        }
+
+        return back()->with('status', $message);
+    }
+
+    /**
+     * Why this account cannot be removed by the person removing it.
+     *
+     * Only one thing stops it: deleting the account you are signed in as would take
+     * the session out from under you mid-request. Everything else — a class they
+     * still hold — is a warning, not a reason to refuse.
+     */
+    private function refusal(User $teacher): ?string
+    {
+        return $teacher->is(auth()->user())
+            ? 'that is the account you are signed in with'
+            : null;
     }
 
     /* ------------------------------------------------------------------ */

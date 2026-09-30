@@ -25,6 +25,9 @@ use Tests\TestCase;
  *
  * It is not Staff & roles: that page manages logins and what each one may do. The
  * permission is separate for that reason, and is tested here.
+ *
+ * Removal is the one destructive thing the page does, so it is tested for what it
+ * takes with it: the photograph, and the classes that were somebody's.
  */
 class TeachersTest extends TestCase
 {
@@ -376,6 +379,172 @@ class TeachersTest extends TestCase
             ->assertSee(route('admin.students-results.teachers.edit', $teacher), false);
     }
 
+    /**
+     * And a bin, plus a box to tick: one teacher at a time, or the six who left at
+     * the end of a session. The bin submits the form that waits outside the table,
+     * because a form cannot sit inside the form the boxes belong to.
+     */
+    public function test_the_register_offers_a_bin_each_and_a_box_to_tick_them(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.list'))
+            ->assertOk()
+            ->assertSee(route('admin.students-results.teachers.destroy-selected'), false)
+            ->assertSee(route('admin.students-results.teachers.destroy', $teacher), false)
+            ->assertSee('form="remove-teacher-'.$teacher->id.'"', false)
+            ->assertSee('name="teachers[]"', false)
+            // The count rides on the button, so nobody presses it wondering what it will do.
+            ->assertSee('x-text="count"', false);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Removing a teacher */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_teacher_is_removed_from_the_register(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy', $teacher))
+            ->assertRedirect(route('admin.students-results.teachers.list'))
+            ->assertSessionHas('status', fn (string $message) => str_contains($message, 'removed from the teaching staff'));
+
+        $this->assertDatabaseMissing('users', ['id' => $teacher->id]);
+    }
+
+    /**
+     * The photograph goes too. A face left on the disk is a face anybody with the link
+     * can still open, and the account it belonged to is gone.
+     */
+    public function test_removing_a_teacher_takes_their_photograph_with_them(): void
+    {
+        Storage::fake('public');
+
+        $teacher = $this->teacher('Chidera Okafor');
+        $teacher->update(['avatar_path' => 'photos/teachers/chidera.jpg']);
+        Storage::disk('public')->put('photos/teachers/chidera.jpg', 'a photograph');
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy', $teacher))
+            ->assertSessionHas('status');
+
+        Storage::disk('public')->assertMissing('photos/teachers/chidera.jpg');
+    }
+
+    /**
+     * A class is left with nobody, and the office is told which one before they
+     * confirm and again in the flash — a blank column weeks later is not a message.
+     */
+    public function test_the_classes_a_teacher_held_are_freed_and_named(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+        $class = $this->class('JSS1A');
+        $class->update(['form_teacher_id' => $teacher->id]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy', $teacher))
+            ->assertSessionHas('status', fn (string $message) => str_contains($message, 'JSS1A'));
+
+        $this->assertDatabaseMissing('users', ['id' => $teacher->id]);
+        $this->assertNull($class->refresh()->form_teacher_id);
+    }
+
+    public function test_several_teachers_are_removed_at_once(): void
+    {
+        $leaving = $this->teacher('Chidera Okafor');
+        $alsoLeaving = $this->teacher('Bola Adeyemi');
+        $staying = $this->teacher('Zainab Yusuf');
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy-selected'), [
+                'teachers' => [$leaving->id, $alsoLeaving->id],
+            ])
+            ->assertSessionHas('status', fn (string $message) => str_contains($message, '2 teachers removed'));
+
+        $this->assertDatabaseMissing('users', ['id' => $leaving->id]);
+        $this->assertDatabaseMissing('users', ['id' => $alsoLeaving->id]);
+        $this->assertDatabaseHas('users', ['id' => $staying->id]);
+    }
+
+    /** Ticking nobody is not a request to remove everybody. */
+    public function test_removing_nobody_is_refused(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy-selected'), ['teachers' => []])
+            ->assertSessionHasErrors('teachers');
+
+        $this->assertDatabaseHas('users', ['id' => $teacher->id]);
+    }
+
+    /** The register removes teachers; an id typed into the form cannot make it a people-deleter. */
+    public function test_an_account_that_is_not_a_teacher_cannot_be_removed_from_here(): void
+    {
+        $bursar = User::factory()->create(['name' => 'Ngozi the bursar']);
+        $bursar->assignRole('Bursar / Accounts');
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy', $bursar))
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy-selected'), [
+                'teachers' => [$bursar->id],
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('users', ['id' => $bursar->id]);
+    }
+
+    /**
+     * Deleting the account you are signed in as would take the session out from under
+     * the request. The rest of a bulk removal still goes through.
+     */
+    public function test_the_office_cannot_remove_the_account_they_are_signed_in_with(): void
+    {
+        $this->admin->assignRole('Teacher');
+        $other = $this->teacher('Chidera Okafor');
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy', $this->admin))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('users', ['id' => $this->admin->id]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students-results.teachers.destroy-selected'), [
+                'teachers' => [$this->admin->id, $other->id],
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('users', ['id' => $this->admin->id]);
+        $this->assertDatabaseMissing('users', ['id' => $other->id]);
+    }
+
+    public function test_removing_a_teacher_is_closed_to_a_role_without_the_permission(): void
+    {
+        $teacher = $this->teacher('Chidera Okafor');
+
+        $bursar = User::factory()->create();
+        $bursar->assignRole('Bursar / Accounts');
+
+        $this->actingAs($bursar)
+            ->delete(route('admin.students-results.teachers.destroy', $teacher))
+            ->assertForbidden();
+
+        $this->actingAs($bursar)
+            ->delete(route('admin.students-results.teachers.destroy-selected'), [
+                'teachers' => [$teacher->id],
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => $teacher->id]);
+    }
+
     /* ------------------------------------------------------------------ */
     /* Editing a teacher */
     /* ------------------------------------------------------------------ */
@@ -440,8 +609,8 @@ class TeachersTest extends TestCase
     }
 
     /**
-     * A teacher who has left is deactivated rather than deleted: the classes they
-     * taught and the marks they entered are still theirs.
+     * The switch on the edit form takes the login away without touching the record: the
+     * reversible way to retire somebody. Removal is the other way, and is tested above.
      */
     public function test_a_teacher_is_deactivated_rather_than_deleted(): void
     {

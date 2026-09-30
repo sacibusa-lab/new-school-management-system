@@ -251,6 +251,13 @@ Route::middleware(['auth'])
             Route::get('teachers/{teacher}/edit', [TeachersController::class, 'edit'])->name('teachers.edit');
             Route::put('teachers/{teacher}', [TeachersController::class, 'update'])->name('teachers.update');
 
+            /*
+            | Removing one teacher, and removing several at once. The collection
+            | route is listed first because it has no id to be confused with one.
+            */
+            Route::delete('teachers', [TeachersController::class, 'destroySelected'])->name('teachers.destroy-selected');
+            Route::delete('teachers/{teacher}', [TeachersController::class, 'destroy'])->name('teachers.destroy');
+
             Route::get('academics', [StudentsResultsController::class, 'academics'])->name('academics');
 
             /*
