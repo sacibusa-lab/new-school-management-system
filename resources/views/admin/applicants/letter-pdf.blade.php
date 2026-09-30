@@ -71,14 +71,21 @@
 <body>
 
 <div class="letterhead">
-    <h1>{{ $letterhead['name'] }}</h1>
+    @if ($letterheadData)
+        {{-- The school's own letterhead. Sized from the image's own proportions
+             rather than by DomPDF, which would stretch it. --}}
+        <img src="{{ $letterheadData['data'] }}"
+             style="height: {{ $letterheadData['height'] ?? 'auto' }}; width: {{ $letterheadData['width'] ?? '100%' }}; margin-bottom: 6pt;">
+    @else
+        <h1>{{ $letterhead['name'] }}</h1>
 
-    @if ($letterhead['address'])
-        <p>{{ $letterhead['address'] }}</p>
-    @endif
+        @if ($letterhead['address'])
+            <p>{{ $letterhead['address'] }}</p>
+        @endif
 
-    @if ($letterhead['phone'] || $letterhead['email'])
-        <p>{{ collect([$letterhead['phone'], $letterhead['email']])->filter()->implode(' · ') }}</p>
+        @if ($letterhead['phone'] || $letterhead['email'])
+            <p>{{ collect([$letterhead['phone'], $letterhead['email']])->filter()->implode(' · ') }}</p>
+        @endif
     @endif
 </div>
 

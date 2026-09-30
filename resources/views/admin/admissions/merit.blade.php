@@ -30,15 +30,23 @@
 
     <div class="card p-6 print:border-0 print:p-0 print:shadow-none">
         <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
-            <div>
-                <h1 class="font-display text-xl font-semibold">{{ $school->name }}</h1>
-                @if ($school->address)
-                    <p class="text-xs text-slate-500">{{ $school->address }}</p>
-                @endif
-                @if ($school->phone)
-                    <p class="text-xs text-slate-500">{{ $school->phone }}</p>
-                @endif
-            </div>
+            @if ($school->letterhead)
+                {{-- The school's own letterhead, exactly as the office prints it, rather
+                     than its name typed out again under a crest. --}}
+                <img src="{{ asset('storage/' . $school->letterhead) }}"
+                     alt="{{ $school->name }}"
+                     class="max-h-24 max-w-[70%] object-contain">
+            @else
+                <div>
+                    <h1 class="font-display text-xl font-semibold">{{ $school->name }}</h1>
+                    @if ($school->address)
+                        <p class="text-xs text-slate-500">{{ $school->address }}</p>
+                    @endif
+                    @if ($school->phone)
+                        <p class="text-xs text-slate-500">{{ $school->phone }}</p>
+                    @endif
+                </div>
+            @endif
 
             <div class="text-right">
                 <p class="eyebrow">Merit list</p>
@@ -83,31 +91,71 @@
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Pos</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Candidate</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Number</th>
-                            <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Papers</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Total</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Average</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Decision</th>
+                            <th rowspan="2" class="px-3 py-2 text-left align-bottom text-xs font-semibold uppercase tracking-wider text-slate-500">Pos</th>
+                            <th rowspan="2" class="px-3 py-2 text-left align-bottom text-xs font-semibold uppercase tracking-wider text-slate-500">Candidate</th>
+
+                            {{-- One column per paper rather than a count of them: this is
+                                 the sheet the office defends a decision with, and "2/2"
+                                 answers nobody who asks what the child actually scored. --}}
+                            @if ($papers->isNotEmpty())
+                                <th colspan="{{ $papers->count() }}"
+                                    class="border-l border-slate-200 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Subjects
+                                </th>
+                            @endif
+
+                            <th rowspan="2" class="px-3 py-2 text-right align-bottom text-xs font-semibold uppercase tracking-wider text-slate-500">Total</th>
+                            <th rowspan="2" class="px-3 py-2 text-right align-bottom text-xs font-semibold uppercase tracking-wider text-slate-500">Average</th>
+                            <th rowspan="2" class="px-3 py-2 text-right align-bottom text-xs font-semibold uppercase tracking-wider text-slate-500">Decision</th>
                         </tr>
+
+                        @if ($papers->isNotEmpty())
+                            <tr>
+                                @foreach ($papers as $paper)
+                                    <th class="border-l border-slate-200 px-3 py-2 text-right text-[11px] font-semibold text-slate-500">
+                                        {{ $paper->subject?->code ?? $paper->label() }}
+                                    </th>
+                                @endforeach
+                            </tr>
+                        @endif
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
                         @foreach ($decisions as $decision)
+                            @php
+                                // The candidate's own marks, keyed by paper, so each
+                                // subject cell is a lookup rather than a query.
+                                $rows = $marks->get($decision->applicant_id, collect());
+                            @endphp
                             <tr>
-                                <td class="px-3 py-2 font-mono text-xs text-slate-500">{{ $decision->position ?? '—' }}</td>
-                                <td class="px-3 py-2 font-medium text-slate-900">
-                                    {{ $decision->applicant?->full_name ?? '—' }}
+                                <td class="px-3 py-2 align-top font-mono text-xs text-slate-500">{{ $decision->position ?? '—' }}</td>
+                                <td class="px-3 py-2 align-top">
+                                    <p class="font-medium text-slate-900">
+                                        {{ $decision->applicant?->full_name ?? '—' }}
+                                    </p>
+                                    {{-- Under the name: on a sheet read down a name column the
+                                         number belongs with the person, not in a column of its own. --}}
+                                    <p class="font-mono text-[11px] text-slate-500">
+                                        {{ $decision->applicant?->registration_number ?? '—' }}
+                                    </p>
                                 </td>
-                                <td class="px-3 py-2 font-mono text-xs text-slate-500">
-                                    {{ $decision->applicant?->registration_number ?? '—' }}
-                                </td>
-                                <td class="px-3 py-2 text-center text-slate-600">
-                                    {{ $decision->subjects_passed }}/{{ $decision->subjects_offered }}
-                                </td>
-                                <td class="px-3 py-2 text-right text-slate-600">{{ $fmt($decision->total_score) }}</td>
-                                <td class="px-3 py-2 text-right font-semibold">{{ $fmt($decision->average_score) }}%</td>
-                                <td class="px-3 py-2 text-right">
+
+                                @foreach ($papers as $paper)
+                                    @php $mark = $rows->get($paper->id); @endphp
+                                    <td class="border-l border-slate-100 px-3 py-2 text-right align-top">
+                                        @if ($mark === null || (! $mark['is_absent'] && $mark['percentage'] === null))
+                                            {{-- A paper nobody recorded a mark for is not a zero. --}}
+                                            <span class="text-slate-300">—</span>
+                                        @elseif ($mark['is_absent'])
+                                            <span class="text-rose-600">Absent</span>
+                                        @else
+                                            {{ $fmt($mark['percentage']) }}%
+                                        @endif
+                                    </td>
+                                @endforeach
+
+                                <td class="px-3 py-2 text-right align-top text-slate-600">{{ $fmt($decision->total_score) }}</td>
+                                <td class="px-3 py-2 text-right align-top font-semibold">{{ $fmt($decision->average_score) }}%</td>
+                                <td class="px-3 py-2 text-right align-top">
                                     @php $verdict = $decision->decision; @endphp
                                     <span @class([
                                         'font-semibold',
@@ -126,8 +174,10 @@
         @endif
 
         <p class="mt-4 text-xs text-slate-500">
-            The cutoff for this examination is {{ $fmt($cutoff) }}% of each candidate's average across the
-            papers sat. Anyone can check a candidate's own marks on their admission status page.
+            Each subject column is the candidate's mark in that paper as a percentage of it, so a
+            paper marked out of fifty counts the same as one out of a hundred. The cutoff for this
+            examination is {{ $fmt($cutoff) }}% of each candidate's average across the papers sat.
+            Anyone can check a candidate's own marks on their admission status page.
         </p>
     </div>
 </div>

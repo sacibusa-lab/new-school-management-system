@@ -35,18 +35,26 @@
 
         {{-- Letterhead --}}
         <header class="border-b border-slate-300 pb-6 text-center">
-            <h1 class="font-display text-2xl font-semibold tracking-tight text-slate-900">
-                {{ $letterhead['name'] }}
-            </h1>
+            @if ($letterhead['image'])
+                {{-- The school's own letterhead, as the office printed it, instead of
+                     the name and address underneath it typed out again. --}}
+                <img src="{{ asset('storage/' . $letterhead['image']) }}"
+                     alt="{{ $letterhead['name'] }}"
+                     class="mx-auto max-h-28 max-w-full object-contain">
+            @else
+                <h1 class="font-display text-2xl font-semibold tracking-tight text-slate-900">
+                    {{ $letterhead['name'] }}
+                </h1>
 
-            @if ($letterhead['address'])
-                <p class="mt-1 text-sm text-slate-600">{{ $letterhead['address'] }}</p>
-            @endif
+                @if ($letterhead['address'])
+                    <p class="mt-1 text-sm text-slate-600">{{ $letterhead['address'] }}</p>
+                @endif
 
-            @if ($letterhead['phone'] || $letterhead['email'])
-                <p class="mt-1 text-sm text-slate-600">
-                    {{ collect([$letterhead['phone'], $letterhead['email']])->filter()->implode(' · ') }}
-                </p>
+                @if ($letterhead['phone'] || $letterhead['email'])
+                    <p class="mt-1 text-sm text-slate-600">
+                        {{ collect([$letterhead['phone'], $letterhead['email']])->filter()->implode(' · ') }}
+                    </p>
+                @endif
             @endif
         </header>
 

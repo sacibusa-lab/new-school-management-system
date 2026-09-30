@@ -28,10 +28,9 @@ class AdmissionService
 {
     public function __construct(
         private readonly SmsNotifier $sms,
-    ) {
-    }
+    ) {}
     /* ------------------------------------------------------------------ */
-    /* Compute the merit list                                              */
+    /* Compute the merit list */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -196,18 +195,35 @@ class AdmissionService
      */
     public function breakdownFor(Applicant $applicant, Exam $exam): Collection
     {
+        return $this->breakdownsFor(collect([$applicant->id]), $exam)[$applicant->id] ?? collect();
+    }
+
+    /**
+     * The same breakdown for a whole column of candidates, in one pass.
+     *
+     * The merit list prints every candidate's mark in every paper, and asking the
+     * question one candidate at a time would be two queries per row on a sheet that
+     * runs to hundreds. The rows are identical to `breakdownFor` — a mark the
+     * office never recorded is still not a zero.
+     *
+     * @param  Collection<int,int>  $applicantIds
+     * @return array<int,Collection<int,array<string,mixed>>> keyed by applicant id
+     */
+    public function breakdownsFor(Collection $applicantIds, Exam $exam): array
+    {
         $examSubjects = $exam->examSubjects()->with('subject')->get()->keyBy('id');
 
-        if ($examSubjects->isEmpty()) {
-            return collect();
+        if ($examSubjects->isEmpty() || $applicantIds->isEmpty()) {
+            return [];
         }
 
-        $scores = Score::query()
-            ->where('applicant_id', $applicant->id)
+        return Score::query()
             ->where('exam_id', $exam->id)
-            ->get();
-
-        return $this->markedRows($scores, $examSubjects);
+            ->whereIn('applicant_id', $applicantIds->all())
+            ->get()
+            ->groupBy('applicant_id')
+            ->map(fn (Collection $scores) => $this->markedRows($scores, $examSubjects))
+            ->all();
     }
 
     /**
@@ -240,7 +256,7 @@ class AdmissionService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Apply the cutoff                                                    */
+    /* Apply the cutoff */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -367,16 +383,16 @@ class AdmissionService
                 'admission.cutoff_applied',
                 $exam,
                 "Applied a cutoff of {$cutoff}% — {$admitted} admitted, {$rejected} not admitted"
-                    . ($kept > 0 ? ", {$kept} left as decided by hand" : ''),
+                    .($kept > 0 ? ", {$kept} left as decided by hand" : ''),
                 ['module' => 'admissions'],
             );
         });
 
         // After commit — a dead gateway must never roll back an admission run.
         foreach ($notify as $item) {
-            /** @var \App\Models\Applicant $applicant */
+            /** @var Applicant $applicant */
             $applicant = $item['applicant'];
-            /** @var \App\Models\AdmissionDecision $decision */
+            /** @var AdmissionDecision $decision */
             $decision = $item['decision'];
 
             if ($decision->decision === AdmissionDecisionStatus::Admitted) {
@@ -397,7 +413,7 @@ class AdmissionService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Manual override                                                     */
+    /* Manual override */
     /* ------------------------------------------------------------------ */
 
     public function override(

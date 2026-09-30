@@ -18,6 +18,8 @@ use App\Services\Sms\SmsNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -34,8 +36,7 @@ class AdmissionController extends Controller
         private readonly ResitService $resits,
         private readonly SmsNotifier $sms,
         private readonly AdmissionLetterService $letters,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -164,7 +165,7 @@ class AdmissionController extends Controller
 
         return redirect()
             ->route('admin.admissions.index', ['exam' => $exam->id])
-            ->with('status', $message . '. Now transfer the admitted applicants into the result and fees portals.');
+            ->with('status', $message.'. Now transfer the admitted applicants into the result and fees portals.');
     }
 
     /** Manually flip a single applicant's decision. */
@@ -173,7 +174,7 @@ class AdmissionController extends Controller
         $this->authorize('admissions.decide');
 
         $validated = $request->validate([
-            'decision' => ['required', 'in:' . implode(',', AdmissionDecisionStatus::values())],
+            'decision' => ['required', 'in:'.implode(',', AdmissionDecisionStatus::values())],
             'remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -188,7 +189,7 @@ class AdmissionController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /* The paperwork the office hands out                                  */
+    /* The paperwork the office hands out */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -244,7 +245,7 @@ class AdmissionController extends Controller
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="merit-list-'
-                . \Illuminate\Support\Str::slug($exam->title) . '.csv"',
+                .Str::slug($exam->title).'.csv"',
         ]);
     }
 
@@ -342,7 +343,7 @@ class AdmissionController extends Controller
             $message .= sprintf(' %d could not be promoted: only %d place(s) were free.', $wanted - $promoted, $promoted);
         }
 
-        return back()->with('status', $message . ' Their admission letters can be printed from this page.');
+        return back()->with('status', $message.' Their admission letters can be printed from this page.');
     }
 
     /** Every admission letter for one examination, one to a sheet. */
@@ -384,9 +385,21 @@ class AdmissionController extends Controller
             ->orderByDesc('average_score')
             ->get();
 
+        // The papers this sitting was made of, and every candidate's mark in each of
+        // them. Read in two queries rather than two per row: the sheet is printed
+        // for a whole examination, not for one candidate.
+        $papers = $exam->examSubjects()->with('subject')->get();
+
+        $marks = collect($this->admissions->breakdownsFor(
+            $decisions->pluck('applicant_id')->filter()->unique()->values(),
+            $exam,
+        ))->map(fn (Collection $rows) => $rows->keyBy('exam_subject_id'));
+
         return [
             'exam' => $exam,
             'decisions' => $decisions,
+            'papers' => $papers,
+            'marks' => $marks,
             'cutoff' => $this->admissions->cutoffFor($exam),
             'slots' => $slots = $this->slotsFor($exam),
             'admitted' => $decisions->where('decision', AdmissionDecisionStatus::Admitted)->count(),
@@ -424,7 +437,7 @@ class AdmissionController extends Controller
         $message = "{$result['enrolled']} applicant(s) transferred — admission numbers issued, portal logins created and fee invoices raised.";
 
         if ($result['withoutInvoice'] !== []) {
-            $message .= ' No fee structure matched for: ' . implode(', ', $result['withoutInvoice']) . '. Publish a fee structure for those levels and raise the invoices from the Fees screen.';
+            $message .= ' No fee structure matched for: '.implode(', ', $result['withoutInvoice']).'. Publish a fee structure for those levels and raise the invoices from the Fees screen.';
         }
 
         return redirect()

@@ -78,6 +78,9 @@ class SettingLayout
             'contact_email',
             'school_logo',
             'school_favicon',
+            // Last of the branding, because it is the picture that carries all of
+            // the above on the documents that leave the school.
+            'letterhead_image',
         ],
 
         // Two number series, each prefix-then-digits, so the pairs read together

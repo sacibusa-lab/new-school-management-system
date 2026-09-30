@@ -114,7 +114,7 @@ class PublicAdmissionStatusTest extends TestCase
      * Sit the candidate in front of some papers.
      *
      * @param  array<int,array{0:string,1:string,2:float|null,3:bool}>  $marks
-     *         [code, name, mark, absent]
+     *                                                                          [code, name, mark, absent]
      */
     private function satPapers(array $marks): void
     {
@@ -279,7 +279,7 @@ class PublicAdmissionStatusTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The papers behind the total                                         */
+    /* The papers behind the total */
     /* ------------------------------------------------------------------ */
 
     public function test_the_marks_are_listed_paper_by_paper(): void
@@ -372,7 +372,7 @@ class PublicAdmissionStatusTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* What comes out of the printer                                       */
+    /* What comes out of the printer */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -444,6 +444,28 @@ class PublicAdmissionStatusTest extends TestCase
         $this->assertStringContainsString(Setting::get('contact_address'), $html);
         $this->assertStringContainsString(Setting::get('contact_phone'), $html);
         $this->assertStringContainsString('storage/branding/crest.png', $html, 'The uploaded logo is not on the printed record.');
+    }
+
+    /**
+     * Once the school has uploaded its own letterhead, that is what heads the printed
+     * record — not the name and the crest put back together by hand underneath it.
+     */
+    public function test_the_printed_record_carries_the_uploaded_letterhead(): void
+    {
+        $this->decide(ApplicantStatus::Admitted, 75);
+
+        Setting::put('letterhead_image', 'branding/letterhead.png');
+        Setting::flush();
+
+        $html = $this->search()->assertOk()->getContent();
+
+        $this->assertStringContainsString('hidden print:mb-5 print:flex', $html, 'The letterhead is not a paper-only block.');
+        $this->assertStringContainsString(
+            'storage/branding/letterhead.png',
+            $html,
+            'The uploaded letterhead is not on the printed record.',
+        );
+        $this->assertStringContainsString('Admission status record', $html);
     }
 
     /**

@@ -32,6 +32,10 @@ class AdmissionLetterService
                 'address' => Setting::get('contact_address'),
                 'phone' => Setting::get('contact_phone'),
                 'email' => Setting::get('contact_email'),
+                // The whole letterhead as one picture, when the school has uploaded
+                // one. The name and address above are still filled in — they are what
+                // the letter falls back to, and what a plain-text copy would show.
+                'image' => Setting::get('letterhead_image'),
             ],
             'level' => $applicant->levelAppliedFor?->name,
             'session' => $session?->name,
@@ -64,8 +68,57 @@ class AdmissionLetterService
      */
     public function signatureDataUri(): ?string
     {
-        $path = Setting::get('signature_image');
+        return $this->dataUri(Setting::get('signature_image'));
+    }
 
+    /**
+     * The letterhead the way the PDF renderer can draw it.
+     *
+     * A data URI for the same reason as the signature: DomPDF does not fetch images
+     * over HTTP, so an <img> pointing at the site comes out as a broken icon at the
+     * head of the letter. The size is worked out here rather than left to DomPDF,
+     * which given only a width will happily stretch a crest into a banner — the
+     * image's own proportions decide the height.
+     *
+     * @return array{data:string,width:?string,height:?string}|null
+     */
+    public function letterheadForPdf(): ?array
+    {
+        $path = Setting::get('letterhead_image');
+        $data = $this->dataUri($path);
+
+        if ($data === null || $path === null) {
+            return null;
+        }
+
+        // An SVG or an ICO, whose dimensions PHP will not read: let DomPDF size it.
+        $size = @getimagesize(Storage::disk('public')->path($path));
+
+        if (! $size || $size[0] < 1 || $size[1] < 1) {
+            return ['data' => $data, 'width' => null, 'height' => null];
+        }
+
+        // The width of the text column on A4 under the letter's own 18mm margins,
+        // and no taller than a quarter of the page: a letterhead is a heading, not
+        // the letter.
+        $width = 174.0;
+        $height = $width * ($size[1] / $size[0]);
+
+        if ($height > 40.0) {
+            $width *= 40.0 / $height;
+            $height = 40.0;
+        }
+
+        return [
+            'data' => $data,
+            'width' => round($width, 1).'mm',
+            'height' => round($height, 1).'mm',
+        ];
+    }
+
+    /** An uploaded image as a data URI, or nothing when there is no such image. */
+    private function dataUri(?string $path): ?string
+    {
         if (! $path || ! Storage::disk('public')->exists($path)) {
             return null;
         }

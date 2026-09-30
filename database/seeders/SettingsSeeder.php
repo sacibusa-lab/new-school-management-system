@@ -22,6 +22,9 @@ class SettingsSeeder extends Seeder
             // because this seeder overwrites every value it touches.
             ['key' => 'school_logo', 'value' => null, 'group' => 'branding', 'type' => 'image', 'label' => 'School logo'],
             ['key' => 'school_favicon', 'value' => null, 'group' => 'branding', 'type' => 'image', 'label' => 'Browser favicon'],
+            // The whole letterhead as one picture, for the documents that leave the
+            // building — see add_letterhead_image_setting.
+            ['key' => 'letterhead_image', 'value' => null, 'group' => 'branding', 'type' => 'image', 'label' => 'Letterhead'],
 
             // Numbering
             ['key' => 'admission_number_prefix', 'value' => 'SAC', 'group' => 'numbering', 'label' => 'Admission number prefix'],

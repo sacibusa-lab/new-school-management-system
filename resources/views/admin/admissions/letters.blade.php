@@ -43,15 +43,22 @@
     @foreach ($letters as $data)
         <article class="letter card mb-6 p-8 print:mb-0 print:rounded-none print:border-0 print:p-0 print:shadow-none">
             <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
-                <div>
-                    <h1 class="font-display text-lg font-semibold">{{ $data['letterhead']['name'] }}</h1>
-                    @if ($data['letterhead']['address'])
-                        <p class="text-xs text-slate-500">{{ $data['letterhead']['address'] }}</p>
-                    @endif
-                    @if ($data['letterhead']['phone'])
-                        <p class="text-xs text-slate-500">{{ $data['letterhead']['phone'] }}</p>
-                    @endif
-                </div>
+                @if ($data['letterhead']['image'])
+                    {{-- The school's own letterhead, as the office printed it. --}}
+                    <img src="{{ asset('storage/' . $data['letterhead']['image']) }}"
+                         alt="{{ $data['letterhead']['name'] }}"
+                         class="max-h-24 max-w-[70%] object-contain">
+                @else
+                    <div>
+                        <h1 class="font-display text-lg font-semibold">{{ $data['letterhead']['name'] }}</h1>
+                        @if ($data['letterhead']['address'])
+                            <p class="text-xs text-slate-500">{{ $data['letterhead']['address'] }}</p>
+                        @endif
+                        @if ($data['letterhead']['phone'])
+                            <p class="text-xs text-slate-500">{{ $data['letterhead']['phone'] }}</p>
+                        @endif
+                    </div>
+                @endif
 
                 <div class="text-right text-xs text-slate-500">
                     <p>{{ $data['issuedOn']->format('j F Y') }}</p>

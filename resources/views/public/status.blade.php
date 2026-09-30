@@ -58,22 +58,29 @@
                      nothing on it saying which school it came from. This is that
                      identity, restored for paper. --}}
                 <div class="hidden print:mb-5 print:flex print:items-start print:justify-between print:gap-6 print:border-b print:border-line print:pb-4">
-                    <div class="flex items-center gap-3">
-                        <x-brand-mark size="lg" />
+                    @if ($school->letterhead)
+                        {{-- The school's own letterhead, when one has been uploaded. --}}
+                        <img src="{{ asset('storage/' . $school->letterhead) }}"
+                             alt="{{ $school->name }}"
+                             class="max-h-24 max-w-[65%] object-contain">
+                    @else
+                        <div class="flex items-center gap-3">
+                            <x-brand-mark size="lg" />
 
-                        <div>
-                            <p class="font-display text-lg font-semibold text-ink">{{ $school->name }}</p>
+                            <div>
+                                <p class="font-display text-lg font-semibold text-ink">{{ $school->name }}</p>
 
-                            @if ($school->address)
-                                <p class="text-xs text-ink-soft">{{ $school->address }}</p>
-                            @endif
+                                @if ($school->address)
+                                    <p class="text-xs text-ink-soft">{{ $school->address }}</p>
+                                @endif
 
-                            @php $contact = collect([$school->phone, $school->email])->filter()->implode(' · '); @endphp
-                            @if ($contact)
-                                <p class="text-xs text-ink-soft">{{ $contact }}</p>
-                            @endif
+                                @php $contact = collect([$school->phone, $school->email])->filter()->implode(' · '); @endphp
+                                @if ($contact)
+                                    <p class="text-xs text-ink-soft">{{ $contact }}</p>
+                                @endif
+                            </div>
                         </div>
-                    </div>
+                    @endif
 
                     <div class="shrink-0 text-right">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-muted">

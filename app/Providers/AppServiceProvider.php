@@ -88,6 +88,7 @@ class AppServiceProvider extends ServiceProvider
                 'address' => Setting::get('contact_address'),
                 'logo' => Setting::get('school_logo'),
                 'favicon' => Setting::get('school_favicon'),
+                'letterhead' => Setting::get('letterhead_image'),
                 'currency' => Setting::get('currency_symbol', '₦'),
                 'code' => Setting::get('currency', 'NGN'),
             ];
@@ -100,6 +101,7 @@ class AppServiceProvider extends ServiceProvider
                 'address' => null,
                 'logo' => null,
                 'favicon' => null,
+                'letterhead' => null,
                 'currency' => '₦',
                 'code' => 'NGN',
             ];

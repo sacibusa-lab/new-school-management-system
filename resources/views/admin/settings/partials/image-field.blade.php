@@ -6,6 +6,7 @@
     $errorKey = 'settings.' . $setting->key . '.file';
     $isFavicon = $setting->key === 'school_favicon';
     $isSignature = $setting->key === 'signature_image';
+    $isLetterhead = $setting->key === 'letterhead_image';
     // Named after the setting itself rather than assumed to be the logo: this is
     // also the crest, the favicon, and the Principal's signature.
     $what = strtolower($setting->label ?? 'image');
@@ -18,7 +19,13 @@
 <label for="{{ $inputId }}" class="label">{{ $setting->label ?? $setting->key }}</label>
 
 <div class="flex flex-wrap items-start gap-4">
-    <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface">
+    {{-- A letterhead is a wide banner lying across a page, so it is previewed in a
+         wide box; the crest and the favicon are squares and are previewed in one. --}}
+    <div @class([
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface',
+        'h-24 w-64' => $isLetterhead,
+        'h-24 w-24' => ! $isLetterhead,
+    ])>
         @if ($setting->value)
             <img src="{{ asset('storage/' . $setting->value) }}"
                  alt="The current {{ $what }}"
@@ -59,6 +66,11 @@
                 A scan or a photograph of the signature itself, on a plain white background and
                 cropped close to it. It is printed above the signatory's name on admission
                 letters, and above the line on a result slip.
+            @elseif ($isLetterhead)
+                The whole letterhead as one picture — crest, school name, address and motto.
+                It is printed across the top of the admission letter, the merit list and the
+                admission status record. A wide banner works best; the documents keep its
+                own proportions.
             @elseif ($isFavicon)
                 The little picture on the browser tab. A square PNG works best, 512 × 512 or smaller.
             @else

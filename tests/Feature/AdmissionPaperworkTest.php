@@ -17,6 +17,7 @@ use App\Models\Score;
 use App\Models\Setting;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\AdmissionLetterService;
 use App\Services\Admissions\AdmissionService;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -191,6 +192,82 @@ class AdmissionPaperworkTest extends TestCase
         $response->assertSee('90%')->assertSee('Admitted')->assertSee('Deferred');
     }
 
+    /**
+     * The sheet carries the marks themselves, not a count of the papers they came
+     * from. A parent asking what their child scored in Mathematics is answered by
+     * the list on the noticeboard, and the columns add up to the total beside them.
+     */
+    public function test_the_merit_list_shows_each_candidate_mark_in_every_subject(): void
+    {
+        $this->threeCandidatesWithTwoPlaces();
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.admissions.merit', $this->exam))
+            ->assertOk();
+
+        $response->assertSee('Subjects')
+            ->assertSee('MTH')
+            ->assertSee('ENG')
+            // The old column: papers passed out of papers sat.
+            ->assertDontSee('2/2');
+
+        $body = $response->getContent();
+
+        // Bola scored 80 and 70, and averaged 75: her two papers are both on her
+        // own row, which the average alone could never satisfy.
+        $row = substr($body, (int) strpos($body, 'Bola Adeyemi'));
+        $row = substr($row, 0, (int) strpos($row, '</tr>'));
+
+        $this->assertStringContainsString('80%', $row);
+        $this->assertStringContainsString('70%', $row);
+    }
+
+    /**
+     * A paper nobody marked is left blank, not printed as a zero. The merit total
+     * was never built from a mark that does not exist, so the column beside it must
+     * not invent one.
+     */
+    public function test_a_subject_nobody_marked_says_nothing_rather_than_zero(): void
+    {
+        $this->setPlaces(1);
+        $this->sitExam('Amaka', 'Obi', ['MTH' => 50]);
+
+        $this->admissions->compute($this->exam, $this->admin);
+
+        $body = $this->actingAs($this->admin)
+            ->get(route('admin.admissions.merit', $this->exam))
+            ->assertOk()
+            ->getContent();
+
+        $row = substr($body, (int) strpos($body, 'Amaka Obi'));
+        $row = substr($row, 0, (int) strpos($row, '</tr>'));
+
+        $this->assertStringContainsString('50%', $row, 'The paper she did sit is missing.');
+        $this->assertStringContainsString('—', $row, 'The paper she never sat is not blank.');
+        $this->assertStringNotContainsString('Absent', $row);
+    }
+
+    public function test_the_registration_number_sits_under_the_candidate_name(): void
+    {
+        [$top] = $this->threeCandidatesWithTwoPlaces();
+
+        $body = $this->actingAs($this->admin)
+            ->get(route('admin.admissions.merit', $this->exam))
+            ->assertOk()
+            ->getContent();
+
+        // Its own column cost a column's width on every row to say the same thing
+        // as the line under the name.
+        $this->assertStringNotContainsString('>Number<', $body);
+
+        $this->assertMatchesRegularExpression(
+            '/'.preg_quote($top->full_name, '/').'\s*<\/p>\s*<p class="font-mono text-\[11px\] text-slate-500">\s*'
+                .preg_quote((string) $top->registration_number, '/').'/s',
+            $body,
+            'The registration number is not under the candidate name.',
+        );
+    }
+
     public function test_the_merit_list_says_so_when_nothing_has_been_computed(): void
     {
         $this->sitExam('Amaka', 'Obi', ['MTH' => 90, 'ENG' => 90]);
@@ -350,6 +427,99 @@ class AdmissionPaperworkTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.applicants.letter.pdf', $top))
             ->assertOk();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The letterhead */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The school's own letterhead, wherever the school's name would otherwise be
+     * typed out by hand: the merit list on the noticeboard, the letter a family
+     * takes home, and the sheet of letters for a whole sitting.
+     */
+    public function test_the_letterhead_is_printed_on_the_documents_that_leave_the_school(): void
+    {
+        [$top] = $this->threeCandidatesWithTwoPlaces();
+
+        Setting::put('letterhead_image', 'branding/letterhead.png');
+        Setting::flush();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.admissions.merit', $this->exam))
+            ->assertOk()
+            ->assertSee('storage/branding/letterhead.png', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter', $top))
+            ->assertOk()
+            ->assertSee('storage/branding/letterhead.png', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.admissions.letters', $this->exam))
+            ->assertOk()
+            ->assertSee('storage/branding/letterhead.png', false);
+
+        // And the PDF, which draws its own inlined copy of it: a clean 200 is what
+        // proves the data URI and the size it was given both went through.
+        Storage::fake('public');
+        Storage::disk('public')->put(
+            'branding/letterhead.png',
+            (string) UploadedFile::fake()->image('letterhead.png', 1200, 250)->get(),
+        );
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter.pdf', $top))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    /**
+     * The PDF is given the letterhead's own proportions, not just a width: DomPDF
+     * will stretch whatever it is handed to fill the box it was given.
+     */
+    public function test_the_letterhead_reaches_the_pdf_at_its_own_proportions(): void
+    {
+        $this->threeCandidatesWithTwoPlaces();
+
+        Storage::fake('public');
+        Storage::disk('public')->put(
+            'branding/letterhead.png',
+            (string) UploadedFile::fake()->image('letterhead.png', 1200, 250)->get(),
+        );
+
+        Setting::put('letterhead_image', 'branding/letterhead.png');
+        Setting::flush();
+
+        $head = app(AdmissionLetterService::class)->letterheadForPdf();
+
+        // 1200 × 250 across the 174mm text column, which is A4 less the letter's
+        // own margins.
+        $this->assertSame('174mm', $head['width']);
+        $this->assertGreaterThan(36.0, (float) $head['height']);
+        $this->assertLessThan(37.0, (float) $head['height']);
+        $this->assertStringStartsWith('data:image/', $head['data']);
+    }
+
+    /** No letterhead uploaded is not a gap: the name and address print as before. */
+    public function test_a_document_with_no_letterhead_prints_the_school_name_and_address(): void
+    {
+        [$top] = $this->threeCandidatesWithTwoPlaces();
+
+        $this->assertNull(Setting::get('letterhead_image'));
+        $this->assertNull(app(AdmissionLetterService::class)->letterheadForPdf());
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.admissions.merit', $this->exam))
+            ->assertOk()
+            ->assertSee(Setting::get('school_name'))
+            ->assertSee((string) Setting::get('contact_address'))
+            ->assertDontSee('storage/branding/letterhead.png', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter', $top))
+            ->assertOk()
+            ->assertSee(Setting::get('school_name'));
     }
 
     /* ------------------------------------------------------------------ */

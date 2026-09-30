@@ -765,6 +765,7 @@ class ApplicantController extends Controller
 
         $pdf = Pdf::loadView('admin.applicants.letter-pdf', $letters->render($applicant) + [
             'signatureData' => $letters->signatureDataUri(),
+            'letterheadData' => $letters->letterheadForPdf(),
         ])->setPaper('a4');
 
         return $pdf->download('admission-letter-'.Str::slug((string) $applicant->registration_number).'.pdf');
