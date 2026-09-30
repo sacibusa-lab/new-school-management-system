@@ -54,7 +54,7 @@ class StudentsResultsModuleTest extends TestCase
         // Named here rather than read from the controller, so that removing a page
         // from the menu is a failing test rather than a silent disappearance.
         foreach ([
-            'dashboard', 'check-result', 'performance', 'pins', 'students', 'employees',
+            'dashboard', 'check-result', 'performance', 'pins', 'students', 'teachers',
             'academics', 'exam-master', 'attendance', 'reports', 'alumni', 'settings',
         ] as $page) {
             $this->actingAs($this->admin)

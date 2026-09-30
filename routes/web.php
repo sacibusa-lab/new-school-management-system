@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SmsController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\StudentsResultsController;
+use App\Http\Controllers\Admin\TeachersController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ProfileController;
@@ -220,7 +221,19 @@ Route::middleware(['auth'])
             Route::get('performance', [StudentsResultsController::class, 'performance'])->name('performance');
             Route::get('pins', [StudentsResultsController::class, 'pins'])->name('pins');
             Route::get('students', [StudentsResultsController::class, 'students'])->name('students');
-            Route::get('employees', [StudentsResultsController::class, 'employees'])->name('employees');
+
+            /*
+            | Teachers, and the two pages that hang off it. `teachers` is the
+            | section's own page, which lists the two below it rather than
+            | duplicating one of them; `teachers/list` and `teachers/create` are
+            | declared after it as literal segments, so "list" and "create" can
+            | never be read as the id of a teacher.
+            */
+            Route::get('teachers', [StudentsResultsController::class, 'teachers'])->name('teachers');
+            Route::get('teachers/list', [TeachersController::class, 'index'])->name('teachers.list');
+            Route::get('teachers/create', [TeachersController::class, 'create'])->name('teachers.create');
+            Route::post('teachers', [TeachersController::class, 'store'])->name('teachers.store');
+
             Route::get('academics', [StudentsResultsController::class, 'academics'])->name('academics');
 
             /*
@@ -244,6 +257,11 @@ Route::middleware(['auth'])
 
             Route::post('academics/classes/{level}', [ClassesAndSectionsController::class, 'storeClassSection'])->name('academics.classes.store-class');
             Route::delete('academics/classes/{schoolClass}', [ClassesAndSectionsController::class, 'destroyClassSection'])->name('academics.classes.destroy-class');
+
+            // The form teacher belongs to the class rather than the class name:
+            // JSS1A and JSS1B have one each, and it is a change of its own —
+            // nothing else about the class moves with it.
+            Route::put('academics/classes/{schoolClass}/teacher', [ClassesAndSectionsController::class, 'updateFormTeacher'])->name('academics.classes.teacher.update');
             Route::get('academics/subjects', [StudentsResultsController::class, 'academicSubjects'])->name('academics.subjects');
             Route::get('academics/schedule', [StudentsResultsController::class, 'academicSchedule'])->name('academics.schedule');
             Route::get('academics/promotion', [StudentsResultsController::class, 'academicPromotion'])->name('academics.promotion');

@@ -51,6 +51,10 @@ class BreadcrumbTest extends TestCase
             'admin.scores.index' => ['Admissions', 'Score entry'],
             'admin.settings.index' => ['Administration', 'Settings'],
             'admin.students-results.academics.classes' => ['Students & Results', 'Academic', 'Classes & Sections'],
+            // A section of the module with a page of its own, and two pages under it.
+            'admin.students-results.teachers' => ['Students & Results', 'Teachers'],
+            'admin.students-results.teachers.list' => ['Students & Results', 'Teachers', 'Teachers List'],
+            'admin.students-results.teachers.create' => ['Students & Results', 'Teachers', 'Add Teachers'],
         ];
 
         foreach ($expected as $route => $crumbs) {

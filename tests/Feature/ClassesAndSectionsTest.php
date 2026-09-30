@@ -92,6 +92,10 @@ class ClassesAndSectionsTest extends TestCase
             ->get(route('admin.students-results.academics.classes', ['tab' => 'section']))
             ->assertOk()
             ->assertSee('x-data="{ tab: \'section\' }"', false);
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes', ['tab' => 'teacher']))
+            ->assertOk()
+            ->assertSee("x-data=\"{ tab: 'teacher' }\"", false);
     }
 
     public function test_the_whole_page_is_closed_to_a_role_without_the_permission(): void
@@ -520,6 +524,116 @@ class ClassesAndSectionsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* The form teacher of a class */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The tab lists every class with whoever is in charge of it, and the ones
+     * nobody has been given read as unset rather than as an empty dropdown with no
+     * explanation.
+     */
+    public function test_the_form_teacher_tab_lists_every_class_with_who_has_it(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $classA = $this->class($level, $a, 'JSS1A');
+        $this->class($level, $b, 'JSS1B');
+        $teacher = $this->teacher();
+
+        $classA->update(['form_teacher_id' => $teacher->id]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes', ['tab' => 'teacher']))
+            ->assertOk()
+            ->assertSee("x-data=\"{ tab: 'teacher' }\"", false)
+            ->assertSee('Form Teacher')
+            ->assertSee('JSS1A')
+            ->assertSee('JSS1B')
+            ->assertSee($teacher->name)
+            ->assertSee('No form teacher');
+    }
+
+    /**
+     * A form teacher belongs to one class and not to the class name: JSS1A having
+     * one says nothing whatever about JSS1B.
+     */
+    public function test_a_form_teacher_is_put_on_one_class_and_not_on_its_neighbour(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $classA = $this->class($level, $a, 'JSS1A');
+        $classB = $this->class($level, $b, 'JSS1B');
+        $teacher = $this->teacher();
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.academics.classes.teacher.update', $classA), [
+                'form_teacher_id' => $teacher->id,
+            ])
+            ->assertSessionHas('status', "{$teacher->name} is now the form teacher of JSS1A.");
+
+        $this->assertSame($teacher->id, $classA->refresh()->form_teacher_id);
+        $this->assertNull($classB->refresh()->form_teacher_id);
+    }
+
+    /**
+     * A class between teachers is left empty rather than keeping the name of the
+     * one who has gone, which is a record of somebody who is not there any more.
+     */
+    public function test_a_class_can_be_left_without_a_form_teacher(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $class = $this->class($level, $a, 'JSS1A');
+        $class->update(['form_teacher_id' => $this->teacher()->id]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.academics.classes.teacher.update', $class), ['form_teacher_id' => ''])
+            ->assertSessionHas('status', 'JSS1A has no form teacher now.');
+
+        $this->assertNull($class->refresh()->form_teacher_id);
+    }
+
+    /**
+     * The picker offers teachers, so the guard behind it has to mean teachers too:
+     * a bursar posting the id of their own account must be refused rather than
+     * quietly put in charge of a class.
+     */
+    public function test_an_account_that_is_not_a_teacher_cannot_be_put_in_charge_of_a_class(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $class = $this->class($level, $a, 'JSS1A');
+
+        $bursar = User::factory()->create(['name' => 'Ngozi the bursar']);
+        $bursar->assignRole('Bursar / Accounts');
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.academics.classes.teacher.update', $class), [
+                'form_teacher_id' => $bursar->id,
+            ])
+            ->assertSessionHas('error', 'Ngozi the bursar is not a teacher. Add them on the Add Teachers page first.');
+
+        $this->assertNull($class->refresh()->form_teacher_id);
+    }
+
+    /** Nobody on the staff yet: the tab says where to go rather than showing empty dropdowns. */
+    public function test_the_form_teacher_tab_says_where_to_go_when_there_are_no_teachers_yet(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $this->class($level, $a, 'JSS1A');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes', ['tab' => 'teacher']))
+            ->assertOk()
+            ->assertSee('No teachers yet')
+            ->assertSee('Add a teacher')
+            ->assertDontSee('name="form_teacher_id"', false);
+    }
+
+    /* ------------------------------------------------------------------ */
 
     private function class(SchoolLevel $level, Section $section, string $name): SchoolClass
     {
@@ -529,6 +643,14 @@ class ClassesAndSectionsTest extends TestCase
             'name' => $name,
             'is_active' => true,
         ]);
+    }
+
+    private function teacher(string $name = 'Chidera Okafor'): User
+    {
+        $teacher = User::factory()->create(['name' => $name]);
+        $teacher->assignRole('Teacher');
+
+        return $teacher;
     }
 
     private function student(SchoolClass $class, SchoolLevel $level, ?AcademicSession $session = null): Student

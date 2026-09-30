@@ -21,7 +21,14 @@
     <div class="border-b border-line px-6 pt-4">
         <div class="flex gap-8">
             @php
-                $tabs = [['class', 'Class', 'academic'], ['section', 'Section', 'cog']];
+                $tabs = [
+                    ['class', 'Class', 'academic'],
+                    ['section', 'Section', 'cog'],
+                    // A class is a class name and a section; a form teacher is put in
+                    // charge of one of those classes. Its own tab, because it is per
+                    // class rather than per class name: JSS1A and JSS1B have one each.
+                    ['teacher', 'Form Teacher', 'briefcase'],
+                ];
 
                 if ($editing) {
                     $tabs[] = ['edit', 'Edit Class', 'pencil'];
@@ -238,6 +245,97 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    {{-- ================= Form Teacher ================= --}}
+    <div x-show="tab === 'teacher'" x-cloak class="p-6">
+        <div class="rounded-xl border border-line p-5">
+            <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
+                <x-nav-icon name="briefcase" class="h-4 w-4 text-ink-soft" />
+                <h2 class="text-base font-semibold text-ink">Form Teacher</h2>
+            </div>
+
+            @if ($teachers->isEmpty())
+                <div class="rounded-xl bg-surface-2 p-6 text-center">
+                    <x-nav-icon name="briefcase" class="mx-auto h-6 w-6 text-muted" />
+
+                    <p class="mt-3 text-sm font-medium text-ink">No teachers yet</p>
+
+                    <p class="mx-auto mt-1 max-w-md text-sm text-muted">
+                        A class can only be given a form teacher once somebody is on the teaching
+                        staff, and nobody is yet. Add the first teacher and this fills up.
+                    </p>
+
+                    <a href="{{ route('admin.students-results.teachers.create') }}"
+                       class="btn-secondary btn-sm mt-4">
+                        <x-nav-icon name="user-plus" class="h-3.5 w-3.5" />
+                        Add a teacher
+                    </a>
+                </div>
+            @else
+                <p class="mb-4 text-sm text-muted">
+                    One row per class. Who is in charge of JSS1A has nothing to do with JSS1B, so
+                    each class keeps its own — and a class between teachers is left empty rather
+                    than keeping a name nobody chose again.
+                </p>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-line text-sm">
+                        <thead>
+                            <tr class="bg-surface-3 text-left font-semibold text-ink-soft">
+                                <th class="w-12 border-b border-r border-line p-3 text-center">#</th>
+                                <th class="w-48 border-b border-r border-line p-3">Class</th>
+                                <th class="border-b border-r border-line p-3">Form Teacher</th>
+                                <th class="w-32 border-b border-line p-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-line text-ink-soft">
+                            @foreach ($allClasses as $class)
+                                <tr class="transition-colors hover:bg-surface-3/60">
+                                    <td class="border-r border-line p-3 text-center align-middle">{{ $loop->iteration }}</td>
+
+                                    <td class="border-r border-line p-3 align-middle font-medium text-ink">
+                                        {{ $class->name }}
+                                    </td>
+
+                                    <td class="border-r border-line p-3 align-middle">
+                                        <form method="POST" id="form-teacher-{{ $class->id }}"
+                                              action="{{ route('admin.students-results.academics.classes.teacher.update', $class) }}"
+                                              class="max-w-md">
+                                            @csrf
+                                            @method('PUT')
+
+                                            <select name="form_teacher_id"
+                                                    aria-label="Form teacher of {{ $class->name }}"
+                                                    class="input">
+                                                <option value="">No form teacher</option>
+
+                                                @foreach ($teachers as $teacher)
+                                                    <option value="{{ $teacher->id }}" @selected($class->form_teacher_id === $teacher->id)>
+                                                        {{ $teacher->name }}@if (! $teacher->is_active) — inactive @endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </form>
+                                    </td>
+
+                                    <td class="p-3 align-middle">
+                                        <div class="flex justify-center">
+                                            <button type="submit" form="form-teacher-{{ $class->id }}"
+                                                    class="btn-secondary btn-sm"
+                                                    title="Save the form teacher of {{ $class->name }}">
+                                                <x-nav-icon name="check" class="h-3.5 w-3.5" />
+                                                Save
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 

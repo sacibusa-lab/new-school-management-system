@@ -67,7 +67,7 @@ class Permissions
                 'results.check' => "Look up any student's result on their behalf",
                 'results.analytics' => 'View performance analytics across classes, terms and years',
                 'results.pins' => 'Generate and manage result-checking PINs',
-                'employees.manage' => 'Manage employee records',
+                'teachers.manage' => 'Manage teacher records',
                 'attendance.manage' => 'Record and correct attendance',
                 'alumni.manage' => 'Manage the alumni register',
             ],

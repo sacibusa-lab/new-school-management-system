@@ -320,6 +320,48 @@ class AcademicStructureService
         $class->delete();
     }
 
+    /**
+     * Put a teacher in charge of a class, or take the one there out.
+     *
+     * A form teacher belongs to the class rather than the class name: JSS1A and
+     * JSS1B have one each. Passing null clears it — a class can be between teachers,
+     * and leaving the last one on it because nobody replaced them would be a worse
+     * record than none.
+     *
+     * Only an account that is actually a teacher can be given a class. The office
+     * picks from the teachers already on the staff rather than from every login, so
+     * this is the guard behind that list, not a second way of choosing.
+     *
+     * @throws RuntimeException when the account is not a teacher
+     */
+    public function assignFormTeacher(SchoolClass $class, ?User $teacher, ?User $actor = null): SchoolClass
+    {
+        if ($teacher !== null && ! $teacher->hasRole('Teacher')) {
+            throw new RuntimeException("{$teacher->name} is not a teacher. Add them on the Add Teachers page first.");
+        }
+
+        $was = $class->formTeacher?->name;
+
+        $class->update(['form_teacher_id' => $teacher?->id]);
+
+        if ($teacher === null) {
+            $this->log($actor, 'class.teacher.cleared', $class, "Took the form teacher off {$class->name}", [
+                'module' => 'academics',
+                'was' => $was,
+            ]);
+
+            return $class;
+        }
+
+        $this->log($actor, 'class.teacher.set', $class, "Set {$teacher->name} as form teacher of {$class->name}", [
+            'module' => 'academics',
+            'was' => $was,
+            'teacher_id' => $teacher->id,
+        ]);
+
+        return $class;
+    }
+
     /* ------------------------------------------------------------------ */
     /* What is in the way */
     /* ------------------------------------------------------------------ */

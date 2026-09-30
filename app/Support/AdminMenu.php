@@ -71,7 +71,14 @@ class AdminMenu
                 ['route' => 'admin.students-results.performance', 'label' => 'Performance Analytics', 'icon' => 'chart', 'can' => 'results.analytics'],
                 ['route' => 'admin.students-results.pins', 'label' => 'Generate Pin', 'icon' => 'key', 'can' => 'results.pins'],
                 ['route' => 'admin.students-results.students', 'label' => 'Students Details', 'icon' => 'academic', 'can' => 'students.view'],
-                ['route' => 'admin.students-results.employees', 'label' => 'Employee', 'icon' => 'briefcase', 'can' => 'employees.manage'],
+
+                // Teachers, and the two pages that hang off it: the register of
+                // the teaching staff, and the form for taking another one on.
+                // Distinct from Staff & roles, which manages logins rather than
+                // people, and which is why this is not called Employees.
+                ['route' => 'admin.students-results.teachers', 'label' => 'Teachers', 'icon' => 'briefcase', 'can' => 'teachers.manage',
+                    'matches' => ['admin.students-results.teachers', 'admin.students-results.teachers.*'],
+                    'children' => StudentsResultsController::TEACHER_PAGES],
                 ['route' => 'admin.students-results.academics', 'label' => 'Academic', 'icon' => 'book', 'can' => 'academics.manage',
                     // Academic is a section in its own right: the four pages it holds
                     // are drawn underneath it, from the list the controller owns.

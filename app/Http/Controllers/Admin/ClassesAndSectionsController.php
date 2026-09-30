@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\Section;
+use App\Models\User;
 use App\Services\Academics\AcademicStructureService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,7 +38,7 @@ class ClassesAndSectionsController extends Controller
         $this->authorize('academics.manage');
 
         $classes = SchoolClass::query()
-            ->with(['level', 'section'])
+            ->with(['level', 'section', 'formTeacher'])
             ->withCount('students')
             ->orderBy('name')
             ->get()
@@ -54,10 +55,19 @@ class ClassesAndSectionsController extends Controller
             'sections' => Section::query()->with('schoolClasses')->ordered()->get(),
             'levels' => SchoolLevel::query()->orderBy('order')->orderBy('name')->get(),
             'classes' => $classes,
+            // Every class on one list for the Form Teacher tab, in the same order
+            // as the classes page above. The accounts on it are the teachers
+            // already on the staff — the office picks a person, not a login.
+            'allClasses' => $classes->flatten(1),
+            'teachers' => User::query()->role('Teacher')->orderBy('name')->get(),
             'editing' => $editing,
             'tab' => $editing !== null
                 ? 'edit'
-                : ($request->string('tab')->value() === 'section' ? 'section' : 'class'),
+                : match ($request->string('tab')->value()) {
+                    'section' => 'section',
+                    'teacher' => 'teacher',
+                    default => 'class',
+                },
         ]);
     }
 
@@ -197,5 +207,42 @@ class ClassesAndSectionsController extends Controller
         }
 
         return back()->with('status', "{$schoolClass->name} deleted.");
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The form teacher of a class */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The Form Teacher tab, one row at a time.
+     *
+     * A class is between teachers as often as it is mid-year, so a blank choice is
+     * a real answer rather than a mistake to be refused: it takes the last teacher
+     * off the class instead of leaving a name there that nobody chose again.
+     */
+    public function updateFormTeacher(Request $request, SchoolClass $schoolClass): RedirectResponse
+    {
+        $this->authorize('academics.manage');
+
+        $validated = $request->validate([
+            'form_teacher_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $teacher = isset($validated['form_teacher_id'])
+            ? User::query()->find($validated['form_teacher_id'])
+            : null;
+
+        try {
+            $this->structure->assignFormTeacher($schoolClass, $teacher, $request->user());
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with(
+            'status',
+            $teacher === null
+                ? "{$schoolClass->name} has no form teacher now."
+                : "{$teacher->name} is now the form teacher of {$schoolClass->name}.",
+        );
     }
 }

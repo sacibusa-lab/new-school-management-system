@@ -35,7 +35,7 @@ class StudentsResultsController extends Controller
         ['key' => 'performance', 'label' => 'Performance Analytics', 'icon' => 'chart', 'permission' => 'results.analytics'],
         ['key' => 'pins', 'label' => 'Generate Pin', 'icon' => 'key', 'permission' => 'results.pins'],
         ['key' => 'students', 'label' => 'Students Details', 'icon' => 'academic', 'permission' => 'students.view'],
-        ['key' => 'employees', 'label' => 'Employee', 'icon' => 'briefcase', 'permission' => 'employees.manage'],
+        ['key' => 'teachers', 'label' => 'Teachers', 'icon' => 'briefcase', 'permission' => 'teachers.manage'],
         ['key' => 'academics', 'label' => 'Academic', 'icon' => 'book', 'permission' => 'academics.manage'],
         ['key' => 'exam-master', 'label' => 'Exam Master', 'icon' => 'clipboard-check', 'permission' => 'exams.manage'],
         ['key' => 'attendance', 'label' => 'Attendance', 'icon' => 'calendar', 'permission' => 'attendance.manage'],
@@ -89,6 +89,36 @@ class StudentsResultsController extends Controller
         ],
     ];
 
+    /**
+     * The two pages that hang off Teachers, in the order the office listed them.
+     *
+     * Kept beside PAGES for the same reason as ACADEMIC_PAGES: the sidebar draws
+     * them underneath Teachers, and the Teachers page draws them as the two things
+     * it is made of.
+     *
+     * Both answer to the permission of the page they hang off. A teacher is one
+     * subject — who teaches here — and splitting the register from the form that
+     * fills it would make a permission nobody could be given half of.
+     *
+     * @var array<int,array{key:string,route:string,label:string,icon:string,note:string}>
+     */
+    public const TEACHER_PAGES = [
+        [
+            'key' => 'teachers-list',
+            'route' => 'admin.students-results.teachers.list',
+            'label' => 'Teachers List',
+            'icon' => 'list',
+            'note' => 'Every teacher on the staff, with the classes each one is form teacher of and the account they sign in with.',
+        ],
+        [
+            'key' => 'teachers-create',
+            'route' => 'admin.students-results.teachers.create',
+            'label' => 'Add Teachers',
+            'icon' => 'user-plus',
+            'note' => 'Take a teacher on: their name, how to reach them, and the login they will use. They change the password the first time they sign in.',
+        ],
+    ];
+
     public function dashboard(): View
     {
         return $this->placeholder('dashboard');
@@ -109,9 +139,18 @@ class StudentsResultsController extends Controller
         return $this->placeholder('students');
     }
 
-    public function employees(): View
+    /**
+     * Teachers, and the two pages that hang off it.
+     *
+     * A section rather than a screen, for the same reason as Academic: the office
+     * asked for a Teachers entry with a list and a form under it, and a section
+     * whose own page is one of its two children is a menu that repeats itself.
+     * The two are drawn from the list below, so the sidebar and this page cannot
+     * drift apart.
+     */
+    public function teachers(): View
     {
-        return $this->placeholder('employees');
+        return $this->placeholder('teachers', ['children' => self::TEACHER_PAGES]);
     }
 
     /**
