@@ -233,6 +233,15 @@ Route::middleware(['auth'])
             Route::get('teachers/list', [TeachersController::class, 'index'])->name('teachers.list');
             Route::get('teachers/create', [TeachersController::class, 'create'])->name('teachers.create');
             Route::post('teachers', [TeachersController::class, 'store'])->name('teachers.store');
+
+            // Bulk upload: all four are literal paths, so none of them can be read
+            // as the id of a teacher, and they are declared before {teacher} for
+            // the same reason.
+            Route::get('teachers/import', [TeachersController::class, 'import'])->name('teachers.import');
+            Route::get('teachers/import/template', [TeachersController::class, 'downloadTemplate'])->name('teachers.import.template');
+            Route::post('teachers/import/preview', [TeachersController::class, 'previewImport'])->name('teachers.import.preview');
+            Route::post('teachers/import/commit', [TeachersController::class, 'commitImport'])->name('teachers.import.commit');
+
             Route::get('teachers/{teacher}/edit', [TeachersController::class, 'edit'])->name('teachers.edit');
             Route::put('teachers/{teacher}', [TeachersController::class, 'update'])->name('teachers.update');
 

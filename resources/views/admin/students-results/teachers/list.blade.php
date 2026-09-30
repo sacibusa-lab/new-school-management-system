@@ -12,10 +12,17 @@
                 </p>
             </div>
 
-            <a href="{{ route('admin.students-results.teachers.create') }}" class="btn-secondary btn-sm">
-                <x-nav-icon name="user-plus" class="h-3.5 w-3.5" />
-                Add teacher
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('admin.students-results.teachers.create') }}" class="btn-secondary btn-sm">
+                    <x-nav-icon name="user-plus" class="h-3.5 w-3.5" />
+                    Add teacher
+                </a>
+
+                <a href="{{ route('admin.students-results.teachers.import') }}" class="btn-secondary btn-sm">
+                    <x-nav-icon name="upload" class="h-3.5 w-3.5" />
+                    Bulk upload
+                </a>
+            </div>
         </div>
 
         <div class="overflow-x-auto">

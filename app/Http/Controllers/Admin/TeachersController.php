@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Teachers\TeacherImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The teaching staff: who they are, and the account they sign in with.
@@ -27,6 +29,13 @@ use Illuminate\View\View;
  */
 class TeachersController extends Controller
 {
+    /** Where a parsed upload waits between the preview and the commit. */
+    private const IMPORT_SESSION_KEY = 'teacher_import';
+
+    public function __construct(
+        private readonly TeacherImportService $imports,
+    ) {}
+
     public function index(): View
     {
         $this->authorize('teachers.manage');
@@ -163,5 +172,152 @@ class TeachersController extends Controller
     private function assertIsTeacher(User $teacher): void
     {
         abort_unless($teacher->hasRole('Teacher'), 404);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Bulk upload */
+    /* ------------------------------------------------------------------ */
+
+    public function import(Request $request): View
+    {
+        $this->authorize('teachers.manage');
+
+        return view('admin.students-results.teachers.import', [
+            'page' => collect(StudentsResultsController::TEACHER_PAGES)->firstWhere('key', 'teachers-list'),
+            'columns' => $this->imports->allColumns(),
+            'staged' => $request->session()->get(self::IMPORT_SESSION_KEY),
+        ]);
+    }
+
+    /** Parse the uploaded sheet and show exactly which accounts would be opened. */
+    public function previewImport(Request $request): RedirectResponse
+    {
+        $this->authorize('teachers.manage');
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:8192'],
+        ], [
+            'file.required' => 'Choose the spreadsheet of teachers.',
+            'file.mimes' => 'Upload a CSV or Excel file (.csv, .xlsx or .xls).',
+            'file.max' => 'That file is larger than 8 MB. Split it into smaller batches.',
+        ]);
+
+        try {
+            $parsed = $this->imports->parse($request->file('file'));
+        } catch (\Throwable $e) {
+            return back()->withErrors(['file' => $e->getMessage()]);
+        }
+
+        if ($parsed['rows'] === []) {
+            return back()->withErrors([
+                'file' => 'No teacher rows were found in that file. Each row needs a name, a phone number and an email address.',
+            ]);
+        }
+
+        $request->session()->put(self::IMPORT_SESSION_KEY, $parsed + [
+            'filename' => $request->file('file')->getClientOriginalName(),
+            'staged_at' => now()->toIso8601String(),
+        ]);
+
+        $message = sprintf(
+            '%d row(s) read — %d ready, %d need fixing.',
+            $parsed['summary']['total'],
+            $parsed['summary']['ok'],
+            $parsed['summary']['errors'],
+        );
+
+        if ($parsed['truncated']) {
+            $message .= sprintf(
+                ' Only the first %d rows were read; split the rest into another file.',
+                TeacherImportService::MAX_ROWS,
+            );
+        }
+
+        return redirect()
+            ->route('admin.students-results.teachers.import')
+            ->with($parsed['summary']['ok'] > 0 ? 'status' : 'error', $message);
+    }
+
+    /**
+     * Open the accounts for the rows the office left ticked.
+     *
+     * The password is asked for here rather than on the upload, and reaches the
+     * office's hands rather than a file: every account made this way is forced to
+     * change it the first time it is signed in with.
+     */
+    public function commitImport(Request $request): RedirectResponse
+    {
+        $this->authorize('teachers.manage');
+
+        $staged = $request->session()->get(self::IMPORT_SESSION_KEY);
+
+        if (! $staged) {
+            return redirect()
+                ->route('admin.students-results.teachers.import')
+                ->with('error', 'That upload has expired. Please choose the file again.');
+        }
+
+        $validated = $request->validate([
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*' => ['integer'],
+            'password' => ['required', 'confirmed', Password::defaults()],
+        ], [
+            'lines.required' => 'Tick at least one teacher to add.',
+            'lines.min' => 'Tick at least one teacher to add.',
+        ]);
+
+        $result = $this->imports->commit(
+            $staged['rows'],
+            $validated['lines'],
+            $validated['password'],
+            $request->user(),
+        );
+
+        $request->session()->forget(self::IMPORT_SESSION_KEY);
+
+        if ($result['created'] === 0) {
+            return redirect()
+                ->route('admin.students-results.teachers.import')
+                ->with('error', 'No teacher was added. '.collect($result['failed'])->pluck('reason')->unique()->implode(' '));
+        }
+
+        $message = sprintf('%d teacher(s) added as teachers.', $result['created']);
+
+        if ($result['failed'] !== []) {
+            $message .= ' '.count($result['failed']).' row(s) could not be added and were skipped.';
+        }
+
+        return redirect()
+            ->route('admin.students-results.teachers.list')
+            ->with('status', $message.' They change the password the first time they sign in.');
+    }
+
+    /** The sheet to fill in, with the headings the reader looks for. */
+    public function downloadTemplate(): Response
+    {
+        $this->authorize('teachers.manage');
+
+        $rows = [
+            $this->imports->templateHeaders(),
+            ['Chidera Okafor', '08031234567', 'chidera@example.com'],
+        ];
+
+        $handle = fopen('php://temp', 'r+');
+
+        // A UTF-8 byte-order mark, or Excel mangles accented names.
+        fwrite($handle, "\xEF\xBB\xBF");
+
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+
+        rewind($handle);
+        $csv = (string) stream_get_contents($handle);
+        fclose($handle);
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="teacher-import-template.csv"',
+        ]);
     }
 }

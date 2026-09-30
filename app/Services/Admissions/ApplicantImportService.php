@@ -7,12 +7,11 @@ use App\Models\Applicant;
 use App\Models\SchoolLevel;
 use App\Models\User;
 use App\Services\ApplicantRegistrationService;
+use App\Support\Spreadsheet\SheetReader;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 /**
  * Bulk registration of applicants from a spreadsheet.
@@ -30,8 +29,8 @@ class ApplicantImportService
     /** One upload cannot carry more than this — beyond it, split the file. */
     public const MAX_ROWS = 500;
 
-    /** How far down the sheet to hunt for the header row. */
-    private const HEADER_SEARCH_DEPTH = 10;
+    /** Where a file waits, under its real name, for the length of the read. */
+    private const READ_FOLDER = 'imports/applicants';
 
     /**
      * Logical column => the spellings an office clerk might actually type.
@@ -75,8 +74,8 @@ class ApplicantImportService
 
     public function __construct(
         private readonly ApplicantRegistrationService $registration,
-    ) {
-    }
+        private readonly SheetReader $sheets,
+    ) {}
 
     /**
      * The canonical template the office should fill in.
@@ -155,14 +154,14 @@ class ApplicantImportService
      */
     public function parse(UploadedFile $file): array
     {
-        $grid = $this->readGrid($file);
+        $grid = $this->sheets->read($file, self::READ_FOLDER);
 
-        [$headerIndex, $map] = $this->locateHeader($grid);
+        [$headerIndex, $map] = $this->sheets->locateHeader($grid, self::COLUMN_ALIASES);
 
         if ($headerIndex === null || ! isset($map['first_name'], $map['last_name'], $map['level'])) {
             throw new \RuntimeException(
                 'Could not find the column headings. The sheet needs at least '
-                . '“Surname”, “First name” and “Class” across the top — download the template to see the layout.',
+                .'“Surname”, “First name” and “Class” across the top — download the template to see the layout.',
             );
         }
 
@@ -177,10 +176,10 @@ class ApplicantImportService
                 continue;
             }
 
-            $values = $this->mapRow($line, $map);
+            $values = $this->sheets->row($line, $map);
 
             // Skip blank spacer rows rather than reporting them as errors.
-            if ($this->isBlank($values)) {
+            if ($this->sheets->isBlank($values)) {
                 continue;
             }
 
@@ -201,7 +200,7 @@ class ApplicantImportService
         return [
             'rows' => $rows,
             'matched' => array_keys($map),
-            'ignored' => $this->ignoredHeaders($grid[$headerIndex] ?? [], $map),
+            'ignored' => $this->sheets->unreadColumns($grid[$headerIndex] ?? [], $map),
             'truncated' => $truncated,
             'summary' => $summary,
             'levels' => $levels->values()->unique('id')->pluck('name', 'id')->all(),
@@ -249,7 +248,7 @@ class ApplicantImportService
             ActivityLog::record(
                 'applicants.imported',
                 null,
-                "Bulk registered {$imported} applicant(s)" . ($actor ? " by {$actor->name}" : ''),
+                "Bulk registered {$imported} applicant(s)".($actor ? " by {$actor->name}" : ''),
                 ['module' => 'admissions', 'count' => $imported],
             );
         }
@@ -258,128 +257,7 @@ class ApplicantImportService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Reading the sheet                                                   */
-    /* ------------------------------------------------------------------ */
-
-    /**
-     * Read the sheet into a plain array.
-     *
-     * PHP stores an upload as `phpXXXX.tmp`, with no extension, and
-     * PhpSpreadsheet picks its reader from the extension. So the file is parked
-     * under its real name for the length of the read and then removed — nothing
-     * is kept on disk.
-     *
-     * @return array<int,array<int,string>>
-     */
-    private function readGrid(UploadedFile $file): array
-    {
-        $extension = strtolower($file->getClientOriginalExtension() ?: (string) $file->extension());
-
-        if (! in_array($extension, ['csv', 'txt', 'xlsx', 'xls'], true)) {
-            throw new \RuntimeException('Upload a CSV or Excel file (.csv, .xlsx or .xls).');
-        }
-
-        $temporary = 'imports/applicants/' . Str::uuid() . '.' . $extension;
-
-        Storage::disk('local')->put($temporary, (string) file_get_contents((string) $file->getRealPath()));
-
-        try {
-            $absolute = Storage::disk('local')->path($temporary);
-
-            $spreadsheet = IOFactory::createReaderForFile($absolute)->load($absolute);
-
-            // Formatted values, so a date cell arrives as "12/03/2013" rather
-            // than the Excel serial number behind it.
-            $grid = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
-
-            $spreadsheet->disconnectWorksheets();
-            unset($spreadsheet);
-        } finally {
-            Storage::disk('local')->delete($temporary);
-        }
-
-        return $grid;
-    }
-
-    /**
-     * Score the first few rows against our aliases and take the best match, so a
-     * title row ("WAEC candidates 2026") or gap above the headings is tolerated.
-     *
-     * @param  array<int,array<int,string>>  $grid
-     * @return array{0:int|null,1:array<string,int>}
-     */
-    private function locateHeader(array $grid): array
-    {
-        $bestIndex = null;
-        $bestMap = [];
-        $bestScore = 0;
-
-        foreach ($grid as $index => $line) {
-            if ($index >= self::HEADER_SEARCH_DEPTH) {
-                break;
-            }
-
-            $map = [];
-
-            foreach ($line as $column => $cell) {
-                $key = $this->matchColumn((string) $cell);
-
-                // First spelling of a column wins; later duplicates are ignored.
-                if ($key && ! in_array($column, $map, true)) {
-                    $map[$key] ??= $column;
-                }
-            }
-
-            if (count($map) > $bestScore) {
-                $bestScore = count($map);
-                $bestIndex = $index;
-                $bestMap = $map;
-            }
-        }
-
-        return $bestScore >= 2 ? [$bestIndex, $bestMap] : [null, []];
-    }
-
-    /** Turn one spreadsheet row into a keyed array using the located header. */
-    private function mapRow(array $line, array $map): array
-    {
-        $values = [];
-
-        foreach ($map as $key => $column) {
-            $values[$key] = $this->clean($line[$column] ?? null);
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param  array<string,string|null>  $values
-     * @return array<int,string>
-     */
-    private function ignoredHeaders(array $headerLine, array $map): array
-    {
-        $used = array_values($map);
-
-        return collect($headerLine)
-            ->reject(fn ($cell, $column) => in_array($column, $used, true) || $this->clean($cell) === null)
-            ->map(fn ($cell) => (string) $this->clean($cell))
-            ->values()
-            ->all();
-    }
-
-    private function isBlank(array $values): bool
-    {
-        foreach ($values as $value) {
-            if ($value !== null) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Validating one row                                                  */
+    /* Validating one row */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -492,7 +370,7 @@ class ApplicantImportService
     }
 
     /* ------------------------------------------------------------------ */
-    /* Small helpers                                                       */
+    /* Small helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -531,7 +409,7 @@ class ApplicantImportService
         if (preg_match('/^\d+(\.\d+)?$/', $value) && (float) $value > 1000) {
             try {
                 return Carbon::instance(
-                    \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value),
+                    Date::excelToDateTimeObject((float) $value),
                 )->startOfDay();
             } catch (\Throwable) {
                 return null;
@@ -551,53 +429,5 @@ class ApplicantImportService
         }
 
         return null;
-    }
-
-    private function matchColumn(string $header): ?string
-    {
-        $normalised = trim((string) preg_replace('/[^a-z0-9]+/', ' ', strtolower($header)));
-
-        if ($normalised === '') {
-            return null;
-        }
-
-        foreach (self::COLUMN_ALIASES as $key => $aliases) {
-            if (in_array($normalised, $aliases, true)) {
-                return $key;
-            }
-        }
-
-        // Fall back to a "contains" match so "Candidate Surname" still works.
-        //
-        // Longest alias first: "Parent Email" must land on the parent's email,
-        // not be swallowed by the shorter "email" alias for some other column.
-        $contains = [];
-
-        foreach (self::COLUMN_ALIASES as $key => $aliases) {
-            foreach ($aliases as $alias) {
-                $contains[] = ['key' => $key, 'alias' => $alias];
-            }
-        }
-
-        usort($contains, fn ($a, $b) => strlen($b['alias']) <=> strlen($a['alias']));
-
-        foreach ($contains as $candidate) {
-            if (Str::contains($normalised, $candidate['alias'])) {
-                return $candidate['key'];
-            }
-        }
-
-        return null;
-    }
-
-    private function clean(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $value = trim((string) preg_replace('/\s+/', ' ', (string) $value));
-
-        return $value === '' ? null : $value;
     }
 }
