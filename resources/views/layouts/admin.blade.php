@@ -35,9 +35,20 @@
 <div class="flex min-h-full">
 
     {{-- ================= Sidebar ================= --}}
+    {{--
+        On a phone it is a drawer that slides in; from `lg` up it is a column the
+        height of the window that stays put while the page beside it scrolls, and
+        the menu inside it scrolls on its own.
+
+        It used to go `static` at `lg`, which made the column as tall as the menu
+        and left the page to scroll both of them together: the second half of the
+        menu could only be reached by scrolling the page down and taking the page
+        with it. Sticking it is what puts the whole menu always within reach — and
+        the script under the menu is what puts it back where you left it.
+    --}}
     <aside x-cloak
            :class="sidebar ? 'translate-x-0' : '-translate-x-full'"
-           class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-brand-950 transition-transform duration-200 lg:static lg:translate-x-0">
+           class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-brand-950 transition-transform duration-200 lg:sticky lg:top-0 lg:bottom-auto lg:h-screen lg:translate-x-0">
 
         <div class="flex h-18 shrink-0 items-center justify-between gap-3 px-5">
             <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3">
@@ -55,7 +66,10 @@
             </button>
         </div>
 
-        <nav class="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
+        {{-- `id` is what the script below scrolls: the menu is longer than most
+             screens, and this is the only thing that keeps it where the office left
+             it. The breadcrumb is a <nav> as well, hence the id rather than a tag. --}}
+        <nav id="admin-menu" class="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
             @php
                 // The menu itself lives in App\Support\AdminMenu, because the trail
                 // above a page is derived from it: drawn from one place, read from
@@ -80,8 +94,9 @@
                                         ->filter(fn (array $child) => auth()->user()?->can($child['can'] ?? $link['can']));
                                 @endphp
 
-                                <li>
+                                <li @if ($menu::isActive($link)) data-menu-section @endif>
                                     <a href="{{ $menu::href($link) }}"
+                                       @if (request()->routeIs($menu::target($link))) aria-current="page" @endif
                                        @class([
                                            'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                                            'bg-white/10 text-white ring-1 ring-white/15' => $menu::isActive($link),
@@ -99,6 +114,7 @@
                                             @foreach ($children as $child)
                                                 <li>
                                                     <a href="{{ route($child['route']) }}"
+                                                       @if (request()->routeIs($child['route'])) aria-current="page" @endif
                                                        @class([
                                                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
                                                            'text-white' => request()->routeIs($child['route']),
@@ -118,6 +134,53 @@
                 @endif
             @endforeach
         </nav>
+
+        {{--
+            The menu is longer than the screen, so it scrolls — and every page load
+            puts it back at the top, which means scrolling down to the entry you just
+            clicked before you can carry on from it.
+
+            Bringing the entry you are on back into view leaves the menu where it
+            was, because the entry you clicked is the one you were looking at. It
+            scrolls the menu and nothing else: the page, the header and the way out
+            of the menu on a phone are all left alone.
+
+            The link you are on is preferred, and the section holding it is the
+            fallback, for the pages that are not a menu entry at all — a detail
+            screen, or a row being edited.
+        --}}
+        <script>
+            (function () {
+                function place() {
+                    var menu = document.getElementById('admin-menu');
+
+                    if (! menu) {
+                        return;
+                    }
+
+                    var entry = menu.querySelector('[aria-current="page"]')
+                        || menu.querySelector('[data-menu-section]');
+
+                    if (! entry) {
+                        return;
+                    }
+
+                    var menuBox = menu.getBoundingClientRect();
+                    var entryBox = entry.getBoundingClientRect();
+
+                    if (entryBox.top < menuBox.top || entryBox.bottom > menuBox.bottom) {
+                        menu.scrollTop += entryBox.top - menuBox.top - 8;
+                    }
+                }
+
+                // It has to wait for the page to be laid out: measured before that,
+                // the menu has no height of its own yet and nothing needs moving.
+                // Alpine's own moment comes first, and `load` is there in case
+                // Alpine never arrives. Both are harmless run twice.
+                document.addEventListener('alpine:initialized', place);
+                window.addEventListener('load', place);
+            })();
+        </script>
 
         <div class="shrink-0 border-t border-white/10 p-3">
             <a href="{{ route('home') }}" target="_blank"
