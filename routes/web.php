@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AcademicCalendarController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
+use App\Http\Controllers\Admin\CheckResultController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ExamController;
 use App\Http\Controllers\Admin\FeeController;
@@ -212,7 +213,9 @@ Route::middleware(['auth'])
         */
         Route::prefix('students-results')->name('students-results.')->group(function (): void {
             Route::get('/', [StudentsResultsController::class, 'dashboard'])->name('dashboard');
-            Route::get('check-result', [StudentsResultsController::class, 'checkResult'])->name('check-result');
+            // Graduated out of the placeholder controller: it has a lookup and a
+            // report card in it now, not a page saying it has not been built.
+            Route::get('check-result', CheckResultController::class)->name('check-result');
             Route::get('performance', [StudentsResultsController::class, 'performance'])->name('performance');
             Route::get('pins', [StudentsResultsController::class, 'pins'])->name('pins');
             Route::get('students', [StudentsResultsController::class, 'students'])->name('students');

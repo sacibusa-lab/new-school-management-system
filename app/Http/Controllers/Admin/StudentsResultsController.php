@@ -14,6 +14,10 @@ use Illuminate\View\View;
  * of its own as it is designed — so this class is a menu that happens to render,
  * not a home for twelve unrelated features.
  *
+ * Check Result is the first to graduate: it is {@see CheckResultController} now.
+ * Its entry below stays, because the entry is the menu — the sidebar, the label and
+ * the permission all come from here — and only the page behind it moved.
+ *
  * The permissions are named for what each page will DO rather than what it is
  * called, because the menu label is the least durable thing about it: "Check
  * Result" has already been renamed once on the legacy system.
@@ -43,19 +47,6 @@ class StudentsResultsController extends Controller
     public function dashboard(): View
     {
         return $this->placeholder('dashboard');
-    }
-
-    /**
-     * Look a student's result up for them.
-     *
-     * Kept to the Super Admin, as asked: the public page asks a parent for a
-     * surname, and this one does not — which makes it the honest answer to "I
-     * cannot see my child's result" and a way to read any child's record, so it
-     * is not a tool to hand out.
-     */
-    public function checkResult(): View
-    {
-        return $this->placeholder('check-result');
     }
 
     public function performance(): View
