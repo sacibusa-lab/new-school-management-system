@@ -8,36 +8,24 @@
 @endphp
 
 @push('head')
-    {{-- One sheet, not two.
-
-         The record outgrew A4 the moment the letterhead went in: it is 168px of the
-         ~1047px printable height, and the screen's generous paddings and leading were
-         sized for a scrolling page. On paper the record has to give, so it does —
-         measured at 1094px before and 976px after, worst case (a rejected candidate,
-         whose banner carries two more lines than anyone else's). The letterhead
-         itself is not shrunk: it is the part the school asked for. --}}
+    {{-- One sheet, not two. 976px worst case against ~1047px of printable A4, which is
+         why the record is tightened here rather than the letterhead shrunk. --}}
     <style>
         @media print {
             @page { margin: 10mm 12mm; }
 
             #record { line-height: 1.35; }
 
-            /* The letterhead band: the picture, then the record's own label under it. */
             #record-head { margin-bottom: 8px; padding-bottom: 4px; row-gap: 0; }
-
-            /* Every section of the card, whichever padding class it carries. */
             #record .card > div { padding-top: 6px; padding-bottom: 6px; }
-
-            /* The papers table: four rows of twenty pixels each on screen. */
             #record table th,
             #record table td { padding-top: 2px; padding-bottom: 2px; }
 
-            /* The candidate's photograph, still recognisable at passport size. */
+            /* Photograph at passport size. */
             #record .card img { height: 52px; width: 39px; }
 
-            /* The verdict is a stamp on paper rather than the poster it is on screen —
-               the icon and the padding are what pushed a rejected record onto a second
-               sheet while an admitted one fitted. */
+            /* The verdict banner is the tallest thing on the sheet; its screen icon and
+               padding are what pushed a rejected record over the page. */
             #record .verdict { padding: 6px 10px; }
             #record .verdict > span:first-child { height: 34px; width: 34px; }
             #record .verdict > span:first-child svg { height: 18px; width: 18px; }
@@ -71,8 +59,7 @@
                      autocomplete="off"
                      :value="request('registration_number')" />
 
-            {{-- Asked for because the number alone is not a secret: SAC-00001,
-                 SAC-00002 … can simply be counted through. --}}
+            {{-- The number alone is not a secret: SAC-00001, SAC-00002 … can be counted through. --}}
             <x-field name="surname" label="Candidate's surname" required
                      class="mt-4"
                      placeholder="Okafor"
@@ -90,16 +77,10 @@
         {{-- ================= Result ================= --}}
         @if ($searched)
             <div id="record" class="mx-auto mt-8 max-w-2xl print:mt-0">
-                {{-- ============ Letterhead, on paper only ============ --}}
-                {{-- The site header carries the school's name and logo, but it is
-                     deliberately hidden when printing — which left the printed record
-                     anonymous: a sheet a parent hands to a relative or an employer with
-                     nothing on it saying which school it came from. This is that
-                     identity, restored for paper. --}}
+                {{-- The site header is hidden on paper, so the school's identity is
+                     restored for print. --}}
                 <div id="record-head" class="hidden print:mb-5 print:flex print:flex-wrap print:items-start print:justify-between print:gap-6 print:border-b print:border-line print:pb-4">
                     @if ($school->letterhead)
-                        {{-- Head paper: the school's own letterhead, across the whole width
-                             of the sheet and nothing beside it. --}}
                         <img src="{{ asset('storage/' . $school->letterhead) }}"
                              alt="{{ $school->name }}"
                              class="w-full">
@@ -123,15 +104,7 @@
                     @endif
 
                     <div class="shrink-0 text-right print:ml-auto">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                            Admission status record
-                        </p>
                         <p class="mt-1 text-xs text-ink-soft">Printed {{ now()->format('j F Y') }}</p>
-                        @if ($applicant)
-                            <p class="mt-0.5 font-mono text-xs text-ink-soft">
-                                {{ $applicant->registration_number }}
-                            </p>
-                        @endif
                     </div>
                 </div>
 
@@ -139,10 +112,8 @@
                     @php
                         // $decision and $papers arrive from the controller.
                         $rejected = $applicant->status === \App\Enums\ApplicantStatus::Rejected;
-                        // Shortlisted means the cutoff was applied and they are waiting
-                        // for a place — NOT that their scripts are still being marked.
-                        // The two used to share a message, and it contradicted the
-                        // marks sitting right above it on the page.
+                        // Shortlisted means the cutoff ran and they are waiting for a place,
+                        // not that their scripts are still being marked.
                         $waiting = $applicant->status === \App\Enums\ApplicantStatus::Shortlisted;
                         $marked = $applicant->status === \App\Enums\ApplicantStatus::ExamCompleted;
                     @endphp
@@ -151,8 +122,7 @@
 
                         {{-- ============ Who this is ============ --}}
                         <div class="flex flex-wrap items-center gap-5 border-b border-line bg-surface p-5 sm:p-6 print:gap-3 print:p-3">
-                            {{-- The photograph is what identifies the candidate at a glance,
-                                 which is the whole reason for asking for one. --}}
+                            {{-- The photograph is what identifies the candidate at a glance. --}}
                             @if ($applicant->photo_path)
                                 <img src="{{ asset('storage/' . $applicant->photo_path) }}"
                                      alt="Passport photograph of {{ $applicant->full_name }}"
@@ -182,8 +152,6 @@
                         </div>
 
                         {{-- ============ Entrance examination ============ --}}
-                        {{-- The figures first, then the papers they were added up from,
-                             so a parent can check the arithmetic for themselves. --}}
                         @if ($decision)
                             <div class="p-5 sm:p-6 print:p-3">
                                 <p class="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -250,8 +218,7 @@
                                                             @endif
                                                         </td>
                                                         <td class="px-4 py-2.5 text-right font-semibold">
-                                                            {{-- A paper the school never recorded cannot be graded,
-                                                                 so it says nothing rather than showing 0%. --}}
+                                                            {{-- A paper the school never recorded cannot be graded. --}}
                                                             @if ($paper['is_absent'] || ! $paper['gradeable'])
                                                                 <span class="text-muted">—</span>
                                                             @else
@@ -282,14 +249,6 @@
                                     Congratulations — you have been admitted
                                 </p>
 
-                                @if ($decision)
-                                    <p class="mx-auto mt-3 max-w-md text-sm text-emerald-800 dark:text-emerald-200">
-                                        You scored <strong>{{ $fmt($decision->average_score) }}%</strong>
-                                        against a cutoff mark of
-                                        <strong>{{ $fmt($decision->cutoff_mark) }}%</strong>.
-                                        Your place is confirmed.
-                                    </p>
-                                @endif
                             </div>
 
                             @if ($applicant->student)
@@ -422,16 +381,13 @@
                                             You will re-sit only the papers you did not pass. Your other marks are kept.
                                         </p>
 
-                                        {{-- The whole point of this screen for a failed candidate, so it
-                                             is the loudest thing on the page rather than a small
-                                             button a parent can scroll past. --}}
+                                        {{-- The loudest thing on the page: it is the whole point of this
+                                             screen for a failed candidate. --}}
                                         <form method="POST" action="{{ route('public.resit.store') }}" class="mt-4 print:hidden">
                                             @csrf
                                             <input type="hidden" name="registration_number"
                                                    value="{{ $applicant->registration_number }}">
-                                            {{-- Booked from a page the parent already opened
-                                                 with the surname, so it is carried rather than
-                                                 asked for twice. The booking checks it. --}}
+                                            {{-- Carried, not asked for twice; the booking checks it. --}}
                                             <input type="hidden" name="surname"
                                                    value="{{ $applicant->last_name }}">
 
@@ -440,10 +396,8 @@
                                             </button>
                                         </form>
 
-                                        {{-- The button is a screen action and stays off the paper.
-                                             On its own that would leave the printed record ending on
-                                             a question with no answer, so paper gets the answer
-                                             instead. --}}
+                                        {{-- A button is a screen action, so paper gets the answer to its
+                                             own question instead. --}}
                                         <p class="mt-3 hidden text-sm text-ink-soft print:block">
                                             To book the resit, open the Admission Status page on the
                                             school's website, or call the office

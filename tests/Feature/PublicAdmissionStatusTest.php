@@ -472,7 +472,7 @@ class PublicAdmissionStatusTest extends TestCase
 
         // Print-only: hidden on screen, a flex row on paper.
         $this->assertStringContainsString('hidden print:mb-5 print:flex', $html, 'The letterhead is not a paper-only block.');
-        $this->assertStringContainsString('Admission status record', $html);
+        $this->assertStringContainsString('Printed '.now()->format('j F Y'), $html);
 
         // Everything on it comes from Settings, where the office keeps it.
         $this->assertStringContainsString(Setting::get('school_name'), $html);
@@ -484,6 +484,8 @@ class PublicAdmissionStatusTest extends TestCase
     /**
      * Once the school has uploaded its own letterhead, that is what heads the printed
      * record — not the name and the crest put back together by hand underneath it.
+     * The label and the candidate's number came off the band at the office's request:
+     * the card below carries both, and the sheet is short of room.
      */
     public function test_the_printed_record_carries_the_uploaded_letterhead(): void
     {
@@ -500,7 +502,7 @@ class PublicAdmissionStatusTest extends TestCase
             $html,
             'The uploaded letterhead is not on the printed record.',
         );
-        $this->assertStringContainsString('Admission status record', $html);
+        $this->assertStringContainsString('Printed '.now()->format('j F Y'), $html);
     }
 
     /**
