@@ -18,7 +18,7 @@
         <div class="border-b border-line bg-surface-2 px-5 py-4">
             <p class="font-display text-base font-semibold text-ink">The people who teach</p>
             <p class="mt-1 text-sm text-muted">
-                Who is on the teaching staff, which classes each one is form teacher of, and the
+                Who is on the teaching staff, which classes each one is class teacher of, and the
                 account they sign in with. Non-teaching staff are not here — they are logins rather
                 than teachers, and they belong with the rest of the staff accounts.
             </p>

@@ -24,10 +24,10 @@
                 $tabs = [
                     ['class', 'Class', 'academic'],
                     ['section', 'Section', 'cog'],
-                    // A class is a class name and a section; a form teacher is put in
+                    // A class is a class name and a section; a class teacher is put in
                     // charge of one of those classes. Its own tab, because it is per
                     // class rather than per class name: JSS1A and JSS1B have one each.
-                    ['teacher', 'Form Teacher', 'briefcase'],
+                    ['teacher', 'Class Teacher', 'briefcase'],
                 ];
 
                 if ($editing) {
@@ -248,12 +248,19 @@
         </div>
     </div>
 
-    {{-- ================= Form Teacher ================= --}}
-    <div x-show="tab === 'teacher'" x-cloak class="p-6">
-        <div class="rounded-xl border border-line p-5">
+    {{-- ================= Class Teacher ================= --}}
+    <div x-show="tab === 'teacher'" x-cloak class="grid grid-cols-1 gap-6 p-6 lg:grid-cols-12">
+
+        {{--
+            Allocation on the left, the list it produces on the right. The class is
+            named the way the school says it — the class, then the section — rather
+            than picked out of twenty rows, and the Section dropdown offers only the
+            sections the chosen class actually has: JSS1 and C make nothing.
+        --}}
+        <div class="self-start rounded-xl border border-line p-5 lg:col-span-4">
             <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
                 <x-nav-icon name="briefcase" class="h-4 w-4 text-ink-soft" />
-                <h2 class="text-base font-semibold text-ink">Form Teacher</h2>
+                <h2 class="text-base font-semibold text-ink">Class Teacher Allocation</h2>
             </div>
 
             @if ($teachers->isEmpty())
@@ -263,7 +270,7 @@
                     <p class="mt-3 text-sm font-medium text-ink">No teachers yet</p>
 
                     <p class="mx-auto mt-1 max-w-md text-sm text-muted">
-                        A class can only be given a form teacher once somebody is on the teaching
+                        A class can only be given a class teacher once somebody is on the teaching
                         staff, and nobody is yet. Add the first teacher and this fills up.
                     </p>
 
@@ -274,68 +281,134 @@
                     </a>
                 </div>
             @else
-                <p class="mb-4 text-sm text-muted">
-                    One row per class. Who is in charge of JSS1A has nothing to do with JSS1B, so
-                    each class keeps its own — and a class between teachers is left empty rather
-                    than keeping a name nobody chose again.
-                </p>
+                <form method="POST" action="{{ route('admin.students-results.academics.classes.teacher.store') }}"
+                      class="space-y-4"
+                      x-data="{
+                          level: '{{ old('level_id', $editingTeacher?->level_id) }}',
+                          held: {{ Js::from($levels->map(fn ($level) => ['id' => $level->id, 'sections' => $level->classes->pluck('section_id')->values()])->values()) }},
+                          sectionsFor() {
+                              const found = this.held.find(level => String(level.id) === String(this.level));
 
-                <div class="overflow-x-auto">
-                    <table class="w-full border-collapse border border-line text-sm">
-                        <thead>
-                            <tr class="bg-surface-3 text-left font-semibold text-ink-soft">
-                                <th class="w-12 border-b border-r border-line p-3 text-center">#</th>
-                                <th class="w-48 border-b border-r border-line p-3">Class</th>
-                                <th class="border-b border-r border-line p-3">Form Teacher</th>
-                                <th class="w-32 border-b border-line p-3 text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-line text-ink-soft">
-                            @foreach ($allClasses as $class)
-                                <tr class="transition-colors hover:bg-surface-3/60">
-                                    <td class="border-r border-line p-3 text-center align-middle">{{ $loop->iteration }}</td>
+                              return found ? found.sections : [];
+                          },
+                      }">
+                    @csrf
 
-                                    <td class="border-r border-line p-3 align-middle font-medium text-ink">
-                                        {{ $class->name }}
-                                    </td>
+                    <x-field name="level_id" label="Class" type="select" required
+                             placeholder-option="Select"
+                             :options="$levels->pluck('name', 'id')->all()"
+                             :value="$editingTeacher?->level_id"
+                             x-on:change="level = $event.target.value" />
 
-                                    <td class="border-r border-line p-3 align-middle">
-                                        <form method="POST" id="form-teacher-{{ $class->id }}"
-                                              action="{{ route('admin.students-results.academics.classes.teacher.update', $class) }}"
-                                              class="max-w-md">
-                                            @csrf
-                                            @method('PUT')
+                    <div>
+                        <label for="section_id" class="label">
+                            Section <span class="text-rose-500">*</span>
+                        </label>
 
-                                            <select name="form_teacher_id"
-                                                    aria-label="Form teacher of {{ $class->name }}"
-                                                    class="input">
-                                                <option value="">No form teacher</option>
+                        <select id="section_id" name="section_id" required class="input @error('section_id') input-error @enderror">
+                            <option value="">Select</option>
 
-                                                @foreach ($teachers as $teacher)
-                                                    <option value="{{ $teacher->id }}" @selected($class->form_teacher_id === $teacher->id)>
-                                                        {{ $teacher->name }}@if (! $teacher->is_active) — inactive @endif
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </form>
-                                    </td>
-
-                                    <td class="p-3 align-middle">
-                                        <div class="flex justify-center">
-                                            <button type="submit" form="form-teacher-{{ $class->id }}"
-                                                    class="btn-secondary btn-sm"
-                                                    title="Save the form teacher of {{ $class->name }}">
-                                                <x-nav-icon name="check" class="h-3.5 w-3.5" />
-                                                Save
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                            @foreach ($sections as $section)
+                                <option value="{{ $section->id }}" @selected((string) old('section_id', $editingTeacher?->section_id) === (string) $section->id)
+                                        x-bind:disabled="level !== '' && ! sectionsFor().includes({{ $section->id }})">
+                                    {{ $section->name }}
+                                </option>
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        </select>
+
+                        <p class="hint">Only the sections that class has. Add one on the Class tab first.</p>
+
+                        @error('section_id')
+                            <p class="error-text">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <x-field name="form_teacher_id" label="Class Teacher" type="select" required
+                             placeholder-option="Select"
+                             :options="$teachers->pluck('name', 'id')->all()"
+                             :value="$editingTeacher?->form_teacher_id" />
+
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="btn-primary btn-sm">
+                            <x-nav-icon name="check" class="h-3.5 w-3.5" />
+                            Save
+                        </button>
+                    </div>
+                </form>
             @endif
+        </div>
+
+        <div class="self-start rounded-xl border border-line p-5 lg:col-span-8">
+            <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
+                <x-nav-icon name="list" class="h-4 w-4 text-ink-soft" />
+                <h2 class="text-base font-semibold text-ink">Class Teacher List</h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse border border-line text-sm">
+                    <thead>
+                        <tr class="bg-surface-3 text-left font-semibold text-ink-soft">
+                            <th class="w-12 border-b border-r border-line p-3 text-center">#</th>
+                            <th class="w-24 border-b border-r border-line p-3">Branch</th>
+                            <th class="border-b border-r border-line p-3">Class Teacher</th>
+                            <th class="w-28 border-b border-r border-line p-3">Class</th>
+                            <th class="w-20 border-b border-r border-line p-3">Section</th>
+                            <th class="w-28 border-b border-line p-3 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-line text-ink-soft">
+                        @forelse ($allClasses as $class)
+                            <tr class="transition-colors hover:bg-surface-3/60">
+                                <td class="border-r border-line p-3 text-center align-middle">{{ $loop->iteration }}</td>
+
+                                <td class="border-r border-line p-3 align-middle">{{ $branch }}</td>
+
+                                <td class="border-r border-line p-3 align-middle">
+                                    @if ($class->formTeacher)
+                                        <span class="font-medium text-ink">{{ $class->formTeacher->name }}</span>
+                                    @else
+                                        <span class="text-muted">Not set</span>
+                                    @endif
+                                </td>
+
+                                <td class="border-r border-line p-3 align-middle font-medium text-ink">{{ $class->level?->name }}</td>
+
+                                <td class="border-r border-line p-3 align-middle">{{ $class->section?->name }}</td>
+
+                                <td class="p-3 align-middle">
+                                    <div class="flex justify-center gap-2">
+                                        <a href="{{ route('admin.students-results.academics.classes', ['teacher' => $class->id]) }}"
+                                           class="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-soft transition hover:bg-surface-3"
+                                           title="Edit the class teacher of {{ $class->name }}">
+                                            <x-nav-icon name="pencil" class="h-3.5 w-3.5" />
+                                        </a>
+
+                                        {{-- Nothing to take off a class that has nobody. --}}
+                                        @if ($class->formTeacher)
+                                            <form method="POST"
+                                                  action="{{ route('admin.students-results.academics.classes.teacher.destroy', $class) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit"
+                                                        class="flex h-8 w-8 items-center justify-center rounded-full bg-rose-500 text-white transition hover:bg-rose-600"
+                                                        title="Take {{ $class->formTeacher->name }} off {{ $class->name }}">
+                                                    <x-nav-icon name="trash" class="h-3.5 w-3.5" />
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-sm text-muted">
+                                    No classes yet. Create one on the Class tab and it appears here.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

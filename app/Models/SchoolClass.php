@@ -36,6 +36,13 @@ class SchoolClass extends Model
         return $this->belongsTo(Section::class);
     }
 
+    /**
+     * The teacher in charge of this class.
+     *
+     * Stored as `form_teacher_id` and called a form teacher by the older screens:
+     * one thing with two names in the school, the same way a "class" is a class
+     * name and a section put together. The office says class teacher.
+     */
     public function formTeacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'form_teacher_id');

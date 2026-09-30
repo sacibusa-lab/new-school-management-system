@@ -235,7 +235,7 @@ class TeachersTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.students-results.teachers.list'))
             ->assertOk()
-            ->assertSee('Not a form teacher yet.');
+            ->assertSee('Not a class teacher yet.');
     }
 
     public function test_the_register_says_where_to_go_when_there_are_no_teachers_yet(): void

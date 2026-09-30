@@ -255,13 +255,17 @@ Route::middleware(['auth'])
             Route::put('academics/classes/names/{level}', [ClassesAndSectionsController::class, 'updateClass'])->name('academics.classes.names.update');
             Route::delete('academics/classes/names/{level}', [ClassesAndSectionsController::class, 'destroyClass'])->name('academics.classes.names.destroy');
 
+            // The class teacher belongs to the class rather than the class name:
+            // JSS1A and JSS1B have one each. The allocation form names the class the
+            // way the school says it — the class, then the section — so it posts the
+            // two rather than an id already known, and this is declared before
+            // {level} so that "teacher" is never read as a class name.
+            Route::post('academics/classes/teacher', [ClassesAndSectionsController::class, 'storeFormTeacher'])->name('academics.classes.teacher.store');
+            Route::delete('academics/classes/{schoolClass}/teacher', [ClassesAndSectionsController::class, 'destroyFormTeacher'])->name('academics.classes.teacher.destroy');
+
             Route::post('academics/classes/{level}', [ClassesAndSectionsController::class, 'storeClassSection'])->name('academics.classes.store-class');
             Route::delete('academics/classes/{schoolClass}', [ClassesAndSectionsController::class, 'destroyClassSection'])->name('academics.classes.destroy-class');
 
-            // The form teacher belongs to the class rather than the class name:
-            // JSS1A and JSS1B have one each, and it is a change of its own —
-            // nothing else about the class moves with it.
-            Route::put('academics/classes/{schoolClass}/teacher', [ClassesAndSectionsController::class, 'updateFormTeacher'])->name('academics.classes.teacher.update');
             Route::get('academics/subjects', [StudentsResultsController::class, 'academicSubjects'])->name('academics.subjects');
             Route::get('academics/schedule', [StudentsResultsController::class, 'academicSchedule'])->name('academics.schedule');
             Route::get('academics/promotion', [StudentsResultsController::class, 'academicPromotion'])->name('academics.promotion');

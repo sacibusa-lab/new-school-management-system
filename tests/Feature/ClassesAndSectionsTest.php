@@ -114,6 +114,12 @@ class ClassesAndSectionsTest extends TestCase
             ->post(route('admin.students-results.academics.classes.sections.store'), ['section_name' => 'Z'])
             ->assertForbidden();
 
+        $this->actingAs($teacher)
+            ->post(route('admin.students-results.academics.classes.teacher.store'), [
+                'level_id' => 1, 'section_id' => 1, 'form_teacher_id' => 1,
+            ])
+            ->assertForbidden();
+
         $this->assertSame(0, Section::query()->count());
     }
 
@@ -524,15 +530,15 @@ class ClassesAndSectionsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The form teacher of a class */
+    /* The class teacher of a class */
     /* ------------------------------------------------------------------ */
 
     /**
-     * The tab lists every class with whoever is in charge of it, and the ones
-     * nobody has been given read as unset rather than as an empty dropdown with no
-     * explanation.
+     * The tab is the office's two panels: the allocation form, and the list it
+     * produces. A class nobody has been given reads as unset rather than as a blank
+     * cell, and which school the allocation belongs to is named on every row.
      */
-    public function test_the_form_teacher_tab_lists_every_class_with_who_has_it(): void
+    public function test_the_class_teacher_tab_is_an_allocation_form_and_the_list_it_fills(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $a = Section::create(['name' => 'A', 'order' => 1]);
@@ -547,18 +553,25 @@ class ClassesAndSectionsTest extends TestCase
             ->get(route('admin.students-results.academics.classes', ['tab' => 'teacher']))
             ->assertOk()
             ->assertSee("x-data=\"{ tab: 'teacher' }\"", false)
-            ->assertSee('Form Teacher')
-            ->assertSee('JSS1A')
-            ->assertSee('JSS1B')
+            ->assertSee('Class Teacher Allocation')
+            ->assertSee('Class Teacher List')
+            ->assertSee('name="level_id"', false)
+            ->assertSee('name="section_id"', false)
+            ->assertSee('name="form_teacher_id"', false)
+            ->assertSee('Branch')
+            ->assertSee(Setting::get('school_name'))
             ->assertSee($teacher->name)
-            ->assertSee('No form teacher');
+            // JSS1A has one, JSS1B is the row that has not.
+            ->assertSee($level->name)
+            ->assertSee('Not set');
     }
 
     /**
-     * A form teacher belongs to one class and not to the class name: JSS1A having
-     * one says nothing whatever about JSS1B.
+     * The class is named the way the school says it — the class, then the section —
+     * and that pair is the class the teacher is put in charge of. Its neighbour is
+     * left alone: JSS1A having one says nothing whatever about JSS1B.
      */
-    public function test_a_form_teacher_is_put_on_one_class_and_not_on_its_neighbour(): void
+    public function test_a_class_teacher_is_allocated_to_the_class_the_form_names(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $a = Section::create(['name' => 'A', 'order' => 1]);
@@ -568,20 +581,73 @@ class ClassesAndSectionsTest extends TestCase
         $teacher = $this->teacher();
 
         $this->actingAs($this->admin)
-            ->put(route('admin.students-results.academics.classes.teacher.update', $classA), [
+            ->post(route('admin.students-results.academics.classes.teacher.store'), [
+                'level_id' => $level->id,
+                'section_id' => $a->id,
                 'form_teacher_id' => $teacher->id,
             ])
-            ->assertSessionHas('status', "{$teacher->name} is now the form teacher of JSS1A.");
+            ->assertRedirect(route('admin.students-results.academics.classes', ['tab' => 'teacher']))
+            ->assertSessionHas('status', "{$teacher->name} is now the class teacher of JSS1A.");
 
         $this->assertSame($teacher->id, $classA->refresh()->form_teacher_id);
         $this->assertNull($classB->refresh()->form_teacher_id);
     }
 
     /**
-     * A class between teachers is left empty rather than keeping the name of the
-     * one who has gone, which is a record of somebody who is not there any more.
+     * Allocating to a class that already has one replaces them. That is what the
+     * form means — and it is why the pencil is only a way of loading a row of it.
      */
-    public function test_a_class_can_be_left_without_a_form_teacher(): void
+    public function test_allocating_again_replaces_the_teacher_who_was_there(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $class = $this->class($level, $a, 'JSS1A');
+
+        $first = $this->teacher('Chidera Okafor');
+        $second = $this->teacher('Ngozi Eze');
+
+        $class->update(['form_teacher_id' => $first->id]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.academics.classes.teacher.store'), [
+                'level_id' => $level->id,
+                'section_id' => $a->id,
+                'form_teacher_id' => $second->id,
+            ])
+            ->assertSessionHas('status', 'Ngozi Eze is now the class teacher of JSS1A.');
+
+        $this->assertSame($second->id, $class->refresh()->form_teacher_id);
+    }
+
+    /**
+     * JSS1 and C make nothing at all, and a teacher cannot be put in charge of a
+     * class that does not exist. The office is told which one is missing rather than
+     * having a class quietly invented for them.
+     */
+    public function test_a_class_teacher_cannot_be_allocated_to_a_class_that_is_not_there(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $c = Section::create(['name' => 'C', 'order' => 3]);
+        $this->class($level, $a, 'JSS1A');
+        $teacher = $this->teacher();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.academics.classes.teacher.store'), [
+                'level_id' => $level->id,
+                'section_id' => $c->id,
+                'form_teacher_id' => $teacher->id,
+            ])
+            ->assertSessionHas('error', 'JSS1C is not a class yet. Create it on the Class tab first.');
+
+        $this->assertSame(['JSS1A'], SchoolClass::query()->pluck('name')->all());
+    }
+
+    /**
+     * A class between teachers is left empty rather than keeping the name of the one
+     * who has gone, which is a record of somebody who is not there any more.
+     */
+    public function test_the_class_teacher_can_be_taken_off_a_class(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $a = Section::create(['name' => 'A', 'order' => 1]);
@@ -589,18 +655,19 @@ class ClassesAndSectionsTest extends TestCase
         $class->update(['form_teacher_id' => $this->teacher()->id]);
 
         $this->actingAs($this->admin)
-            ->put(route('admin.students-results.academics.classes.teacher.update', $class), ['form_teacher_id' => ''])
-            ->assertSessionHas('status', 'JSS1A has no form teacher now.');
+            ->delete(route('admin.students-results.academics.classes.teacher.destroy', $class))
+            ->assertRedirect(route('admin.students-results.academics.classes', ['tab' => 'teacher']))
+            ->assertSessionHas('status', 'JSS1A has no class teacher now.');
 
         $this->assertNull($class->refresh()->form_teacher_id);
     }
 
     /**
-     * The picker offers teachers, so the guard behind it has to mean teachers too:
-     * a bursar posting the id of their own account must be refused rather than
-     * quietly put in charge of a class.
+     * The form offers teachers, so the guard behind it has to mean teachers too: a
+     * bursar posting the id of their own account must be refused rather than quietly
+     * put in charge of a class.
      */
-    public function test_an_account_that_is_not_a_teacher_cannot_be_put_in_charge_of_a_class(): void
+    public function test_an_account_that_is_not_a_teacher_cannot_be_given_a_class(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $a = Section::create(['name' => 'A', 'order' => 1]);
@@ -610,7 +677,9 @@ class ClassesAndSectionsTest extends TestCase
         $bursar->assignRole('Bursar / Accounts');
 
         $this->actingAs($this->admin)
-            ->put(route('admin.students-results.academics.classes.teacher.update', $class), [
+            ->post(route('admin.students-results.academics.classes.teacher.store'), [
+                'level_id' => $level->id,
+                'section_id' => $a->id,
                 'form_teacher_id' => $bursar->id,
             ])
             ->assertSessionHas('error', 'Ngozi the bursar is not a teacher. Add them on the Add Teachers page first.');
@@ -618,8 +687,49 @@ class ClassesAndSectionsTest extends TestCase
         $this->assertNull($class->refresh()->form_teacher_id);
     }
 
-    /** Nobody on the staff yet: the tab says where to go rather than showing empty dropdowns. */
-    public function test_the_form_teacher_tab_says_where_to_go_when_there_are_no_teachers_yet(): void
+    /**
+     * The class, the section and the teacher all have to be named: half an
+     * allocation is not one, and the form says so field by field.
+     */
+    public function test_the_allocation_form_asks_for_all_three(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $this->class($level, $a, 'JSS1A');
+        $this->teacher();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.academics.classes.teacher.store'), [])
+            ->assertSessionHasErrors(['level_id', 'section_id', 'form_teacher_id']);
+    }
+
+    /** The pencil fills the allocation form with that row, on the same tab. */
+    public function test_the_pencil_fills_the_allocation_form_with_that_class(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $classA = $this->class($level, $a, 'JSS1A');
+        $classB = $this->class($level, $b, 'JSS1B');
+        $teacher = $this->teacher();
+
+        $classB->update(['form_teacher_id' => $teacher->id]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes', ['teacher' => $classB->id]))
+            ->assertOk()
+            ->assertSee("x-data=\"{ tab: 'teacher' }\"", false)
+            ->assertSee('value="'.$level->id.'" selected', false)
+            ->assertSee('value="'.$b->id.'" selected', false)
+            ->assertSee('value="'.$teacher->id.'" selected', false);
+    }
+
+    /**
+     * Nobody on the staff yet: the allocation form is replaced by the way to fix
+     * that, and the list stays — which classes still have no class teacher is the
+     * thing worth knowing in that state.
+     */
+    public function test_the_class_teacher_tab_says_where_to_go_when_there_are_no_teachers_yet(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $a = Section::create(['name' => 'A', 'order' => 1]);
@@ -630,6 +740,7 @@ class ClassesAndSectionsTest extends TestCase
             ->assertOk()
             ->assertSee('No teachers yet')
             ->assertSee('Add a teacher')
+            ->assertSee('Class Teacher List')
             ->assertDontSee('name="form_teacher_id"', false);
     }
 

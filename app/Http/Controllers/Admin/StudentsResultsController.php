@@ -64,7 +64,7 @@ class StudentsResultsController extends Controller
             'route' => 'admin.students-results.academics.classes',
             'label' => 'Classes & Sections',
             'icon' => 'grid',
-            'note' => 'The classes the school runs — JSS1A, JSS1B, SS2 Science — with the form teacher in each and the space a class holds.',
+            'note' => 'The classes the school runs — JSS1A, JSS1B, SS2 Science — with the class teacher in each and the space a class holds.',
         ],
         [
             'key' => 'subjects',
@@ -108,7 +108,7 @@ class StudentsResultsController extends Controller
             'route' => 'admin.students-results.teachers.list',
             'label' => 'Teachers List',
             'icon' => 'list',
-            'note' => 'Every teacher on the staff, with the classes each one is form teacher of and the account they sign in with.',
+            'note' => 'Every teacher on the staff, with the classes each one is class teacher of and the account they sign in with.',
         ],
         [
             'key' => 'teachers-create',

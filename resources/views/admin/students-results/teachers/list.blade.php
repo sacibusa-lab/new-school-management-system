@@ -8,7 +8,7 @@
             <div>
                 <p class="font-display text-base font-semibold text-ink">Teachers List</p>
                 <p class="mt-1 text-sm text-muted">
-                    Every teacher on the staff, and the class each one is form teacher of.
+                    Every teacher on the staff, and the class each one is class teacher of.
                 </p>
             </div>
 
@@ -25,7 +25,7 @@
                         <th class="w-12 border-b border-r border-line p-3 text-center">#</th>
                         <th class="border-b border-r border-line p-3">Teacher</th>
                         <th class="border-b border-r border-line p-3">Contact</th>
-                        <th class="border-b border-r border-line p-3">Form Teacher Of</th>
+                        <th class="border-b border-r border-line p-3">Class Teacher Of</th>
                         <th class="w-28 border-b border-line p-3 text-center">Status</th>
                     </tr>
                 </thead>
@@ -50,7 +50,7 @@
 
                             <td class="border-r border-line p-3 align-top">
                                 {{ $teacher->taughtClasses->isEmpty()
-                                    ? 'Not a form teacher yet.'
+                                    ? 'Not a class teacher yet.'
                                     : $teacher->taughtClasses->pluck('name')->implode(', ') }}
                             </td>
 
@@ -71,7 +71,7 @@
                                    class="font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-200">
                                     Add the first one
                                 </a>
-                                — a class can only be given a form teacher once somebody is on the staff.
+                                — a class can only be given a class teacher once somebody is on the staff.
                             </td>
                         </tr>
                     @endforelse

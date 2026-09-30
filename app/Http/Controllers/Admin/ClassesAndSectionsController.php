@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\Section;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\Academics\AcademicStructureService;
 use Illuminate\Http\RedirectResponse;
@@ -49,25 +50,41 @@ class ClassesAndSectionsController extends Controller
             ? SchoolLevel::query()->find($request->integer('edit'))
             : null;
 
+        // The pencil in the Class Teacher list opens this screen on the Form Teacher
+        // tab with that class in it: the same idea as the one above, for the other
+        // thing a row of this page can be edited as.
+        $editingTeacher = $request->integer('teacher')
+            ? SchoolClass::query()->with(['level', 'section', 'formTeacher'])->find($request->integer('teacher'))
+            : null;
+
         return view('admin.students-results.academics.classes', [
             'page' => collect(StudentsResultsController::ACADEMIC_PAGES)->firstWhere('key', 'classes'),
             // Sections first, and each one says which classes are drawn from it.
             'sections' => Section::query()->with('schoolClasses')->ordered()->get(),
-            'levels' => SchoolLevel::query()->orderBy('order')->orderBy('name')->get(),
+            // The classes each name has, so the Section dropdown can offer only the
+            // ones that class actually has — JSS1 and C make nothing at all.
+            'levels' => SchoolLevel::query()->with('classes:id,level_id,section_id')->orderBy('order')->orderBy('name')->get(),
             'classes' => $classes,
-            // Every class on one list for the Form Teacher tab, in the same order
+            // Every class on one list for the Class Teacher table, in the same order
             // as the classes page above. The accounts on it are the teachers
             // already on the staff — the office picks a person, not a login.
             'allClasses' => $classes->flatten(1),
             'teachers' => User::query()->role('Teacher')->orderBy('name')->get(),
             'editing' => $editing,
-            'tab' => $editing !== null
-                ? 'edit'
-                : match ($request->string('tab')->value()) {
+            'editingTeacher' => $editingTeacher,
+            // The school the allocation belongs to. There is one branch in this
+            // platform, but the list has always carried the column and the office
+            // reads a row by it, so it is named rather than left blank.
+            'branch' => Setting::get('school_name', config('saci.school_name')),
+            'tab' => match (true) {
+                $editing !== null => 'edit',
+                $editingTeacher !== null => 'teacher',
+                default => match ($request->string('tab')->value()) {
                     'section' => 'section',
                     'teacher' => 'teacher',
                     default => 'class',
                 },
+            },
         ]);
     }
 
@@ -210,39 +227,80 @@ class ClassesAndSectionsController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /* The form teacher of a class */
+    /* The class teacher of a class */
     /* ------------------------------------------------------------------ */
 
     /**
-     * The Form Teacher tab, one row at a time.
+     * Allocate a class teacher, which is the Class Teacher Allocation form.
      *
-     * A class is between teachers as often as it is mid-year, so a blank choice is
-     * a real answer rather than a mistake to be refused: it takes the last teacher
-     * off the class instead of leaving a name there that nobody chose again.
+     * The office names the class the way the school does — the class, then the
+     * section — rather than picking a class from a list of twenty: JSS1 and A is
+     * how JSS1A is said out loud, and it is how it is asked for here. A class that
+     * does not exist yet is refused with the reason, because a teacher cannot be
+     * put in charge of JSS1C when there is no JSS1C.
+     *
+     * Allocating to a class that already has one replaces them: that is what the
+     * form means, and the pencil in the list is only a way of loading one row of it
+     * without it being typed out again.
      */
-    public function updateFormTeacher(Request $request, SchoolClass $schoolClass): RedirectResponse
+    public function storeFormTeacher(Request $request): RedirectResponse
     {
         $this->authorize('academics.manage');
 
         $validated = $request->validate([
-            'form_teacher_id' => ['nullable', 'integer', 'exists:users,id'],
+            'level_id' => ['required', 'integer', 'exists:school_levels,id'],
+            'section_id' => ['required', 'integer', 'exists:sections,id'],
+            'form_teacher_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $teacher = isset($validated['form_teacher_id'])
-            ? User::query()->find($validated['form_teacher_id'])
-            : null;
+        $class = SchoolClass::query()
+            ->where('level_id', $validated['level_id'])
+            ->where('section_id', $validated['section_id'])
+            ->first();
+
+        if ($class === null) {
+            $level = SchoolLevel::query()->find($validated['level_id']);
+            $section = Section::query()->find($validated['section_id']);
+
+            return redirect()
+                ->route('admin.students-results.academics.classes', ['tab' => 'teacher'])
+                ->with('error', "{$level->name}{$section->name} is not a class yet. Create it on the Class tab first.");
+        }
+
+        $teacher = User::query()->findOrFail($validated['form_teacher_id']);
 
         try {
-            $this->structure->assignFormTeacher($schoolClass, $teacher, $request->user());
+            $this->structure->assignClassTeacher($class, $teacher, $request->user());
+        } catch (RuntimeException $e) {
+            return redirect()
+                ->route('admin.students-results.academics.classes', ['tab' => 'teacher'])
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('admin.students-results.academics.classes', ['tab' => 'teacher'])
+            ->with('status', "{$teacher->name} is now the class teacher of {$class->name}.");
+    }
+
+    /**
+     * Take the class teacher off a class.
+     *
+     * A class between teachers is left empty rather than keeping the name of the
+     * one who has gone, which is a record of somebody who is not there any more.
+     * Nothing else about the class moves with it.
+     */
+    public function destroyFormTeacher(Request $request, SchoolClass $schoolClass): RedirectResponse
+    {
+        $this->authorize('academics.manage');
+
+        try {
+            $this->structure->assignClassTeacher($schoolClass, null, $request->user());
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with(
-            'status',
-            $teacher === null
-                ? "{$schoolClass->name} has no form teacher now."
-                : "{$teacher->name} is now the form teacher of {$schoolClass->name}.",
-        );
+        return redirect()
+            ->route('admin.students-results.academics.classes', ['tab' => 'teacher'])
+            ->with('status', "{$schoolClass->name} has no class teacher now.");
     }
 }
