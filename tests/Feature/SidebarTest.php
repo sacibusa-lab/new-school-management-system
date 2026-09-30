@@ -53,6 +53,9 @@ class SidebarTest extends TestCase
             'admin.students-results.teachers' => 'admin.students-results.teachers',
             'admin.students-results.teachers.list' => 'admin.students-results.teachers.list',
             'admin.students-results.teachers.create' => 'admin.students-results.teachers.create',
+            // Settings is the general page, and the admissions settings hang off it.
+            'admin.settings.index' => 'admin.settings.index',
+            'admin.settings.admissions' => 'admin.settings.admissions',
         ];
 
         foreach ($expected as $route => $marked) {
@@ -115,6 +118,24 @@ class SidebarTest extends TestCase
             'data-menu-section',
             $this->sectionIn($menu, route('admin.students-results.teachers')),
         );
+    }
+
+    /**
+     * The admissions settings are in the Admissions section, so being on them must
+     * not also light up Settings: two entries lit up for one page is a menu telling
+     * the office they are in two places.
+     */
+    public function test_the_admissions_settings_do_not_light_up_settings(): void
+    {
+        $menu = $this->menuOn(route('admin.settings.admissions'));
+
+        $this->assertStringContainsString(
+            'aria-current="page"',
+            $this->anchorIn($menu, route('admin.settings.admissions')),
+        );
+
+        // The active entry is drawn with a tinted background; Settings must not be.
+        $this->assertStringNotContainsString('bg-white/10', $this->anchorIn($menu, route('admin.settings.index')));
     }
 
     /* ------------------------------------------------------------------ */

@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\SequenceType;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Setting;
 use App\Models\Term;
+use App\Services\Academics\AcademicCalendarService;
 use App\Services\Branding\BrandingService;
 use App\Services\NumberSequenceService;
-use App\Services\Academics\AcademicCalendarService;
 use App\Support\SettingLayout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,11 +24,12 @@ class SettingController extends Controller
 
         // Grouped only; the order it is drawn in comes from SettingLayout, because
         // ordering by group then key is alphabetical twice over and put the
-        // school's Address above its own Name.
+        // school's Address above its own Name. Admissions and the letters are set
+        // up on a page of their own — see SettingLayout::PAGES.
         $settings = Setting::query()->orderBy('key')->get()->groupBy('group');
 
         return view('admin.settings.index', [
-            'groups' => SettingLayout::arrange($settings),
+            'groups' => SettingLayout::arrange($settings, 'general'),
             // The calendar card behind the selector: what exists to choose from,
             // what is in the way of deleting any of it. Terms are shared by every
             // session, so they are listed once, with their dates for the current one.
@@ -41,10 +43,38 @@ class SettingController extends Controller
             'currentSession' => AcademicSession::current(),
             'currentTerm' => Term::current(),
             'previews' => [
-                'admission' => $sequences->preview(\App\Enums\SequenceType::AdmissionRegistration),
-                'student' => $sequences->preview(\App\Enums\SequenceType::StudentNumber),
-                'invoice' => $sequences->preview(\App\Enums\SequenceType::Invoice),
-                'receipt' => $sequences->preview(\App\Enums\SequenceType::Receipt),
+                'admission' => $sequences->preview(SequenceType::AdmissionRegistration),
+                'student' => $sequences->preview(SequenceType::StudentNumber),
+                'invoice' => $sequences->preview(SequenceType::Invoice),
+                'receipt' => $sequences->preview(SequenceType::Receipt),
+            ],
+        ]);
+    }
+
+    /**
+     * The admissions settings, on their own page.
+     *
+     * The same form as the general page and the same route to save it: a setting is
+     * a setting, and which page it was drawn on makes no difference to how it is
+     * written. Only the groups differ, and which those are is SettingLayout's to
+     * say.
+     */
+    public function admissions(NumberSequenceService $sequences): View
+    {
+        $this->authorize('settings.manage');
+
+        return view('admin.settings.admissions', [
+            'groups' => SettingLayout::arrange(
+                Setting::query()->orderBy('key')->get()->groupBy('group'),
+                'admissions',
+            ),
+            // Used by the numbering fields' hints; the groups here have none, but the
+            // fields are drawn by a shared partial that knows no better.
+            'previews' => [
+                'admission' => $sequences->preview(SequenceType::AdmissionRegistration),
+                'student' => $sequences->preview(SequenceType::StudentNumber),
+                'invoice' => $sequences->preview(SequenceType::Invoice),
+                'receipt' => $sequences->preview(SequenceType::Receipt),
             ],
         ]);
     }
@@ -56,11 +86,11 @@ class SettingController extends Controller
         $validated = $request->validate([
             'settings' => ['required', 'array'],
             'settings.*.value' => ['nullable', 'string', 'max:2000'],
-            'settings.*.file' => ['nullable', 'file', 'mimes:' . BrandingService::EXTENSIONS, 'max:' . BrandingService::MAX_KB],
+            'settings.*.file' => ['nullable', 'file', 'mimes:'.BrandingService::EXTENSIONS, 'max:'.BrandingService::MAX_KB],
             'settings.*.remove' => ['nullable', 'boolean'],
         ], [
             'settings.*.file.mimes' => 'That file is not an image the browser can show. Use PNG, JPG, WEBP, SVG or ICO.',
-            'settings.*.file.max' => 'That image is larger than ' . round(BrandingService::MAX_KB / 1024) . ' MB.',
+            'settings.*.file.max' => 'That image is larger than '.round(BrandingService::MAX_KB / 1024).' MB.',
         ]);
 
         foreach ($validated['settings'] as $key => $payload) {
@@ -129,7 +159,7 @@ class SettingController extends Controller
         ]);
 
         $sequences->setLastNumber(
-            \App\Enums\SequenceType::from($validated['type']),
+            SequenceType::from($validated['type']),
             $validated['scope'],
             $validated['last_number'],
         );

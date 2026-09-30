@@ -53,7 +53,7 @@ class SettingsLayoutTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The order of the groups                                             */
+    /* The order of the groups */
     /* ------------------------------------------------------------------ */
 
     public function test_the_groups_are_drawn_in_the_order_they_are_declared(): void
@@ -81,14 +81,65 @@ class SettingsLayoutTest extends TestCase
         $this->assertSame('Academic session', $headings[0] ?? null);
         $this->assertSame('School branding', $headings[1] ?? null);
 
-        $this->assertLessThan(
-            array_search('Admissions', $headings, true),
-            array_search('School branding', $headings, true),
-        );
+        // Admissions is set up on its own page now, not scrolled past on the way
+        // to the school's logo.
+        $this->assertNotContains('Admissions', $headings);
+        $this->assertNotContains('Admission letters', $headings);
     }
 
     /* ------------------------------------------------------------------ */
-    /* The order of the fields inside a group                              */
+    /* Which page a group is set up on */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The admissions journey and the letter it sends out are one sitting's work, so
+     * they have a page of their own — and the general page no longer carries them.
+     */
+    public function test_the_admissions_settings_are_on_their_own_page(): void
+    {
+        $general = $this->actingAs($this->admin)
+            ->get(route('admin.settings.index'))->assertOk()->getContent();
+
+        $admissions = $this->actingAs($this->admin)
+            ->get(route('admin.settings.admissions'))->assertOk()->getContent();
+
+        foreach (['settings[registration_open]', 'settings[application_fee]', 'settings[default_cutoff_mark]', 'settings[admission_letter_body]', 'settings[admission_letter_title]'] as $field) {
+            $this->assertStringContainsString($field, $admissions, "{$field} is not on the admissions settings page.");
+            $this->assertStringNotContainsString($field, $general, "{$field} is still on the general settings page.");
+        }
+
+        // And the other way about: the school's own settings stayed where they were.
+        $this->assertStringContainsString('settings[school_name]', $general);
+        $this->assertStringNotContainsString('settings[school_name]', $admissions);
+    }
+
+    /** The groups keep the order they are declared in, whatever page they are on. */
+    public function test_the_admissions_page_draws_admissions_before_the_letters(): void
+    {
+        $admissions = $this->actingAs($this->admin)
+            ->get(route('admin.settings.admissions'))->assertOk()->getContent();
+
+        $this->assertNotFalse(strpos($admissions, 'settings[admission_letter_title]'));
+
+        $this->assertLessThan(
+            strpos($admissions, 'settings[admission_letter_title]'),
+            strpos($admissions, 'settings[default_cutoff_mark]'),
+        );
+    }
+
+    /** A group the layout has never heard_of is left on the general page, not hidden. */
+    public function test_a_group_the_layout_has_never_heard_of_goes_to_the_general_page(): void
+    {
+        Setting::put('library_fine', '50', ['group' => 'library', 'label' => 'Library fine']);
+
+        $settings = Setting::query()->orderBy('key')->get()->groupBy('group');
+
+        $this->assertSame(['admissions', 'letters'], array_column(SettingLayout::arrange($settings, 'admissions'), 'key'));
+        $this->assertContains('library', array_column(SettingLayout::arrange($settings, 'general'), 'key'));
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The order of the fields inside a group */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -136,7 +187,7 @@ class SettingsLayoutTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Nothing may quietly disappear                                       */
+    /* Nothing may quietly disappear */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -183,15 +234,24 @@ class SettingsLayoutTest extends TestCase
         $this->assertNotContains('General', $headings);
     }
 
-    public function test_every_setting_in_the_database_reaches_the_page(): void
+    public function test_every_setting_in_the_database_reaches_a_page(): void
     {
-        $html = $this->actingAs($this->admin)->get(route('admin.settings.index'))->assertOk()->getContent();
+        $pages = [
+            route('admin.settings.index'),
+            route('admin.settings.admissions'),
+        ];
+
+        $html = '';
+
+        foreach ($pages as $page) {
+            $html .= $this->actingAs($this->admin)->get($page)->assertOk()->getContent();
+        }
 
         foreach (Setting::query()->pluck('key') as $key) {
             $this->assertStringContainsString(
-                'settings[' . $key . ']',
+                'settings['.$key.']',
                 $html,
-                "The setting {$key} is not on the page.",
+                "The setting {$key} is not on any settings page.",
             );
         }
     }

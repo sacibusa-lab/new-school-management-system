@@ -329,6 +329,11 @@ Route::middleware(['auth'])
         /* ---------------- Administration ---------------- */
         Route::resource('users', UserController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
         Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
+
+        // The settings the office sets up in a sitting of their own. Saved through
+        // the same route as the rest: a setting is a setting wherever it is drawn.
+        Route::get('settings/admissions', [SettingController::class, 'admissions'])->name('settings.admissions');
+
         Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
         Route::post('settings/sequences', [SettingController::class, 'updateSequence'])->name('settings.sequences.update');
 

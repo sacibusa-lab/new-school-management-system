@@ -50,6 +50,8 @@ class BreadcrumbTest extends TestCase
             'admin.exams.create' => ['Admissions', 'Examinations', 'New examination'],
             'admin.scores.index' => ['Admissions', 'Score entry'],
             'admin.settings.index' => ['Administration', 'Settings'],
+            // Its own place in the menu, in the section it belongs to.
+            'admin.settings.admissions' => ['Admissions', 'Admissions settings'],
             'admin.students-results.academics.classes' => ['Students & Results', 'Academic', 'Classes & Sections'],
             // A section of the module with a page of its own, and two pages under it.
             'admin.students-results.teachers' => ['Students & Results', 'Teachers'],

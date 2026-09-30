@@ -61,6 +61,13 @@ class AdminMenu
                 ['route' => 'admin.scores.*', 'label' => 'Score entry', 'icon' => 'pencil', 'can' => 'scores.enter'],
                 ['route' => 'admin.imports.*', 'label' => 'Scoresheet imports', 'icon' => 'upload', 'can' => 'scores.import'],
                 ['route' => 'admin.admissions.*', 'label' => 'Cutoff & decisions', 'icon' => 'scale', 'can' => 'admissions.decide'],
+
+                // The settings the admission itself runs on — whether the form is
+                // open, what it costs, the cutoff and the letter — sit with the work
+                // they belong to rather than under Settings, which is where the
+                // office went looking for them and did not find them.
+                ['route' => 'admin.settings.admissions', 'label' => 'Admissions settings', 'icon' => 'sliders', 'can' => 'settings.manage',
+                    'matches' => ['admin.settings.admissions']],
             ],
             'Students & Results' => [
                 // The module the office listed for us, in their order. Every one of
@@ -107,7 +114,18 @@ class AdminMenu
             ],
             'Administration' => [
                 ['route' => 'admin.users.*', 'label' => 'Staff & roles', 'icon' => 'shield', 'can' => 'users.manage'],
-                ['route' => 'admin.settings.*', 'label' => 'Settings', 'icon' => 'cog', 'can' => 'settings.manage'],
+
+                // `matches` is spelled out rather than left as `admin.settings.*`,
+                // because that would also light this up on the admissions settings,
+                // which are no longer settings in the sense this entry means.
+                ['route' => 'admin.settings.*', 'label' => 'Settings', 'icon' => 'cog', 'can' => 'settings.manage',
+                    'matches' => [
+                        'admin.settings.index',
+                        'admin.settings.update',
+                        'admin.settings.sequences.update',
+                        'admin.settings.academic.*',
+                    ]],
+
                 ['route' => 'admin.activity.*', 'label' => 'Activity log', 'icon' => 'clock', 'can' => 'audit.view'],
             ],
         ];

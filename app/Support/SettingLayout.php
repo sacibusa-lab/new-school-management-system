@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Setting;
 use Illuminate\Support\Collection;
 
 /**
@@ -31,6 +32,8 @@ class SettingLayout
      *
      * Who we are, then the numbers we hand out, then the admission journey, then
      * the money, then the results. This is the order a school sets itself up in.
+     *
+     * It is one list whatever page a group ends up on — see PAGES for that.
      */
     public const GROUPS = [
         'branding' => 'School branding',
@@ -41,6 +44,21 @@ class SettingLayout
         'fees' => 'Fees',
         'results' => 'Results',
         'general' => 'General',
+    ];
+
+    /**
+     * Which groups are set up on a page of their own.
+     *
+     * Admissions and the letter that goes out with an offer are a sitting's work:
+     * the office opens the application, sets the cutoff and the fee, and writes the
+     * letter it will send. On one long page that is something to scroll past on the
+     * way to the school's logo, which is how the office found it.
+     *
+     * A group not named here — including one this file has never heard of — belongs
+     * to the general page, so nothing can be saved into invisibility.
+     */
+    public const PAGES = [
+        'admissions' => ['admissions', 'letters'],
     ];
 
     /**
@@ -125,6 +143,18 @@ class SettingLayout
         return self::GROUPS[$group] ?? ucfirst($group);
     }
 
+    /** The page a group is set up on. Anything not declared belongs to the general one. */
+    public static function pageFor(string $group): string
+    {
+        foreach (self::PAGES as $page => $groups) {
+            if (in_array($group, $groups, true)) {
+                return $page;
+            }
+        }
+
+        return 'general';
+    }
+
     /** Whether a field should span the row rather than sit in one column. */
     public static function isWide(string $key): bool
     {
@@ -134,12 +164,21 @@ class SettingLayout
     /**
      * The whole page, in the order it is drawn.
      *
-     * @param  Collection<string,Collection<int,\App\Models\Setting>>  $settings  grouped by group key
-     * @return array<int,array{key:string,label:string,items:Collection<int,\App\Models\Setting>}>
+     * With no page named, every group is drawn — which is what the tests of the
+     * arrangement want, and what a caller showing everything would use. Naming one
+     * narrows it to that page's groups.
+     *
+     * @param  Collection<string,Collection<int,Setting>>  $settings  grouped by group key
+     * @return array<int,array{key:string,label:string,items:Collection<int,Setting>}>
      */
-    public static function arrange(Collection $settings): array
+    public static function arrange(Collection $settings, ?string $page = null): array
     {
         return self::groupOrder($settings->keys())
+            ->when(
+                $page !== null,
+                fn (Collection $groups) => $groups->filter(fn (string $group) => self::pageFor($group) === $page),
+            )
+            ->values()
             ->map(fn (string $group) => [
                 'key' => $group,
                 'label' => self::headingFor($group),
@@ -171,8 +210,8 @@ class SettingLayout
     /**
      * One group's fields, in order.
      *
-     * @param  Collection<int,\App\Models\Setting>  $items
-     * @return Collection<int,\App\Models\Setting>
+     * @param  Collection<int,Setting>  $items
+     * @return Collection<int,Setting>
      */
     public static function fieldsIn(Collection $items, string $group): Collection
     {
