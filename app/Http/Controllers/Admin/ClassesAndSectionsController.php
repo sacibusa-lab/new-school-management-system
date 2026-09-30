@@ -43,8 +43,7 @@ class ClassesAndSectionsController extends Controller
             ->get()
             ->groupBy('level_id');
 
-        // The pencil in the list opens this same form with that class in it, so the
-        // page is one screen for the job rather than a second screen for editing.
+        // The pencil in the list opens this same screen on its Edit tab.
         $editing = $request->integer('edit')
             ? SchoolLevel::query()->find($request->integer('edit'))
             : null;
@@ -56,7 +55,9 @@ class ClassesAndSectionsController extends Controller
             'levels' => SchoolLevel::query()->orderBy('order')->orderBy('name')->get(),
             'classes' => $classes,
             'editing' => $editing,
-            'tab' => $request->string('tab')->value() === 'section' ? 'section' : 'class',
+            'tab' => $editing !== null
+                ? 'edit'
+                : ($request->string('tab')->value() === 'section' ? 'section' : 'class'),
         ]);
     }
 
@@ -129,13 +130,22 @@ class ClassesAndSectionsController extends Controller
         return back()->with('status', "Class {$level->name} deleted.");
     }
 
-    /** The pencil in the class list: rename it, and its classes follow. */
+    /**
+     * The Edit tab, in one submit: the name, and the sections it should have.
+     *
+     * A name that is already taken stops the whole thing — there is no sense in half
+     * a rename. A section that cannot be dropped does not: the refusal is reported and
+     * the rest of the form is saved, because a class holding children in one section
+     * is no reason to refuse its rename.
+     */
     public function updateClass(Request $request, SchoolLevel $level): RedirectResponse
     {
         $this->authorize('academics.manage');
 
         $validated = $request->validate([
             'class_name' => ['required', 'string', 'max:20'],
+            'sections' => ['array'],
+            'sections.*' => ['integer', 'exists:sections,id'],
         ]);
 
         try {
@@ -144,7 +154,13 @@ class ClassesAndSectionsController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', "Class renamed to {$level->refresh()->name}.");
+        $refused = $this->structure->syncSections($level, $validated['sections'] ?? [], $request->user());
+
+        if ($refused !== []) {
+            return back()->with('warning', implode(' ', $refused));
+        }
+
+        return back()->with('status', "{$level->refresh()->name} saved.");
     }
 
     /* ------------------------------------------------------------------ */

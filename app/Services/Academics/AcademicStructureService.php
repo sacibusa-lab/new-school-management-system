@@ -176,6 +176,49 @@ class AcademicStructureService
     }
 
     /**
+     * The sections a class should have, once the Edit form has been filled in.
+     *
+     * Ticked sections it has not got are added; the ones it has that were unticked
+     * are removed. A removal that something is written against is refused — and the
+     * reason is returned rather than thrown, because the rest of the form is still
+     * worth saving: renaming a class and dropping one empty section of it should not
+     * be undone because a third section is holding children.
+     *
+     * @param  array<int,int>  $sectionIds  The sections the class should end up with.
+     * @return array<int,string> Why each section that stayed, stayed.
+     */
+    public function syncSections(SchoolLevel $level, array $sectionIds, ?User $actor = null): array
+    {
+        $wanted = Section::query()->whereIn('id', $sectionIds)->pluck('id')->all();
+
+        foreach ($wanted as $id) {
+            if ($level->classes()->where('section_id', $id)->exists()) {
+                continue;
+            }
+
+            if ($section = Section::query()->find($id)) {
+                $this->addClass($level, $section, $actor);
+            }
+        }
+
+        $refused = [];
+
+        foreach ($level->classes()->with('section')->get() as $class) {
+            if (in_array($class->section_id, $wanted, true)) {
+                continue;
+            }
+
+            try {
+                $this->deleteClass($class);
+            } catch (RuntimeException $e) {
+                $refused[] = $e->getMessage();
+            }
+        }
+
+        return $refused;
+    }
+
+    /**
      * A class name with nothing written against it, and none of its classes
      * holding anything, can go — and takes its classes with it, which is what
      * deleting the name of a class means.

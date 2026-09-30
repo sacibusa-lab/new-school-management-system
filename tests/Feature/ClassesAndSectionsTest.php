@@ -263,7 +263,7 @@ class ClassesAndSectionsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Renaming a class                                                    */
+    /* Renaming a class */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -279,7 +279,11 @@ class ClassesAndSectionsTest extends TestCase
         $this->class($level, $b, 'JSS1B');
 
         $this->actingAs($this->admin)
-            ->put(route('admin.students-results.academics.classes.names.update', $level), ['class_name' => 'JSS2'])
+            ->put(route('admin.students-results.academics.classes.names.update', $level), [
+                'class_name' => 'JSS2',
+                // Both sections are kept: the form submits the set it should end up with.
+                'sections' => [$a->id, $b->id],
+            ])
             ->assertSessionHas('status');
 
         $this->assertSame('JSS2', $level->refresh()->name);
@@ -287,32 +291,101 @@ class ClassesAndSectionsTest extends TestCase
     }
 
     /**
-     * The pencil opens the same form with that class in it, which is what the office
-     * asked for: one screen for the job rather than a second one for editing.
+     * The pencil opens an Edit Class tab with that row in it: the name, and the
+     * sections it has as tags.
      */
-    public function test_the_pencil_loads_that_class_into_the_form(): void
+    public function test_the_pencil_opens_the_edit_tab_with_that_class_in_it(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $this->class($level, $a, 'JSS1A');
+        $this->class($level, $b, 'JSS1B');
 
         $this->actingAs($this->admin)
             ->get(route('admin.students-results.academics.classes', ['edit' => $level->id]))
             ->assertOk()
             ->assertSee('Edit Class')
+            ->assertSee('Update')
             ->assertSee('value="JSS1"', false)
-            ->assertDontSee('Create Class');
+            // The sections it has are in the tag box, and the ones it has not are in
+            // the picker for adding them.
+            ->assertSee('name="sections[]"', false)
+            ->assertSee('+ add a section')
+            // It opens on the Edit tab. The other two are still in the page, hidden
+            // behind the tabs, so what says "this is the one showing" is the form that
+            // carries the section set.
+            ->assertSee("tab: 'edit'", false)
+            ->assertSee('form="edit-class"', false);
+    }
+
+    /**
+     * Update is one submit: the name, and the sections the class should end up with.
+     * Adding a section here is the same act as adding it from the Class tab, and
+     * dropping a tag is the same act as deleting that class.
+     */
+    public function test_update_renames_the_class_and_sets_which_sections_it_has(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $c = Section::create(['name' => 'C', 'order' => 3]);
+        $this->class($level, $a, 'JSS1A');
+        $this->class($level, $b, 'JSS1B');
+
+        // Renamed, B dropped, C added.
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.academics.classes.names.update', $level), [
+                'class_name' => 'JSS2',
+                'sections' => [$a->id, $c->id],
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertSame('JSS2', $level->refresh()->name);
+        $this->assertSame(['JSS2A', 'JSS2C'], SchoolClass::query()->orderBy('name')->pluck('name')->all());
+    }
+
+    /**
+     * A section that cannot be dropped is reported and the rest of the form is saved:
+     * one class holding children is no reason to refuse the rename next to it.
+     */
+    public function test_a_section_that_cannot_be_dropped_is_reported_and_the_rest_is_saved(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $classA = $this->class($level, $a, 'JSS1A');
+        $this->class($level, $b, 'JSS1B');
+        $this->student($classA, $level);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.students-results.academics.classes.names.update', $level), [
+                'class_name' => 'JSS2',
+                // Both sections are being dropped; A holds the child.
+                'sections' => [],
+            ])
+            ->assertSessionHas('warning', 'JSS2A still holds 1 student. Move them before deleting the class.');
+
+        // The rename and the empty section's removal went through.
+        $this->assertSame('JSS2', $level->refresh()->name);
+        $this->assertSame(['JSS2A'], SchoolClass::query()->pluck('name')->all());
     }
 
     public function test_renaming_a_class_onto_another_name_is_refused(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         SchoolLevel::create(['name' => 'JSS2', 'order' => 2]);
-        $this->class($level, Section::create(['name' => 'A', 'order' => 1]), 'JSS1A');
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $this->class($level, $a, 'JSS1A');
 
         $this->actingAs($this->admin)
-            ->put(route('admin.students-results.academics.classes.names.update', $level), ['class_name' => 'JSS2'])
+            ->put(route('admin.students-results.academics.classes.names.update', $level), [
+                'class_name' => 'JSS2',
+                'sections' => [],
+            ])
             ->assertSessionHas('error', 'JSS2 is already there.');
 
-        // Nothing moved: the class and its class are as they were.
+        // Nothing moved: not the name, and not the section that was being dropped.
         $this->assertSame('JSS1', $level->refresh()->name);
         $this->assertSame(['JSS1A'], SchoolClass::query()->pluck('name')->all());
     }

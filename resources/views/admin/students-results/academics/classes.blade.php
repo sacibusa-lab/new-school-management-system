@@ -4,99 +4,92 @@
 
 @section('content')
 
+@php
+    // What the Edit tab's tag box needs: every section, and the ones this class has.
+    $allSections = $sections->map(fn ($section) => ['id' => $section->id, 'name' => $section->name])->values();
+    $chosen = $editing ? ($classes->get($editing->id)?->pluck('section_id')->all() ?? []) : [];
+@endphp
+
 {{--
-    A class is a class name and a section put together, and the sections have to exist
-    first — so this is two tabs, and the Section tab is the one that answers "there is
-    nothing in the dropdown".
+    One card, with the tabs across its top: a class is a class name and a section put
+    together, and the sections have to exist first, so the Section tab is the one that
+    answers "there is nothing in the dropdown".
 --}}
-<div x-data="{ tab: '{{ $tab }}' }">
+<div class="card overflow-hidden" x-data="{ tab: '{{ $tab }}' }">
 
     {{-- ================= Tabs ================= --}}
-    <div class="border-b border-line">
+    <div class="border-b border-line px-6 pt-4">
         <div class="flex gap-8">
-            @foreach ([['class', 'Class', 'academic'], ['section', 'Section', 'cog']] as [$key, $label, $icon])
+            @php
+                $tabs = [['class', 'Class', 'academic'], ['section', 'Section', 'cog']];
+
+                if ($editing) {
+                    $tabs[] = ['edit', 'Edit Class', 'pencil'];
+                }
+            @endphp
+
+            @foreach ($tabs as [$key, $label, $icon])
                 <button type="button"
                         @click="tab = '{{ $key }}'"
                         :class="tab === '{{ $key }}'
                             ? 'border-gold-400 text-ink'
                             : 'border-transparent text-muted hover:text-ink-soft'"
-                        class="flex items-center gap-2 border-b-2 pb-3 text-sm font-medium transition-colors">
+                        class="relative flex items-center gap-2 border-b-2 pb-3 text-sm font-medium transition-colors">
                     <x-nav-icon :name="$icon" class="h-4 w-4" />
                     <span>{{ $label }}</span>
+
+                    @if ($key === 'edit')
+                        <span class="absolute -bottom-1.5 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-gold-400"></span>
+                    @endif
                 </button>
             @endforeach
         </div>
     </div>
 
     {{-- ================= Class ================= --}}
-    <div x-show="tab === 'class'" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <div x-show="tab === 'class'" class="grid grid-cols-1 gap-6 p-6 lg:grid-cols-12">
 
-        {{-- Create, or edit the row the pencil was clicked on --}}
-        <div class="card self-start p-5 lg:col-span-4">
+        <div class="self-start rounded-xl border border-line p-5 lg:col-span-4">
             <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
                 <x-nav-icon name="pencil" class="h-4 w-4 text-ink-soft" />
-                <h2 class="text-base font-semibold text-ink">{{ $editing ? 'Edit Class' : 'Create Class' }}</h2>
+                <h2 class="text-base font-semibold text-ink">Create Class</h2>
             </div>
 
-            @if ($editing)
-                <form method="POST" action="{{ route('admin.students-results.academics.classes.names.update', $editing) }}" class="space-y-4">
-                    @csrf
-                    @method('PUT')
+            <form method="POST" action="{{ route('admin.students-results.academics.classes.names.store') }}" class="space-y-4">
+                @csrf
 
-                    <x-field name="class_name" label="Name" required :value="$editing->name" />
+                <x-field name="class_name" label="Name" placeholder="JSS1" required />
+
+                @if ($sections->isEmpty())
+                    <div>
+                        <label class="label">Section <span class="text-rose-500">*</span></label>
+                        <div class="input text-muted">No sections yet</div>
+                        <p class="hint">
+                            Create one on the <strong>Section</strong> tab first — a class is a class name
+                            and a section put together.
+                        </p>
+                    </div>
+                @else
+                    <x-field name="section_id" label="Section" type="select" required
+                             :placeholder-option="false"
+                             :options="$sections->pluck('name', 'id')->all()" />
 
                     <p class="hint">
-                        Its classes are renamed with it —
-                        {{ $classes->get($editing->id)?->pluck('name')->implode(', ') ?: 'it has none yet' }}.
+                        Type the class name and pick the section: JSS1 and A make JSS1A. Pick another
+                        section later to add JSS1B.
                     </p>
+                @endif
 
-                    <div class="flex items-center justify-end gap-3 pt-2">
-                        <a href="{{ route('admin.students-results.academics.classes') }}" class="text-xs text-muted hover:text-ink-soft">Cancel</a>
-
-                        <button type="submit" class="btn-secondary btn-sm">
-                            <x-nav-icon name="check" class="h-3.5 w-3.5" />
-                            Update
-                        </button>
-                    </div>
-                </form>
-            @else
-                <form method="POST" action="{{ route('admin.students-results.academics.classes.names.store') }}" class="space-y-4">
-                    @csrf
-
-                    <x-field name="class_name" label="Name" placeholder="JSS1" required />
-
-                    @if ($sections->isEmpty())
-                        <div>
-                            <label class="label">Section <span class="text-rose-500">*</span></label>
-                            <div class="input text-muted">No sections yet</div>
-                            <p class="hint">
-                                Create one on the <strong>Section</strong> tab first — a class is a class name
-                                and a section put together.
-                            </p>
-                        </div>
-                    @else
-                        <x-field name="section_id" label="Section" type="select" required
-                                 :placeholder-option="false"
-                                 :options="$sections->pluck('name', 'id')->all()" />
-
-                        <p class="hint">
-                            Type the class name and pick the section: JSS1 and A make JSS1A. Pick another
-                            section later to add JSS1B.
-                        </p>
-                    @endif
-
-                    <div class="flex justify-end pt-2">
-                        <button type="submit" class="btn-secondary btn-sm">
-                            <x-nav-icon name="check" class="h-3.5 w-3.5" />
-                            Save
-                        </button>
-                    </div>
-                </form>
-            @endif
+                <div class="flex justify-end pt-2">
+                    <button type="submit" class="btn-secondary btn-sm">
+                        <x-nav-icon name="check" class="h-3.5 w-3.5" />
+                        Save
+                    </button>
+                </div>
+            </form>
         </div>
 
-        {{-- Class List --}}
-        <div class="card self-start p-5 lg:col-span-8">
+        <div class="self-start rounded-xl border border-line p-5 lg:col-span-8">
             <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
                 <x-nav-icon name="list" class="h-4 w-4 text-ink-soft" />
                 <h2 class="text-base font-semibold text-ink">Class List</h2>
@@ -173,9 +166,9 @@
     </div>
 
     {{-- ================= Section ================= --}}
-    <div x-show="tab === 'section'" x-cloak class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <div x-show="tab === 'section'" x-cloak class="grid grid-cols-1 gap-6 p-6 lg:grid-cols-12">
 
-        <div class="card self-start p-5 lg:col-span-4">
+        <div class="self-start rounded-xl border border-line p-5 lg:col-span-4">
             <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
                 <x-nav-icon name="cog" class="h-4 w-4 text-ink-soft" />
                 <h2 class="text-base font-semibold text-ink">Create Section</h2>
@@ -196,7 +189,7 @@
             </form>
         </div>
 
-        <div class="card self-start p-5 lg:col-span-8">
+        <div class="self-start rounded-xl border border-line p-5 lg:col-span-8">
             <div class="mb-5 flex items-center gap-2 border-b border-line-soft pb-3">
                 <x-nav-icon name="list" class="h-4 w-4 text-ink-soft" />
                 <h2 class="text-base font-semibold text-ink">Section List</h2>
@@ -247,6 +240,97 @@
             </div>
         </div>
     </div>
+
+    {{-- ================= Edit Class ================= --}}
+    @if ($editing)
+        <div x-show="tab === 'edit'" class="px-6 py-12">
+            <form id="edit-class" method="POST"
+                  action="{{ route('admin.students-results.academics.classes.names.update', $editing) }}"
+                  class="mx-auto max-w-2xl space-y-8"
+                  x-data="{
+                      all: {{ Js::from($allSections) }},
+                      chosen: [],
+                      init() {
+                          const current = {{ Js::from($chosen) }};
+                          this.chosen = this.all.filter(section => current.includes(section.id));
+                      },
+                      get spare() {
+                          return this.all.filter(section => ! this.chosen.some(tag => tag.id === section.id));
+                      },
+                      take(event) {
+                          const id = parseInt(event.target.value, 10);
+                          if (id) { this.chosen.push(this.all.find(section => section.id === id)); }
+                          event.target.value = '';
+                      },
+                      drop(id) { this.chosen = this.chosen.filter(tag => tag.id !== id); },
+                  }">
+                @csrf
+                @method('PUT')
+
+                {{-- Name --}}
+                <div class="flex items-center">
+                    <label for="class_name" class="w-1/4 pr-6 text-right text-sm font-medium text-ink-soft">
+                        Name <span class="text-rose-500">*</span>
+                    </label>
+
+                    <div class="w-3/4">
+                        <input id="class_name" name="class_name" type="text" required
+                               value="{{ old('class_name', $editing->name) }}"
+                               class="input @error('class_name') input-error @enderror">
+
+                        @error('class_name')
+                            <p class="error-text">{{ $message }}</p>
+                        @enderror
+
+                        <p class="hint">Its classes are renamed with it.</p>
+                    </div>
+                </div>
+
+                {{-- Section --}}
+                <div class="flex items-center">
+                    <label for="section-picker" class="w-1/4 pr-6 text-right text-sm font-medium text-ink-soft">Section</label>
+
+                    <div class="w-3/4">
+                        <div class="flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface p-1.5">
+                            <template x-for="tag in chosen" :key="tag.id">
+                                <span class="inline-flex items-center rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-soft">
+                                    <button type="button" @click="drop(tag.id)"
+                                            class="mr-1 text-muted transition hover:text-rose-600"
+                                            :title="'Remove ' + tag.name">&times;</button>
+                                    <span x-text="tag.name"></span>
+                                    <input type="hidden" name="sections[]" :value="tag.id">
+                                </span>
+                            </template>
+
+                            <select id="section-picker" @change="take($event)"
+                                    class="rounded-lg border-0 bg-transparent py-1 pr-6 pl-1 text-xs text-muted focus:ring-0">
+                                <option value="">+ add a section</option>
+                                <template x-for="section in spare" :key="section.id">
+                                    <option :value="section.id" x-text="section.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <p class="hint">
+                            Removing a section deletes that class — JSS1E — if nothing is written
+                            against it yet.
+                        </p>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="flex items-center justify-center gap-4 rounded-b-2xl border-t border-line-soft bg-surface-2 py-4">
+            <button type="submit" form="edit-class" class="btn-secondary btn-sm">
+                <x-nav-icon name="check" class="h-3.5 w-3.5" />
+                Update
+            </button>
+
+            <a href="{{ route('admin.students-results.academics.classes') }}" class="text-xs text-muted hover:text-ink-soft">
+                Cancel
+            </a>
+        </div>
+    @endif
 </div>
 
 @endsection
