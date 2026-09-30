@@ -49,6 +49,8 @@ class BreadcrumbTest extends TestCase
             'admin.exams.index' => ['Admissions', 'Examinations'],
             'admin.exams.create' => ['Admissions', 'Examinations', 'New examination'],
             'admin.scores.index' => ['Admissions', 'Score entry'],
+            // Its own place in the menu, under the section it belongs to.
+            'admin.admissions.printing' => ['Admissions', 'Printing'],
             'admin.settings.index' => ['Administration', 'Settings'],
             // Its own place in the menu, in the section it belongs to.
             'admin.settings.admissions' => ['Admissions', 'Admissions settings'],

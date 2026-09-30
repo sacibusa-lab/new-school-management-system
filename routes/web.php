@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\ExamController;
 use App\Http\Controllers\Admin\FeeController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\PrintingController;
 use App\Http\Controllers\Admin\ResultController;
 use App\Http\Controllers\Admin\ScoreEntryController;
 use App\Http\Controllers\Admin\ScoreImportController;
@@ -177,6 +178,11 @@ Route::middleware(['auth'])
 
         /* ---------------- Cutoff & admission decisions ---------------- */
         Route::get('admissions', [AdmissionController::class, 'index'])->name('admissions.index');
+
+        /* Where the office goes to print: every list the school hands out, in one
+           place, rather than on whichever desk happens to produce it. Declared
+           before the {exam} routes below, as a literal path. */
+        Route::get('admissions/printing', [PrintingController::class, 'index'])->name('admissions.printing');
         Route::put('admissions/settings/{level}', [AdmissionController::class, 'updateSetting'])->name('admissions.settings.update');
         Route::post('admissions/{exam}/compute', [AdmissionController::class, 'compute'])->name('admissions.compute');
         Route::post('admissions/{exam}/apply', [AdmissionController::class, 'apply'])->name('admissions.apply');

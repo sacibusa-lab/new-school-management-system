@@ -56,6 +56,7 @@ class SidebarTest extends TestCase
             // Settings is the general page, and the admissions settings hang off it.
             'admin.settings.index' => 'admin.settings.index',
             'admin.settings.admissions' => 'admin.settings.admissions',
+            'admin.admissions.printing' => 'admin.admissions.printing',
         ];
 
         foreach ($expected as $route => $marked) {
@@ -136,6 +137,23 @@ class SidebarTest extends TestCase
 
         // The active entry is drawn with a tinted background; Settings must not be.
         $this->assertStringNotContainsString('bg-white/10', $this->anchorIn($menu, route('admin.settings.index')));
+    }
+
+    /**
+     * Printing is not the cutoff desk, though both live under /admin/admissions —
+     * which is why the cutoff entry's `matches` is spelled out rather than left as
+     * a wildcard.
+     */
+    public function test_printing_does_not_light_up_the_cutoff_desk(): void
+    {
+        $menu = $this->menuOn(route('admin.admissions.printing'));
+
+        $this->assertStringContainsString(
+            'aria-current="page"',
+            $this->anchorIn($menu, route('admin.admissions.printing')),
+        );
+
+        $this->assertStringNotContainsString('bg-white/10', $this->anchorIn($menu, route('admin.admissions.index')));
     }
 
     /* ------------------------------------------------------------------ */

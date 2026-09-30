@@ -60,7 +60,28 @@ class AdminMenu
                 ['route' => 'admin.exams.*', 'label' => 'Examinations', 'icon' => 'clipboard', 'can' => 'exams.view'],
                 ['route' => 'admin.scores.*', 'label' => 'Score entry', 'icon' => 'pencil', 'can' => 'scores.enter'],
                 ['route' => 'admin.imports.*', 'label' => 'Scoresheet imports', 'icon' => 'upload', 'can' => 'scores.import'],
-                ['route' => 'admin.admissions.*', 'label' => 'Cutoff & decisions', 'icon' => 'scale', 'can' => 'admissions.decide'],
+                ['route' => 'admin.admissions.*', 'label' => 'Cutoff & decisions', 'icon' => 'scale', 'can' => 'admissions.decide',
+                    // Spelled out rather than left as `admin.admissions.*`, because
+                    // Printing lives under the same URL and is not the cutoff desk.
+                    'matches' => [
+                        'admin.admissions.index',
+                        'admin.admissions.settings.update',
+                        'admin.admissions.compute',
+                        'admin.admissions.apply',
+                        'admin.admissions.decision.override',
+                        'admin.admissions.enrol',
+                        'admin.admissions.merit',
+                        'admin.admissions.merit.csv',
+                        'admin.admissions.letters',
+                        'admin.admissions.waiting',
+                        'admin.admissions.waiting.promote',
+                        'admin.admissions.resit',
+                    ]],
+
+                // The paper that leaves the building, gathered in one place. The
+                // office asking "where do I print the admission list" should not have
+                // to know which desk produces it.
+                ['route' => 'admin.admissions.printing', 'label' => 'Printing', 'icon' => 'printer', 'can' => 'admissions.view'],
 
                 // The settings the admission itself runs on — whether the form is
                 // open, what it costs, the cutoff and the letter — sit with the work
