@@ -107,7 +107,10 @@ class StudentsResultsModuleTest extends TestCase
 
             $this->assertStringContainsString($href, $html, "The sidebar is missing {$page['label']}.");
 
-            $positions[] = strpos($html, '>'.$page['label'].'<');
+            // The link itself, not the label: a label is bare text in several
+            // places on a page, and matching on it made this assertion pass with
+            // every position false — that is, without checking the order at all.
+            $positions[] = strpos($html, 'href="'.$href.'"');
         }
 
         $sorted = $positions;
@@ -360,16 +363,26 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /**
-     * A trail of one item says only what the title under it already says, so a page
-     * at the top of the module declares no trail at all and gets none.
+     * The trail is read off the menu, so every page of the module has one — the
+     * pages that are not built yet included, because where a page sits is decided
+     * by the menu holding it rather than by the page having anything on it.
      */
-    public function test_a_page_with_nothing_above_it_draws_no_trail(): void
+    public function test_every_page_of_the_module_says_where_it_sits(): void
     {
-        foreach (['dashboard', 'check-result', 'pins', 'students', 'exam-master'] as $page) {
-            $this->actingAs($this->admin)
-                ->get(route('admin.students-results.'.$page))
+        foreach (StudentsResultsController::PAGES as $page) {
+            $html = $this->actingAs($this->admin)
+                ->get(route('admin.students-results.'.$page['key']))
                 ->assertOk()
-                ->assertDontSee('aria-label="Breadcrumb"', false);
+                ->getContent();
+
+            // Asserted first so the slice below cannot quietly fall back to the
+            // sidebar, whose own </nav> and section heading would answer for it.
+            $this->assertStringContainsString('aria-label="Breadcrumb"', $html, "{$page['label']} has no trail.");
+
+            $trail = str($html)->after('aria-label="Breadcrumb"')->before('</nav>')->value();
+
+            $this->assertStringContainsString('Students &amp; Results', $trail, "{$page['label']} has no trail.");
+            $this->assertStringContainsString($page['label'], $trail, "The trail does not name {$page['label']}.");
         }
     }
 }

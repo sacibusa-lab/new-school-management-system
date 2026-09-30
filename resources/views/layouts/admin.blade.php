@@ -18,6 +18,13 @@
 </head>
 <body class="h-full bg-surface-2" x-data="{ sidebar: false }">
 
+@php
+    // Named once, in a block rather than as @php(...): the inline form of this
+    // directive compiles to an opening tag PHP does not recognise, which swallows
+    // the markup after it and turns the whole page into an undefined variable.
+    $menu = \App\Support\AdminMenu::class;
+@endphp
+
 <div class="flex min-h-full">
 
     {{-- ================= Sidebar ================= --}}
@@ -43,80 +50,10 @@
 
         <nav class="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
             @php
-                // The menu is defined by the controller that owns the module, so a
-                // page's label, permission and children are declared once. Named in
-                // full because Blade has no use block of its own.
-                $module = \App\Http\Controllers\Admin\StudentsResultsController::class;
-
-                // A `*` route becomes its .index URL; a plain name is used as-is,
-                // so an entry can point at a create screen.
-                $href = fn (array $link) => str_contains($link['route'], '*')
-                    ? route(str_replace('.*', '.index', $link['route']))
-                    : route($link['route']);
-
-                // `matches` lets an item claim the exact routes it should light up
-                // for, so Register does not also highlight Applicants.
-                $isActive = fn (array $link) => request()->routeIs(...(array) ($link['matches'] ?? [$link['route']]));
-
-                $sections = [
-                    'Overview' => [
-                        ['route' => 'admin.dashboard', 'label' => 'Dashboard', 'icon' => 'home', 'can' => null],
-                    ],
-                    'Admissions' => [
-                        ['route' => 'admin.applicants.*', 'label' => 'Applicants', 'icon' => 'users', 'can' => 'admissions.view',
-                         'matches' => ['admin.applicants.index', 'admin.applicants.show', 'admin.applicants.edit']],
-
-                        ['route' => 'admin.applicants.create', 'label' => 'Register applicant', 'icon' => 'user-plus', 'can' => 'admissions.create',
-                         'matches' => ['admin.applicants.create', 'admin.applicants.import', 'admin.applicants.import.*']],
-
-                        ['route' => 'admin.exams.*', 'label' => 'Examinations', 'icon' => 'clipboard', 'can' => 'exams.view'],
-                        ['route' => 'admin.scores.*', 'label' => 'Score entry', 'icon' => 'pencil', 'can' => 'scores.enter'],
-                        ['route' => 'admin.imports.*', 'label' => 'Scoresheet imports', 'icon' => 'upload', 'can' => 'scores.import'],
-                        ['route' => 'admin.admissions.*', 'label' => 'Cutoff & decisions', 'icon' => 'scale', 'can' => 'admissions.decide'],
-                    ],
-                    'Students & Results' => [
-                        // The module the office listed for us, in their order. Every
-                        // one of these is built one at a time; until its turn comes it
-                        // is a blank page that says so, never a link that errors.
-                        ['route' => 'admin.students-results.dashboard', 'label' => 'Dashboard', 'icon' => 'grid', 'can' => 'results.view'],
-                        ['route' => 'admin.students-results.check-result', 'label' => 'Check Result', 'icon' => 'search', 'can' => 'results.check'],
-                        ['route' => 'admin.students-results.performance', 'label' => 'Performance Analytics', 'icon' => 'chart', 'can' => 'results.analytics'],
-                        ['route' => 'admin.students-results.pins', 'label' => 'Generate Pin', 'icon' => 'key', 'can' => 'results.pins'],
-                        ['route' => 'admin.students-results.students', 'label' => 'Students Details', 'icon' => 'academic', 'can' => 'students.view'],
-                        ['route' => 'admin.students-results.employees', 'label' => 'Employee', 'icon' => 'briefcase', 'can' => 'employees.manage'],
-                        ['route' => 'admin.students-results.academics', 'label' => 'Academic', 'icon' => 'book', 'can' => 'academics.manage',
-                         // Academic is a section in its own right: the four pages it
-                         // holds are drawn underneath it, from the same list the
-                         // page itself uses.
-                         'matches' => ['admin.students-results.academics', 'admin.students-results.academics.*'],
-                         'children' => $module::ACADEMIC_PAGES],
-                        ['route' => 'admin.students-results.exam-master', 'label' => 'Exam Master', 'icon' => 'clipboard-check', 'can' => 'exams.manage'],
-                        ['route' => 'admin.students-results.attendance', 'label' => 'Attendance', 'icon' => 'calendar', 'can' => 'attendance.manage'],
-                        ['route' => 'admin.students-results.reports', 'label' => 'Reports', 'icon' => 'report', 'can' => 'reports.view'],
-                        ['route' => 'admin.students-results.alumni', 'label' => 'Alumni', 'icon' => 'rosette', 'can' => 'alumni.manage'],
-                        ['route' => 'admin.students-results.settings', 'label' => 'Settings', 'icon' => 'sliders', 'can' => 'settings.manage'],
-                    ],
-                    'Fees' => [
-                        ['route' => 'admin.fees.categories.*', 'label' => 'Fee categories', 'icon' => 'tag', 'can' => 'fees.manage'],
-                        ['route' => 'admin.fees.structures.*', 'label' => 'Fee structures', 'icon' => 'list', 'can' => 'fees.manage'],
-                        ['route' => 'admin.invoices.*', 'label' => 'Invoices', 'icon' => 'receipt', 'can' => 'fees.view'],
-                        ['route' => 'admin.payments.*', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view'],
-                    ],
-                    'Communication' => [
-                        ['route' => 'admin.sms.center', 'label' => 'SMS center', 'icon' => 'chat', 'can' => 'sms.view',
-                         'matches' => ['admin.sms.center']],
-
-                        // `matches` is spelled out because admin.sms.* would also
-                        // light this up on the SMS centre screen.
-                        ['route' => 'admin.sms.*', 'label' => 'Text messages', 'icon' => 'envelope', 'can' => 'sms.view',
-                         'matches' => ['admin.sms.index', 'admin.sms.batch', 'admin.sms.batch.store', 'admin.sms.templates', 'admin.sms.templates.*']],
-                    ],
-                    'Administration' => [
-                        ['route' => 'admin.users.*', 'label' => 'Staff & roles', 'icon' => 'shield', 'can' => 'users.manage'],
-                        ['route' => 'admin.settings.*', 'label' => 'Settings', 'icon' => 'cog', 'can' => 'settings.manage'],
-                        ['route' => 'admin.activity.*', 'label' => 'Activity log', 'icon' => 'clock', 'can' => 'audit.view'],
-                    ],
-                ];
+                // The menu itself lives in App\Support\AdminMenu, because the trail
+                // above a page is derived from it: drawn from one place, read from
+                // two, so the sidebar and the breadcrumb cannot disagree.
+                $sections = $menu::sections();
             @endphp
 
             @foreach ($sections as $heading => $links)
@@ -137,11 +74,11 @@
                                 @endphp
 
                                 <li>
-                                    <a href="{{ $href($link) }}"
+                                    <a href="{{ $menu::href($link) }}"
                                        @class([
                                            'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                                           'bg-white/10 text-white ring-1 ring-white/15' => $isActive($link),
-                                           'text-brand-200 hover:bg-white/5 hover:text-white' => ! $isActive($link),
+                                           'bg-white/10 text-white ring-1 ring-white/15' => $menu::isActive($link),
+                                           'text-brand-200 hover:bg-white/5 hover:text-white' => ! $menu::isActive($link),
                                        ])>
                                         <x-nav-icon :name="$link['icon']" />
                                         {{ $link['label'] }}
@@ -150,7 +87,7 @@
                                     {{-- Shown only while you are inside the section, so the
                                          sidebar stays the length the office judged it to be.
                                          The child pages are reached by opening the parent. --}}
-                                    @if ($children->isNotEmpty() && $isActive($link))
+                                    @if ($children->isNotEmpty() && $menu::isActive($link))
                                         <ul class="mt-0.5 ml-5 space-y-0.5 border-l border-white/10 pl-3">
                                             @foreach ($children as $child)
                                                 <li>
@@ -206,15 +143,8 @@
                     {{ trim($__env->yieldContent('title')) ?: 'Dashboard' }}
                 </p>
 
-                {{-- A page deep enough to have a way back says where it sits; the
-                     rest say what they are. Never both: the trail already names the
-                     page above this one, which is all the subtitle would repeat. --}}
-                @if (! empty($breadcrumbs))
-                    <x-breadcrumb :trail="$breadcrumbs" class="mt-0.5 truncate" />
-                @else
-                    @hasSection('subtitle')
-                        <p class="truncate text-xs text-muted">@yield('subtitle')</p>
-                    @endif
+                @hasSection('subtitle')
+                    <p class="truncate text-xs text-muted">@yield('subtitle')</p>
                 @endif
             </div>
 
@@ -257,6 +187,12 @@
         </header>
 
         <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+            {{-- Where this page sits. Read from the menu rather than declared per
+                 page, so it is right on every page that the menu holds and simply
+                 absent on the few it does not. --}}
+            <x-breadcrumb class="mb-5"
+                          :trail="$menu::trailFor(request()->route()?->getName(), trim($__env->yieldContent('title')))" />
+
             @if (session('status'))
                 <div class="mb-6"><x-alert tone="success">{{ session('status') }}</x-alert></div>
             @endif

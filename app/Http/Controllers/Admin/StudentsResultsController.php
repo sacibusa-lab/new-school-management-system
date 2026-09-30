@@ -123,10 +123,7 @@ class StudentsResultsController extends Controller
      */
     public function academics(): View
     {
-        return $this->placeholder('academics', [
-            'children' => self::ACADEMIC_PAGES,
-            'breadcrumbs' => $this->academicTrail(),
-        ]);
+        return $this->placeholder('academics', ['children' => self::ACADEMIC_PAGES]);
     }
 
     public function academicClasses(): View
@@ -209,34 +206,6 @@ class StudentsResultsController extends Controller
 
         $this->authorize('academics.manage');
 
-        return view('admin.students-results.academics.'.$key, [
-            'page' => $page,
-            'breadcrumbs' => $this->academicTrail($page),
-        ]);
-    }
-
-    /**
-     * The way back up from Academic and the pages under it.
-     *
-     * Only pages that sit under something get one: a trail of a single item is not
-     * a trail, so a page of the menu itself declares its title and nothing else.
-     * The last crumb is where you are and carries no route, because the view draws
-     * it as text rather than as a link to a page you are already on.
-     *
-     * @param  array{label:string}|null  $child  The page under Academic, if any.
-     * @return array<int,array{label:string,route:?string}>
-     */
-    protected function academicTrail(?array $child = null): array
-    {
-        $trail = [
-            ['label' => 'Students & Results', 'route' => 'admin.students-results.dashboard'],
-            ['label' => 'Academic', 'route' => 'admin.students-results.academics'],
-        ];
-
-        if ($child !== null) {
-            $trail[] = ['label' => $child['label'], 'route' => null];
-        }
-
-        return $trail;
+        return view('admin.students-results.academics.'.$key, ['page' => $page]);
     }
 }

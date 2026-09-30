@@ -22,10 +22,11 @@
                         <x-nav-icon name="chevron-right" class="h-3 w-3 text-muted" />
                     @endunless
 
-                    @if ($loop->last || empty($crumb['route']))
-                        {{-- Where you are is not a link: a link to this page is a way
-                             out that leads nowhere. --}}
-                        <span class="font-medium text-ink-soft" aria-current="page">{{ $crumb['label'] }}</span>
+                    @if ($loop->last || empty($crumb['route']) || request()->routeIs($crumb['route']))
+                        {{-- Where you are is not a link, and neither is a crumb that
+                             happens to point at this very page: a way out that leads
+                             nowhere is worse than no way out. --}}
+                        <span class="font-medium text-ink-soft" @if ($loop->last) aria-current="page" @endif>{{ $crumb['label'] }}</span>
                     @else
                         <a href="{{ route($crumb['route']) }}" class="transition-colors hover:text-ink-soft">{{ $crumb['label'] }}</a>
                     @endif
