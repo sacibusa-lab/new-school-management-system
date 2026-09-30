@@ -44,6 +44,51 @@ class StudentsResultsController extends Controller
         ['key' => 'settings', 'label' => 'Settings', 'icon' => 'sliders', 'permission' => 'settings.manage'],
     ];
 
+    /**
+     * The pages that hang off Academic, in the order the office listed them.
+     *
+     * Kept beside PAGES rather than inside it because they are a second level: the
+     * sidebar draws them underneath Academic, and the Academic page draws them as
+     * the four things it is made of. One list, so the two cannot drift apart — an
+     * item added here appears in both places.
+     *
+     * All four answer to the permission of the page they hang off. They are one
+     * subject — how the school is organised — and splitting that into four
+     * permissions would make a menu nobody could be given half of.
+     *
+     * @var array<int,array{key:string,route:string,label:string,icon:string,note:string}>
+     */
+    public const ACADEMIC_PAGES = [
+        [
+            'key' => 'classes',
+            'route' => 'admin.students-results.academics.classes',
+            'label' => 'Classes & Sections',
+            'icon' => 'grid',
+            'note' => 'The classes the school runs — JSS1A, JSS1B, SS2 Science — with the form teacher in each and the space a class holds.',
+        ],
+        [
+            'key' => 'subjects',
+            'route' => 'admin.students-results.academics.subjects',
+            'label' => 'Subjects',
+            'icon' => 'list',
+            'note' => 'Every subject the school teaches and the code each one is known by, so a mark entered once can be found again on the report card.',
+        ],
+        [
+            'key' => 'schedule',
+            'route' => 'admin.students-results.academics.schedule',
+            'label' => 'Class schedule',
+            'icon' => 'calendar',
+            'note' => 'Which subject a class sits, on which day and at which period, and the teacher taking it — the timetable the term runs on.',
+        ],
+        [
+            'key' => 'promotion',
+            'route' => 'admin.students-results.academics.promotion',
+            'label' => 'Promotion',
+            'icon' => 'refresh',
+            'note' => 'Moving a class on at the end of a session: who goes up, who repeats the year, and who has left the school.',
+        ],
+    ];
+
     public function dashboard(): View
     {
         return $this->placeholder('dashboard');
@@ -69,9 +114,39 @@ class StudentsResultsController extends Controller
         return $this->placeholder('employees');
     }
 
+    /**
+     * Academic, and the four pages that hang off it.
+     *
+     * The page itself is a list of its own four children rather than a placeholder;
+     * a page with nothing on it but the word "Academic" tells the office nothing
+     * about what Academic holds.
+     */
     public function academics(): View
     {
-        return $this->placeholder('academics');
+        return $this->placeholder('academics', [
+            'children' => self::ACADEMIC_PAGES,
+            'breadcrumbs' => $this->academicTrail(),
+        ]);
+    }
+
+    public function academicClasses(): View
+    {
+        return $this->academicPage('classes');
+    }
+
+    public function academicSubjects(): View
+    {
+        return $this->academicPage('subjects');
+    }
+
+    public function academicSchedule(): View
+    {
+        return $this->academicPage('schedule');
+    }
+
+    public function academicPromotion(): View
+    {
+        return $this->academicPage('promotion');
     }
 
     public function examMaster(): View
@@ -105,8 +180,10 @@ class StudentsResultsController extends Controller
      * The page is looked up in PAGES rather than trusted from the URL, so the
      * label and the permission always come from this file and never from the
      * browser.
+     *
+     * @param  array<string,mixed>  $extra  Anything the page's own view needs.
      */
-    protected function placeholder(string $key): View
+    protected function placeholder(string $key, array $extra = []): View
     {
         $page = collect(self::PAGES)->firstWhere('key', $key);
 
@@ -114,6 +191,52 @@ class StudentsResultsController extends Controller
 
         $this->authorize($page['permission']);
 
-        return view('admin.students-results.' . $key, ['page' => $page]);
+        return view('admin.students-results.'.$key, $extra + ['page' => $page]);
+    }
+
+    /**
+     * Draw a page that hangs off Academic.
+     *
+     * Looked up in ACADEMIC_PAGES for the same reason: the label, the note and the
+     * permission are decided here, never by what the URL says. The permission is
+     * the parent's — see ACADEMIC_PAGES.
+     */
+    protected function academicPage(string $key): View
+    {
+        $page = collect(self::ACADEMIC_PAGES)->firstWhere('key', $key);
+
+        abort_if($page === null, 404);
+
+        $this->authorize('academics.manage');
+
+        return view('admin.students-results.academics.'.$key, [
+            'page' => $page,
+            'breadcrumbs' => $this->academicTrail($page),
+        ]);
+    }
+
+    /**
+     * The way back up from Academic and the pages under it.
+     *
+     * Only pages that sit under something get one: a trail of a single item is not
+     * a trail, so a page of the menu itself declares its title and nothing else.
+     * The last crumb is where you are and carries no route, because the view draws
+     * it as text rather than as a link to a page you are already on.
+     *
+     * @param  array{label:string}|null  $child  The page under Academic, if any.
+     * @return array<int,array{label:string,route:?string}>
+     */
+    protected function academicTrail(?array $child = null): array
+    {
+        $trail = [
+            ['label' => 'Students & Results', 'route' => 'admin.students-results.dashboard'],
+            ['label' => 'Academic', 'route' => 'admin.students-results.academics'],
+        ];
+
+        if ($child !== null) {
+            $trail[] = ['label' => $child['label'], 'route' => null];
+        }
+
+        return $trail;
     }
 }

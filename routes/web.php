@@ -221,6 +221,18 @@ Route::middleware(['auth'])
             Route::get('students', [StudentsResultsController::class, 'students'])->name('students');
             Route::get('employees', [StudentsResultsController::class, 'employees'])->name('employees');
             Route::get('academics', [StudentsResultsController::class, 'academics'])->name('academics');
+
+            /*
+            | The four pages that hang off Academic, listed individually for the
+            | same reason as the menu above: each will grow its own controller,
+            | and a {page} wildcard under `academics` would have to be pulled
+            | apart the first time one of them needs a child of its own.
+            */
+            Route::get('academics/classes', [StudentsResultsController::class, 'academicClasses'])->name('academics.classes');
+            Route::get('academics/subjects', [StudentsResultsController::class, 'academicSubjects'])->name('academics.subjects');
+            Route::get('academics/schedule', [StudentsResultsController::class, 'academicSchedule'])->name('academics.schedule');
+            Route::get('academics/promotion', [StudentsResultsController::class, 'academicPromotion'])->name('academics.promotion');
+
             Route::get('exam-master', [StudentsResultsController::class, 'examMaster'])->name('exam-master');
             Route::get('attendance', [StudentsResultsController::class, 'attendance'])->name('attendance');
             Route::get('reports', [StudentsResultsController::class, 'reports'])->name('reports');

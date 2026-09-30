@@ -43,6 +43,11 @@
 
         <nav class="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
             @php
+                // The menu is defined by the controller that owns the module, so a
+                // page's label, permission and children are declared once. Named in
+                // full because Blade has no use block of its own.
+                $module = \App\Http\Controllers\Admin\StudentsResultsController::class;
+
                 // A `*` route becomes its .index URL; a plain name is used as-is,
                 // so an entry can point at a create screen.
                 $href = fn (array $link) => str_contains($link['route'], '*')
@@ -79,7 +84,12 @@
                         ['route' => 'admin.students-results.pins', 'label' => 'Generate Pin', 'icon' => 'key', 'can' => 'results.pins'],
                         ['route' => 'admin.students-results.students', 'label' => 'Students Details', 'icon' => 'academic', 'can' => 'students.view'],
                         ['route' => 'admin.students-results.employees', 'label' => 'Employee', 'icon' => 'briefcase', 'can' => 'employees.manage'],
-                        ['route' => 'admin.students-results.academics', 'label' => 'Academic', 'icon' => 'book', 'can' => 'academics.manage'],
+                        ['route' => 'admin.students-results.academics', 'label' => 'Academic', 'icon' => 'book', 'can' => 'academics.manage',
+                         // Academic is a section in its own right: the four pages it
+                         // holds are drawn underneath it, from the same list the
+                         // page itself uses.
+                         'matches' => ['admin.students-results.academics', 'admin.students-results.academics.*'],
+                         'children' => $module::ACADEMIC_PAGES],
                         ['route' => 'admin.students-results.exam-master', 'label' => 'Exam Master', 'icon' => 'clipboard-check', 'can' => 'exams.manage'],
                         ['route' => 'admin.students-results.attendance', 'label' => 'Attendance', 'icon' => 'calendar', 'can' => 'attendance.manage'],
                         ['route' => 'admin.students-results.reports', 'label' => 'Reports', 'icon' => 'report', 'can' => 'reports.view'],
@@ -119,6 +129,13 @@
                         <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-brand-400">{{ $heading }}</p>
                         <ul class="space-y-0.5">
                             @foreach ($visible as $link)
+                                @php
+                                    // Second-level pages inherit the parent's permission
+                                    // when they do not name one of their own.
+                                    $children = collect($link['children'] ?? [])
+                                        ->filter(fn (array $child) => auth()->user()?->can($child['can'] ?? $link['can']));
+                                @endphp
+
                                 <li>
                                     <a href="{{ $href($link) }}"
                                        @class([
@@ -129,6 +146,27 @@
                                         <x-nav-icon :name="$link['icon']" />
                                         {{ $link['label'] }}
                                     </a>
+
+                                    {{-- Shown only while you are inside the section, so the
+                                         sidebar stays the length the office judged it to be.
+                                         The child pages are reached by opening the parent. --}}
+                                    @if ($children->isNotEmpty() && $isActive($link))
+                                        <ul class="mt-0.5 ml-5 space-y-0.5 border-l border-white/10 pl-3">
+                                            @foreach ($children as $child)
+                                                <li>
+                                                    <a href="{{ route($child['route']) }}"
+                                                       @class([
+                                                           'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+                                                           'text-white' => request()->routeIs($child['route']),
+                                                           'text-brand-300 hover:bg-white/5 hover:text-white' => ! request()->routeIs($child['route']),
+                                                       ])>
+                                                        <x-nav-icon :name="$child['icon']" class="h-4 w-4" />
+                                                        {{ $child['label'] }}
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>
@@ -167,8 +205,16 @@
                 <p class="truncate text-sm font-semibold text-ink">
                     {{ trim($__env->yieldContent('title')) ?: 'Dashboard' }}
                 </p>
-                @hasSection('subtitle')
-                    <p class="truncate text-xs text-muted">@yield('subtitle')</p>
+
+                {{-- A page deep enough to have a way back says where it sits; the
+                     rest say what they are. Never both: the trail already names the
+                     page above this one, which is all the subtitle would repeat. --}}
+                @if (! empty($breadcrumbs))
+                    <x-breadcrumb :trail="$breadcrumbs" class="mt-0.5 truncate" />
+                @else
+                    @hasSection('subtitle')
+                        <p class="truncate text-xs text-muted">@yield('subtitle')</p>
+                    @endif
                 @endif
             </div>
 

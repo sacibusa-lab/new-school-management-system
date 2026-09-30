@@ -46,7 +46,7 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Every page of the menu opens                                        */
+    /* Every page of the menu opens */
     /* ------------------------------------------------------------------ */
 
     public function test_every_page_in_the_menu_opens_for_the_super_admin(): void
@@ -58,7 +58,7 @@ class StudentsResultsModuleTest extends TestCase
             'academics', 'exam-master', 'attendance', 'reports', 'alumni', 'settings',
         ] as $page) {
             $this->actingAs($this->admin)
-                ->get(route('admin.students-results.' . $page))
+                ->get(route('admin.students-results.'.$page))
                 ->assertOk();
         }
     }
@@ -93,7 +93,7 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The sidebar                                                         */
+    /* The sidebar */
     /* ------------------------------------------------------------------ */
 
     public function test_the_sidebar_lists_the_whole_menu_in_order(): void
@@ -103,11 +103,11 @@ class StudentsResultsModuleTest extends TestCase
         $positions = [];
 
         foreach (StudentsResultsController::PAGES as $page) {
-            $href = route('admin.students-results.' . $page['key']);
+            $href = route('admin.students-results.'.$page['key']);
 
             $this->assertStringContainsString($href, $html, "The sidebar is missing {$page['label']}.");
 
-            $positions[] = strpos($html, '>' . $page['label'] . '<');
+            $positions[] = strpos($html, '>'.$page['label'].'<');
         }
 
         $sorted = $positions;
@@ -121,8 +121,8 @@ class StudentsResultsModuleTest extends TestCase
     {
         $html = $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('>' . 'Students' . '<', $html);
-        $this->assertStringNotContainsString('>' . 'Results' . '<', $html);
+        $this->assertStringNotContainsString('>'.'Students'.'<', $html);
+        $this->assertStringNotContainsString('>'.'Results'.'<', $html);
     }
 
     /**
@@ -143,7 +143,7 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The permission behind each page                                     */
+    /* The permission behind each page */
     /* ------------------------------------------------------------------ */
 
     public function test_check_result_is_for_the_super_admin_alone(): void
@@ -187,5 +187,189 @@ class StudentsResultsModuleTest extends TestCase
             ->get(route('admin.students-results.settings'))
             ->assertOk()
             ->assertDontSee('School branding');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Academic, and the four pages under it */
+    /* ------------------------------------------------------------------ */
+
+    public function test_every_page_under_academic_opens_and_is_the_page_it_claims(): void
+    {
+        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+            $this->actingAs($this->admin)
+                ->get(route($child['route']))
+                ->assertOk()
+                // The note is written per page, so finding it is what proves the
+                // right one drew rather than a shared placeholder looking alike.
+                ->assertSee($child['note'])
+                ->assertSee('This page has not been built yet');
+        }
+    }
+
+    public function test_the_academic_page_lists_the_four_things_it_holds(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics'))
+            ->assertOk()
+            ->getContent();
+
+        $positions = [];
+
+        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+            $this->assertStringContainsString(
+                route($child['route']),
+                $html,
+                "Academic does not link to {$child['label']}.",
+            );
+
+            $at = strpos($html, $child['note']);
+
+            $this->assertNotFalse($at, "Academic does not describe {$child['label']}.");
+            $positions[] = $at;
+        }
+
+        $sorted = $positions;
+        sort($sorted);
+
+        $this->assertSame($sorted, $positions, 'Academic lists its pages out of the order the office asked for.');
+    }
+
+    /**
+     * The four are a second level, and a second level that is always open is just
+     * a longer first level. They appear once Academic is the page you are on.
+     */
+    public function test_the_four_pages_are_drawn_under_academic_only_while_it_is_open(): void
+    {
+        $dashboard = $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk()->getContent();
+
+        $academic = $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics'))
+            ->assertOk()
+            ->getContent();
+
+        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+            $this->assertStringNotContainsString(
+                route($child['route']),
+                $dashboard,
+                "{$child['label']} is in the sidebar before Academic has been opened.",
+            );
+
+            $this->assertStringContainsString(
+                route($child['route']),
+                $academic,
+                "The sidebar does not offer {$child['label']} from Academic.",
+            );
+        }
+    }
+
+    /**
+     * Standing on a page under Academic has to leave Academic looking open —
+     * otherwise the four vanish the moment you use one, and the only way back is
+     * up a level. That they render at all on a child route is the proof: the
+     * sidebar only draws them for the link it considers active.
+     */
+    public function test_the_four_stay_in_the_sidebar_while_you_are_on_one_of_them(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.promotion'))
+            ->assertOk()
+            ->getContent();
+
+        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+            $this->assertStringContainsString(route($child['route']), $html);
+        }
+    }
+
+    /**
+     * They are one subject — how the school is organised — so they answer to the
+     * permission of the page they hang off, and a role without it is refused the
+     * whole section rather than half of it.
+     */
+    public function test_the_pages_under_academic_are_refused_without_the_permission(): void
+    {
+        $teacher = $this->userWithRole('Teacher');
+
+        $this->assertFalse($teacher->can('academics.manage'));
+
+        $this->actingAs($teacher)
+            ->get(route('admin.students-results.academics'))
+            ->assertForbidden();
+
+        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+            $this->actingAs($teacher)
+                ->get(route($child['route']))
+                ->assertForbidden();
+        }
+
+        // And Academic is not in their sidebar to be clicked in the first place.
+        $sidebar = $this->actingAs($teacher)->get(route('admin.dashboard'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString(route('admin.students-results.academics'), $sidebar);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Breadcrumbs */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Three levels down there has to be a way back that is not the browser button:
+     * the sidebar sub-items say where you may go, and this says where you are.
+     */
+    public function test_a_page_under_academic_shows_the_trail_back_to_it(): void
+    {
+        foreach (StudentsResultsController::ACADEMIC_PAGES as $child) {
+            $html = $this->actingAs($this->admin)
+                ->get(route($child['route']))
+                ->assertOk()
+                ->getContent();
+
+            // Read the trail itself, not the page: both parent URLs are also in the
+            // sidebar, where finding them would prove nothing.
+            $trail = str($html)->after('aria-label="Breadcrumb"')->before('</nav>')->value();
+
+            $this->assertStringContainsString('Students &amp; Results', $trail, 'The trail does not start at the module.');
+            $this->assertStringContainsString('Academic', $trail, 'The trail skips Academic.');
+
+            // e() because this reads the HTML: "Classes & Sections" is written to
+            // the page as "Classes &amp; Sections".
+            $this->assertStringContainsString(e($child['label']), $trail, "The trail does not end at {$child['label']}.");
+
+            // Both parents are ways out of here...
+            $this->assertStringContainsString('href="'.route('admin.students-results.dashboard').'"', $trail);
+            $this->assertStringContainsString('href="'.route('admin.students-results.academics').'"', $trail);
+
+            // ...and the page you are on is not one of them.
+            $this->assertStringNotContainsString('href="'.route($child['route']).'"', $trail);
+        }
+    }
+
+    public function test_academic_itself_says_it_sits_under_the_module(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics'))
+            ->assertOk()
+            ->getContent();
+
+        $trail = str($html)->after('aria-label="Breadcrumb"')->before('</nav>')->value();
+
+        $this->assertStringContainsString('Students &amp; Results', $trail);
+        $this->assertStringContainsString(route('admin.students-results.dashboard'), $trail);
+
+        // Academic is where you are, so it is the one crumb that is not a link.
+        $this->assertStringNotContainsString('href="'.route('admin.students-results.academics').'"', $trail);
+    }
+
+    /**
+     * A trail of one item says only what the title under it already says, so a page
+     * at the top of the module declares no trail at all and gets none.
+     */
+    public function test_a_page_with_nothing_above_it_draws_no_trail(): void
+    {
+        foreach (['dashboard', 'check-result', 'pins', 'students', 'exam-master'] as $page) {
+            $this->actingAs($this->admin)
+                ->get(route('admin.students-results.'.$page))
+                ->assertOk()
+                ->assertDontSee('aria-label="Breadcrumb"', false);
+        }
     }
 }

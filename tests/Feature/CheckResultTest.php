@@ -93,7 +93,7 @@ class CheckResultTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The form                                                            */
+    /* The form */
     /* ------------------------------------------------------------------ */
 
     public function test_the_page_asks_for_a_year_a_term_and_an_admission_number(): void
@@ -113,8 +113,8 @@ class CheckResultTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.students-results.check-result'))
             ->assertOk()
-            ->assertSee('value="' . $this->session->id . '" selected', false)
-            ->assertSee('value="' . $this->firstTerm->id . '" selected', false);
+            ->assertSee('value="'.$this->session->id.'" selected', false)
+            ->assertSee('value="'.$this->firstTerm->id.'" selected', false);
     }
 
     public function test_the_term_chooser_lists_every_term_in_order(): void
@@ -145,7 +145,7 @@ class CheckResultTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Reading a result                                                    */
+    /* Reading a result */
     /* ------------------------------------------------------------------ */
 
     public function test_it_finds_the_student_by_admission_number_and_shows_the_result(): void
@@ -207,7 +207,7 @@ class CheckResultTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* What it says when there is no result to show                        */
+    /* What it says when there is no result to show */
     /* ------------------------------------------------------------------ */
 
     public function test_an_unpublished_result_is_shown_and_labelled_as_unpublished(): void
@@ -299,7 +299,7 @@ class CheckResultTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Reaching back to the terms the school has moved on from             */
+    /* Reaching back to the terms the school has moved on from */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -334,7 +334,7 @@ class CheckResultTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Who may look                                                        */
+    /* Who may look */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -407,4 +407,3 @@ class CheckResultTest extends TestCase
         return $result;
     }
 }
-
