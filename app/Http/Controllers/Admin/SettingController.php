@@ -29,11 +29,12 @@ class SettingController extends Controller
         return view('admin.settings.index', [
             'groups' => SettingLayout::arrange($settings),
             // The calendar card behind the selector: what exists to choose from,
-            // and what is in the way of deleting any of it.
+            // what is in the way of deleting any of it. Terms are shared by every
+            // session, so they are listed once, with their dates for the current one.
             'academic' => $academic,
             'suggestedSession' => $academic->suggestNextSessionName(),
+            'terms' => Term::query()->orderBy('position')->get(),
             'sessions' => AcademicSession::query()
-                ->with('terms')
                 ->orderByDesc('starts_on')
                 ->orderByDesc('id')
                 ->get(),

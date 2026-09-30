@@ -45,23 +45,9 @@ class AcademicCalendarController extends Controller
 
         $validated = $request->validate([
             'academic_session_id' => ['required', 'integer', 'exists:academic_sessions,id'],
-            'term_id' => [
-                'nullable', 'integer', 'exists:terms,id',
-                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
-                    if (! $value) {
-                        return;
-                    }
-
-                    $belongs = Term::query()
-                        ->whereKey($value)
-                        ->where('academic_session_id', $request->input('academic_session_id'))
-                        ->exists();
-
-                    if (! $belongs) {
-                        $fail('That term belongs to a different academic session. Pick the term listed under the session you chose.');
-                    }
-                },
-            ],
+            // No check that the term belongs to the session: it belongs to every
+            // session. That is the whole point of a term being universal.
+            'term_id' => ['nullable', 'integer', 'exists:terms,id'],
         ], [
             'academic_session_id.required' => 'Choose the academic session the school is in.',
             'academic_session_id.exists' => 'That academic session no longer exists.',
@@ -70,24 +56,21 @@ class AcademicCalendarController extends Controller
 
         $session = AcademicSession::query()->findOrFail($validated['academic_session_id']);
 
-        $created = [];
-
-        DB::transaction(function () use ($session, $validated, &$created): void {
+        DB::transaction(function () use ($session, $validated): void {
             AcademicSession::query()->whereKeyNot($session->id)->update(['is_current' => false]);
             $session->forceFill(['is_current' => true])->save();
 
-            // A session with no terms cannot be "in" a term. The terms were created
-            // when it was added, so this only catches one whose terms were all
-            // deleted afterwards.
-            $created = $this->calendar->layDownStandardTerms($session);
+            // A session always has every term, so this is only ever filling a gap
+            // left by a session created before terms were shared.
+            $this->calendar->attachEveryTermTo($session);
 
             $term = ! empty($validated['term_id'])
-                ? $session->terms->firstWhere('id', (int) $validated['term_id'])
+                ? Term::query()->find($validated['term_id'])
                 : null;
 
             // No term named means "the first one of this session", which is what
             // somebody moving to a new session expects to get.
-            $term ??= $session->terms->sortBy('position')->first();
+            $term ??= Term::query()->orderBy('position')->first();
 
             if ($term === null) {
                 return;
@@ -97,17 +80,12 @@ class AcademicCalendarController extends Controller
             $term->forceFill(['is_current' => true])->save();
         });
 
-        $term = $session->terms()->where('is_current', true)->first();
+        $term = Term::current();
 
         ActivityLog::record(
             'settings.academic',
             $session,
-            sprintf(
-                'Moved the school to %s, %s%s',
-                $session->name,
-                $term?->name ?? 'no term set',
-                $created === [] ? '' : ' (' . implode(', ', $created) . ' created)',
-            ),
+            sprintf('Moved the school to %s, %s', $session->name, $term?->name ?? 'no term set'),
             ['module' => 'settings'],
         );
 
@@ -115,10 +93,6 @@ class AcademicCalendarController extends Controller
 
         if ($term) {
             $message .= ', ' . $term->name;
-        }
-
-        if ($created !== []) {
-            $message .= '. This session had no terms, so ' . implode(', ', $created) . ' were created for it.';
         }
 
         return back()->with('status', $message . '.');
@@ -144,18 +118,18 @@ class AcademicCalendarController extends Controller
             ],
             'starts_on' => ['nullable', 'date'],
             'ends_on' => ['nullable', 'date', 'after:starts_on'],
-            'with_terms' => ['nullable', 'boolean'],
         ], [
             'name.regex' => 'Write the session as two years, like 2027/2028.',
             'name.unique' => 'That academic session already exists.',
             'ends_on.after' => 'The session cannot end before it starts.',
         ]);
 
+        // No "create the terms for it": the terms exist, and a session has all of
+        // them the moment it is created.
         $session = $this->calendar->addSession(
             $validated['name'],
             $validated['starts_on'] ?? null,
             $validated['ends_on'] ?? null,
-            $request->boolean('with_terms', true),
             $request->user(),
         );
 
@@ -182,13 +156,68 @@ class AcademicCalendarController extends Controller
     /* Terms                                                               */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * Add a term to the school. It belongs to every session.
+     *
+     * Dates are optional and belong to one session — the one the form names,
+     * which is the session the school is working in.
+     */
     public function storeTerm(Request $request): RedirectResponse
     {
         $this->authorize('settings.manage');
 
         $validated = $request->validate([
-            'academic_session_id' => ['required', 'integer', 'exists:academic_sessions,id'],
             'name' => ['required', 'string', 'max:40'],
+            'dates_in' => ['nullable', 'integer', 'exists:academic_sessions,id'],
+            'starts_on' => ['nullable', 'date'],
+            'ends_on' => ['nullable', 'date', 'after:starts_on'],
+        ], [
+            'ends_on.after' => 'A term cannot end before it starts.',
+        ]);
+
+        // A session may run two terms or four; the count is the school's business.
+        // A name repeated is not — that is a second attempt at a term that already
+        // exists, and now it would be repeated in every session at once.
+        if (Term::query()->where('name', $validated['name'])->exists()) {
+            return back()->with('error', sprintf(
+                'The school already has a term called %s. Terms are the same for every session.',
+                $validated['name'],
+            ));
+        }
+
+        $session = ! empty($validated['dates_in'])
+            ? AcademicSession::query()->find($validated['dates_in'])
+            : AcademicSession::current();
+
+        try {
+            $term = $this->calendar->addTerm(
+                $validated['name'],
+                $this->calendar->nextTermPosition(),
+                $session,
+                $validated['starts_on'] ?? null,
+                $validated['ends_on'] ?? null,
+                $request->user(),
+            );
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', sprintf(
+            '%s added. It applies to every session%s.',
+            $term->name,
+            ! empty($validated['starts_on']) || ! empty($validated['ends_on'])
+                ? ', with its dates set for ' . ($session?->name ?? 'the current session')
+                : '',
+        ));
+    }
+
+    /** Record when a term runs in one session — last year's dates stay last year's. */
+    public function updateTermDates(Request $request, Term $term): RedirectResponse
+    {
+        $this->authorize('settings.manage');
+
+        $validated = $request->validate([
+            'academic_session_id' => ['required', 'integer', 'exists:academic_sessions,id'],
             'starts_on' => ['nullable', 'date'],
             'ends_on' => ['nullable', 'date', 'after:starts_on'],
         ], [
@@ -197,26 +226,19 @@ class AcademicCalendarController extends Controller
 
         $session = AcademicSession::query()->findOrFail($validated['academic_session_id']);
 
-        // A session may run two terms or four; the count is the school's business.
-        // A name repeated inside the same session is not — that is a second
-        // attempt at a term that already exists.
-        if ($session->terms()->where('name', $validated['name'])->exists()) {
-            return back()->with('error', sprintf(
-                '%s already has a term called %s.',
-                $session->name,
-                $validated['name'],
-            ));
-        }
-
-        $term = $this->calendar->addTerm(
+        $this->calendar->setTermDates(
             $session,
-            $validated['name'],
+            $term,
             $validated['starts_on'] ?? null,
             $validated['ends_on'] ?? null,
             $request->user(),
         );
 
-        return back()->with('status', sprintf('%s added to %s.', $term->name, $session->name));
+        return back()->with('status', sprintf(
+            'Dates saved for %s in %s.',
+            $term->name,
+            $session->name,
+        ));
     }
 
     public function destroyTerm(Request $request, Term $term): RedirectResponse

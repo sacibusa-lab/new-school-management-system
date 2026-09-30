@@ -279,6 +279,7 @@ Route::middleware(['auth'])
             Route::delete('sessions/{academicSession}', [AcademicCalendarController::class, 'destroySession'])->name('sessions.destroy');
 
             Route::post('terms', [AcademicCalendarController::class, 'storeTerm'])->name('terms.store');
+            Route::put('terms/{term}/dates', [AcademicCalendarController::class, 'updateTermDates'])->name('terms.dates');
             Route::delete('terms/{term}', [AcademicCalendarController::class, 'destroyTerm'])->name('terms.destroy');
         });
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');

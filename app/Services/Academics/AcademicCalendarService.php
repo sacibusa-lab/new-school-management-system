@@ -9,6 +9,7 @@ use App\Models\Assessment;
 use App\Models\Exam;
 use App\Models\Invoice;
 use App\Models\ResultPublication;
+use App\Models\SessionTerm;
 use App\Models\Student;
 use App\Models\Term;
 use App\Models\TermResult;
@@ -33,14 +34,6 @@ use RuntimeException;
 class AcademicCalendarService
 {
     /**
-     * The terms a session runs, in order.
-     *
-     * Used to lay them down for a session that has none — never to correct an
-     * existing one, since a school that renamed or reordered its terms has said
-     * something and should not have it overwritten.
-     */
-    public const STANDARD_TERMS = [1 => 'First Term', 2 => 'Second Term', 3 => 'Third Term'];
-
     /**
      * Everything that would be destroyed with a session. The order of this array
      * is the order the office reads about it.
@@ -73,20 +66,25 @@ class AcademicCalendarService
     ];
 
     /* ------------------------------------------------------------------ */
-    /* Adding                                                              */
+    /* Sessions                                                            */
     /* ------------------------------------------------------------------ */
 
     /**
-     * Create a session, optionally with the three terms it will run.
+     * Create a session, and give it every term the school runs.
+     *
+     * The terms are not created here: they exist already, and a new session simply
+     * joins them. What is created is one row per term for this session, which is
+     * where that term's dates will go — empty until somebody knows them.
      */
     public function addSession(
         string $name,
         ?string $startsOn = null,
         ?string $endsOn = null,
-        bool $withTerms = true,
         ?User $actor = null,
     ): AcademicSession {
-        return DB::transaction(function () use ($name, $startsOn, $endsOn, $withTerms, $actor) {
+        return DB::transaction(function () use ($name, $startsOn, $endsOn, $actor) {
+            $this->ensureStandardTerms();
+
             $session = AcademicSession::create([
                 'name' => $name,
                 'starts_on' => $startsOn,
@@ -97,9 +95,7 @@ class AcademicCalendarService
                 'is_admission_open' => false,
             ]);
 
-            if ($withTerms) {
-                $this->layDownStandardTerms($session);
-            }
+            $this->attachEveryTermTo($session);
 
             $this->log($session, sprintf('Added the academic session %s', $session->name), $actor);
 
@@ -107,67 +103,128 @@ class AcademicCalendarService
         });
     }
 
+    /* ------------------------------------------------------------------ */
+    /* Terms — one set, shared by every session                            */
+    /* ------------------------------------------------------------------ */
+
     /**
-     * Add one term to a session.
+     * Add a term to the school.
      *
-     * It takes the lowest free position, so a term added after a deletion sits
-     * back in the gap where it belongs rather than at the end.
+     * It belongs to every session from the moment it exists, so a row is created
+     * for it in each one. Dates, if given, are set for the session named: a term
+     * added while the school is in 2026/2027 is almost always being scheduled
+     * there, and the form asks which session it is for.
+     *
+     * @throws RuntimeException when the position is already taken
      */
     public function addTerm(
-        AcademicSession $session,
         string $name,
+        int $position,
+        ?AcademicSession $datesIn = null,
         ?string $startsOn = null,
         ?string $endsOn = null,
         ?User $actor = null,
     ): Term {
-        return DB::transaction(function () use ($session, $name, $startsOn, $endsOn, $actor) {
-            $taken = $session->terms()->pluck('position')->all();
-            $position = 1;
-
-            while (in_array($position, $taken, true)) {
-                $position++;
+        return DB::transaction(function () use ($name, $position, $datesIn, $startsOn, $endsOn, $actor) {
+            if (Term::query()->where('position', $position)->exists()) {
+                throw new RuntimeException(sprintf(
+                    'The school already has a term in position %d. Terms are the same for every session, so a new one has to take a free position.',
+                    $position,
+                ));
             }
 
-            $term = $session->terms()->create([
+            $term = Term::create([
                 'name' => $name,
                 'position' => $position,
-                'starts_on' => $startsOn,
-                'ends_on' => $endsOn,
                 'is_current' => false,
             ]);
 
-            $this->log($term, sprintf('Added %s to %s', $term->name, $session->name), $actor);
+            // A term is for every session, so it starts with a row in each of them.
+            foreach (AcademicSession::query()->pluck('id') as $sessionId) {
+                SessionTerm::create([
+                    'academic_session_id' => $sessionId,
+                    'term_id' => $term->id,
+                    'starts_on' => $sessionId === $datesIn?->id ? $startsOn : null,
+                    'ends_on' => $sessionId === $datesIn?->id ? $endsOn : null,
+                ]);
+            }
+
+            $this->log($term, sprintf('Added the term %s, for every session', $term->name), $actor);
 
             return $term;
         });
     }
 
     /**
-     * The standard three, for a session that has none.
+     * Record when a term runs in one session.
      *
-     * @return array<int,string> the names created, empty if there were already terms
+     * The dates are per session, not per term: First Term is September in both
+     * years, and setting next year's must not touch this year's.
      */
-    public function layDownStandardTerms(AcademicSession $session): array
-    {
-        if ($session->terms()->exists()) {
-            return [];
-        }
+    public function setTermDates(
+        AcademicSession $session,
+        Term $term,
+        ?string $startsOn,
+        ?string $endsOn,
+        ?User $actor = null,
+    ): SessionTerm {
+        $dates = SessionTerm::updateOrCreate(
+            ['academic_session_id' => $session->id, 'term_id' => $term->id],
+            ['starts_on' => $startsOn, 'ends_on' => $endsOn],
+        );
 
+        $this->log(
+            $term,
+            sprintf('Set %s dates for %s: %s', $term->name, $session->name, $dates->describe() ?? 'cleared'),
+            $actor,
+        );
+
+        return $dates;
+    }
+
+    /**
+     * Make sure the three terms a Nigerian school runs exist. Once, ever.
+     *
+     * @return array<int,string> the names created, empty if they were already there
+     */
+    public function ensureStandardTerms(): array
+    {
         $created = [];
 
-        foreach (self::STANDARD_TERMS as $position => $name) {
-            $session->terms()->create([
-                'name' => $name,
-                'position' => $position,
-                'is_current' => false,
-            ]);
+        foreach (Term::standard() as $position => $name) {
+            if (Term::query()->where('position', $position)->exists()) {
+                continue;
+            }
 
+            Term::create(['name' => $name, 'position' => $position, 'is_current' => false]);
             $created[] = $name;
         }
 
-        $session->load('terms');
-
         return $created;
+    }
+
+    /** Give a session a row for every term, so none is ever missing from it. */
+    public function attachEveryTermTo(AcademicSession $session): void
+    {
+        foreach (Term::query()->pluck('id') as $termId) {
+            SessionTerm::firstOrCreate([
+                'academic_session_id' => $session->id,
+                'term_id' => $termId,
+            ]);
+        }
+    }
+
+    /** The lowest position no term is using. */
+    public function nextTermPosition(): int
+    {
+        $taken = Term::query()->pluck('position')->all();
+        $position = 1;
+
+        while (in_array($position, $taken, true)) {
+            $position++;
+        }
+
+        return $position;
     }
 
     /* ------------------------------------------------------------------ */
@@ -199,18 +256,15 @@ class AcademicCalendarService
         }
 
         $name = $session->name;
-        $terms = $session->terms()->count();
 
-        DB::transaction(function () use ($session): void {
-            // The terms go with it — the foreign key says so, and a term with no
-            // session is not a thing.
-            $session->delete();
-        });
+        // The session goes; the terms stay, because they never belonged to it. What
+        // goes with it is this session's row of dates for each of them.
+        $session->delete();
 
         ActivityLog::record(
             'academic.session',
             null,
-            sprintf('Deleted the academic session %s, with its %d term(s)', $name, $terms),
+            sprintf('Deleted the academic session %s', $name),
             ['module' => 'settings'],
         );
     }
@@ -238,14 +292,16 @@ class AcademicCalendarService
             ));
         }
 
-        $label = $term->label();
+        $name = $term->name;
 
+        // And with it the dates it had in every session, which is what the cascade
+        // on session_terms is for.
         $term->delete();
 
         ActivityLog::record(
             'academic.term',
             null,
-            sprintf('Deleted the term %s', $label),
+            sprintf('Deleted the term %s', $name),
             ['module' => 'settings'],
         );
     }

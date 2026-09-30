@@ -37,7 +37,7 @@ class ResultController extends Controller
 
         return view('admin.results.index', [
             'results' => $results,
-            'terms' => Term::query()->with('academicSession')->orderByDesc('academic_session_id')->orderBy('position')->get(),
+            'terms' => Term::query()->orderBy('position')->get(),
             'classes' => SchoolClass::query()->where('is_active', true)->with('level')->orderBy('name')->get(),
             'selectedTerm' => $termId,
             'selectedClass' => $classId,

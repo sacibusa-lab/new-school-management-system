@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class AcademicSession extends Model
 {
@@ -19,9 +20,36 @@ class AcademicSession extends Model
         ];
     }
 
-    public function terms(): HasMany
+    /**
+     * The terms this session runs — which is all of them.
+     *
+     * A term belongs to every session rather than to one, so this reaches them
+     * through `session_terms`, the table that holds *when* each term runs in this
+     * particular session. The list is the same for every session; only the dates
+     * differ, and a session never has a term missing from it.
+     */
+    public function terms(): HasManyThrough
     {
-        return $this->hasMany(Term::class)->orderBy('position');
+        return $this->hasManyThrough(
+            Term::class,
+            SessionTerm::class,
+            'academic_session_id',
+            'id',
+            'id',
+            'term_id',
+        )->orderBy('terms.position');
+    }
+
+    /** When each term runs in this session. */
+    public function sessionTerms(): HasMany
+    {
+        return $this->hasMany(SessionTerm::class);
+    }
+
+    /** The dates a term runs here, if anybody has set them. */
+    public function datesFor(Term $term): ?SessionTerm
+    {
+        return $this->sessionTerms()->where('term_id', $term->id)->first();
     }
 
     public function applicants(): HasMany
@@ -44,9 +72,16 @@ class AcademicSession extends Model
         return $this->hasMany(AdmissionSetting::class);
     }
 
+    /**
+     * The term the school is in — or null, if this is not the session it is in.
+     *
+     * There is one active term and one current session, so a session that is not
+     * the current one is not "in" a term at all. Answering with the active term
+     * anyway would put this year's term on a past year's invoice.
+     */
     public function currentTerm(): ?Term
     {
-        return $this->terms()->where('is_current', true)->first();
+        return $this->is_current ? Term::current() : null;
     }
 
     /**

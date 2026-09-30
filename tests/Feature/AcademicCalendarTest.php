@@ -6,6 +6,7 @@ use App\Models\AcademicSession;
 use App\Models\Assessment;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
+use App\Models\SessionTerm;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Subject;
@@ -18,16 +19,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Adding and deleting sessions and terms.
+ * The calendar: sessions are years, terms are shared by all of them.
  *
- * Adding is the easy half. The half that needs guarding is deletion, because every
- * foreign key pointing at a session or a term is ON DELETE CASCADE: applicants,
- * students, examinations, invoices, assessments and results all vanish silently
- * with the session they belong to. A stray "2027/2028" created by accident is
- * worth deleting; a session holding a hundred children is emphatically not.
+ * The thing that changed, and the thing these tests are mostly about, is that a
+ * term is no longer a row per session. There is one First Term; it runs in every
+ * session; only *when* it runs differs, and those dates are kept per session so
+ * that starting the next year does not rewrite what last year's report cards said.
  *
- * So the tests below are mostly about refusal, and about the refusal naming what
- * is in the way rather than saying "no".
+ * Deletion is the other half. Every foreign key pointing at a session or a term is
+ * ON DELETE CASCADE — applicants, students, examinations, invoices, assessments
+ * and results all vanish silently with the session they belong to — so the guard
+ * cannot be the database's.
  */
 class AcademicCalendarTest extends TestCase
 {
@@ -35,7 +37,11 @@ class AcademicCalendarTest extends TestCase
 
     private User $admin;
 
+    private AcademicCalendarService $calendar;
+
     private AcademicSession $thisYear;
+
+    private AcademicSession $nextYear;
 
     protected function setUp(): void
     {
@@ -48,41 +54,48 @@ class AcademicCalendarTest extends TestCase
         $this->admin = User::factory()->create();
         $this->admin->assignRole('Super Admin');
 
-        $this->thisYear = AcademicSession::create([
-            'name' => '2026/2027',
-            'starts_on' => '2026-09-01',
-            'ends_on' => '2027-07-31',
-            'is_current' => true,
-        ]);
+        $this->calendar = app(AcademicCalendarService::class);
 
-        foreach ([1 => 'First Term', 2 => 'Second Term', 3 => 'Third Term'] as $position => $name) {
-            $this->thisYear->terms()->create([
-                'name' => $name,
-                'position' => $position,
-                'is_current' => $position === 1,
-            ]);
-        }
+        $this->thisYear = $this->makeSession('2026/2027', '2026-09-01', true);
+        $this->nextYear = $this->makeSession('2027/2028', '2027-09-01', false);
+
+        $this->calendar->ensureStandardTerms();
+        $this->calendar->attachEveryTermTo($this->thisYear);
+        $this->calendar->attachEveryTermTo($this->nextYear);
+
+        $this->termAt(1)->forceFill(['is_current' => true])->save();
+        $this->calendar->setTermDates($this->thisYear, $this->termAt(1), '2026-09-01', '2026-12-18');
+    }
+
+    private function makeSession(string $name, string $startsOn, bool $current): AcademicSession
+    {
+        return AcademicSession::create([
+            'name' => $name,
+            'starts_on' => $startsOn,
+            'ends_on' => $startsOn === '2026-09-01' ? '2027-07-31' : '2028-07-31',
+            'is_current' => $current,
+        ]);
+    }
+
+    private function termAt(int $position): Term
+    {
+        return Term::query()->where('position', $position)->sole();
     }
 
     private function addSession(array $overrides = [])
     {
         return $this->actingAs($this->admin)->post(
             route('admin.settings.academic.sessions.store'),
-            array_merge(['name' => '2027/2028', 'with_terms' => '1'], $overrides),
+            array_merge(['name' => '2028/2029'], $overrides),
         );
     }
 
-    private function addTerm(AcademicSession $session, string $name, array $overrides = [])
+    private function addTerm(string $name, array $overrides = [])
     {
         return $this->actingAs($this->admin)->post(
             route('admin.settings.academic.terms.store'),
-            array_merge(['academic_session_id' => $session->id, 'name' => $name], $overrides),
+            array_merge(['name' => $name, 'dates_in' => $this->thisYear->id], $overrides),
         );
-    }
-
-    private function term(AcademicSession $session, string $name): Term
-    {
-        return $session->terms()->where('name', $name)->sole();
     }
 
     private function student(AcademicSession $session): Student
@@ -99,19 +112,82 @@ class AcademicCalendarTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* A term is the same term in every session                            */
+    /* ------------------------------------------------------------------ */
+
+    public function test_every_session_has_every_term_without_anybody_creating_them(): void
+    {
+        $this->assertSame(['First Term', 'Second Term', 'Third Term'], $this->thisYear->terms->pluck('name')->all());
+        $this->assertSame(['First Term', 'Second Term', 'Third Term'], $this->nextYear->terms->pluck('name')->all());
+
+        // The same records, not copies.
+        $this->assertSame(
+            $this->thisYear->terms->pluck('id')->all(),
+            $this->nextYear->terms->pluck('id')->all(),
+        );
+    }
+
+    /** The point of the whole change: last year's dates survive next year starting. */
+    public function test_the_same_term_keeps_its_own_dates_in_each_session(): void
+    {
+        $this->calendar->setTermDates($this->nextYear, $this->termAt(1), '2027-09-06', '2027-12-17');
+
+        $first = $this->termAt(1);
+
+        $this->assertSame('2026-09-01', $first->datesIn($this->thisYear)?->starts_on?->format('Y-m-d'));
+        $this->assertSame('2026-12-18', $first->datesIn($this->thisYear)?->ends_on?->format('Y-m-d'));
+
+        $this->assertSame('2027-09-06', $first->datesIn($this->nextYear)?->starts_on?->format('Y-m-d'));
+        $this->assertSame('2027-12-17', $first->datesIn($this->nextYear)?->ends_on?->format('Y-m-d'));
+
+        // One term, one set of dates per session.
+        $this->assertSame(1, Term::query()->where('position', 1)->count());
+        $this->assertSame(2, SessionTerm::query()->where('term_id', $first->id)->count());
+    }
+
+    public function test_a_term_answers_without_dates_when_asked_about_no_session(): void
+    {
+        $this->assertNull($this->termAt(1)->datesIn(null));
+    }
+
+    public function test_moving_the_school_on_leaves_every_earlier_session_intact(): void
+    {
+        $student = $this->student($this->thisYear);
+
+        $this->actingAs($this->admin)->put(route('admin.settings.academic.update'), [
+            'academic_session_id' => $this->nextYear->id,
+            'term_id' => $this->termAt(2)->id,
+        ])->assertSessionHas('status');
+
+        // The school is in the new session, in the term it chose.
+        $this->assertTrue($this->nextYear->refresh()->is_current);
+        $this->assertSame('Second Term', Term::current()?->name);
+
+        // And the year it left is exactly as it was, still reachable.
+        $this->assertSame($this->thisYear->id, $student->refresh()->academic_session_id);
+        $this->assertSame(
+            '2026-09-01',
+            $this->termAt(1)->datesIn($this->thisYear)?->starts_on?->format('Y-m-d'),
+        );
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Adding a session                                                    */
     /* ------------------------------------------------------------------ */
 
-    public function test_a_session_can_be_added_and_comes_with_its_three_terms(): void
+    public function test_a_session_can_be_added_and_arrives_with_every_term(): void
     {
         $this->addSession()->assertRedirect()->assertSessionHas('status');
 
-        $session = AcademicSession::query()->where('name', '2027/2028')->sole();
+        $session = AcademicSession::query()->where('name', '2028/2029')->sole();
 
         $this->assertSame(
             ['First Term', 'Second Term', 'Third Term'],
-            $session->terms()->orderBy('position')->pluck('name')->all(),
+            $session->terms->pluck('name')->all(),
         );
+
+        // No dates until somebody sets them.
+        $this->assertNull($this->termAt(1)->datesIn($session)?->starts_on);
     }
 
     /** Moving the school is a separate, deliberate act. */
@@ -119,115 +195,101 @@ class AcademicCalendarTest extends TestCase
     {
         $this->addSession();
 
-        $this->assertFalse(AcademicSession::query()->where('name', '2027/2028')->sole()->is_current);
+        $this->assertFalse(AcademicSession::query()->where('name', '2028/2029')->sole()->is_current);
         $this->assertTrue($this->thisYear->refresh()->is_current);
     }
 
-    public function test_the_terms_can_be_left_out_when_a_session_is_added(): void
+    public function test_a_session_name_is_stored_in_one_shape_and_cannot_repeat(): void
     {
-        $this->addSession(['with_terms' => null]);
+        $this->addSession(['name' => '2028 / 2029']);
+        $this->assertSame(1, AcademicSession::query()->where('name', '2028/2029')->count());
 
-        $this->assertSame(0, AcademicSession::query()->where('name', '2027/2028')->sole()->terms()->count());
-    }
-
-    public function test_a_session_name_is_stored_in_one_shape(): void
-    {
-        $this->addSession(['name' => '2027 / 2028']);
-
-        $this->assertSame('2027/2028', AcademicSession::query()->where('name', '2027/2028')->sole()->name);
-    }
-
-    public function test_the_same_session_cannot_be_added_twice_however_it_is_spaced(): void
-    {
-        $this->addSession(['name' => ' 2027 / 2028 ']);
-        $this->addSession(['name' => '2027/2028'])->assertSessionHasErrors('name');
-
-        $this->assertSame(1, AcademicSession::query()->where('name', '2027/2028')->count());
-    }
-
-    public function test_a_session_name_that_is_not_two_years_is_refused(): void
-    {
+        $this->addSession(['name' => '2028/2029'])->assertSessionHasErrors('name');
         $this->addSession(['name' => 'Next session'])->assertSessionHasErrors('name');
-
-        $this->assertSame(1, AcademicSession::query()->count());
     }
 
     public function test_a_session_cannot_end_before_it_starts(): void
     {
-        $this->addSession([
-            'starts_on' => '2027-09-01',
-            'ends_on' => '2027-07-31',
-        ])->assertSessionHasErrors('ends_on');
+        $this->addSession(['starts_on' => '2028-09-01', 'ends_on' => '2028-07-31'])
+            ->assertSessionHasErrors('ends_on');
     }
 
     public function test_the_next_session_name_is_suggested_by_rolling_the_years_on(): void
     {
-        $this->assertSame('2027/2028', app(AcademicCalendarService::class)->suggestNextSessionName());
+        $this->assertSame('2028/2029', $this->calendar->suggestNextSessionName());
     }
 
     /* ------------------------------------------------------------------ */
     /* Adding a term                                                       */
     /* ------------------------------------------------------------------ */
 
-    public function test_a_term_can_be_added_to_a_session(): void
+    public function test_a_term_added_belongs_to_every_session_at_once(): void
     {
-        $this->addTerm($this->thisYear, 'Fourth Term', ['starts_on' => '2027-04-26']);
+        $this->addTerm('Fourth Term')->assertSessionHas('status');
 
-        $term = $this->term($this->thisYear, 'Fourth Term');
+        $fourth = $this->termAt(4);
 
-        $this->assertSame(4, $term->position);
-        $this->assertFalse($term->is_current);
+        $this->assertSame('Fourth Term', $fourth->name);
+        $this->assertTrue($this->thisYear->refresh()->terms->contains($fourth));
+        $this->assertTrue($this->nextYear->refresh()->terms->contains($fourth));
     }
 
-    /** A term added after a deletion takes the gap, not the end. */
-    public function test_a_new_term_takes_the_first_free_position(): void
+    public function test_a_term_takes_the_first_free_position(): void
     {
-        $this->term($this->thisYear, 'Second Term')->delete();
+        $this->termAt(2)->delete();
 
-        $this->addTerm($this->thisYear, 'Second Term (moved)');
+        $this->addTerm('Second Term (moved)');
 
-        $this->assertSame(2, $this->term($this->thisYear, 'Second Term (moved)')->position);
+        $this->assertSame(2, Term::query()->where('name', 'Second Term (moved)')->sole()->position);
         $this->assertSame(
             ['First Term', 'Second Term (moved)', 'Third Term'],
-            $this->thisYear->terms()->orderBy('position')->pluck('name')->all(),
+            Term::query()->orderBy('position')->pluck('name')->all(),
         );
     }
 
-    public function test_the_same_term_cannot_be_added_twice_to_one_session(): void
+    public function test_a_term_name_cannot_repeat_because_it_would_repeat_in_every_session(): void
     {
-        $this->addTerm($this->thisYear, 'First Term')->assertSessionHas('error');
+        $this->addTerm('First Term')->assertSessionHas('error');
 
-        $this->assertSame(3, $this->thisYear->terms()->count());
+        $this->assertSame(3, Term::query()->count());
     }
 
-    public function test_a_term_can_be_added_to_a_different_session_with_the_same_name(): void
+    public function test_dates_given_with_a_new_term_are_set_for_the_session_named(): void
     {
-        $next = AcademicSession::create(['name' => '2027/2028', 'is_current' => false]);
+        $this->addTerm('Fourth Term', [
+            'dates_in' => $this->nextYear->id,
+            'starts_on' => '2028-04-24',
+            'ends_on' => '2028-07-28',
+        ]);
 
-        $this->addTerm($next, 'First Term')->assertSessionHas('status');
+        $fourth = $this->termAt(4);
 
-        $this->assertSame(1, $next->terms()->count());
+        $this->assertSame('2028-04-24', $fourth->datesIn($this->nextYear)?->starts_on?->format('Y-m-d'));
+        $this->assertNull($fourth->datesIn($this->thisYear)?->starts_on);
     }
 
     /* ------------------------------------------------------------------ */
     /* Deleting                                                            */
     /* ------------------------------------------------------------------ */
 
-    public function test_an_unused_session_can_be_deleted_along_with_its_terms(): void
+    public function test_an_unused_session_can_be_deleted_and_the_terms_stay(): void
     {
         $this->addSession();
-        $session = AcademicSession::query()->where('name', '2027/2028')->sole();
+        $session = AcademicSession::query()->where('name', '2028/2029')->sole();
 
         $this->actingAs($this->admin)
             ->delete(route('admin.settings.academic.sessions.destroy', $session))
-            ->assertRedirect()
             ->assertSessionHas('status');
 
-        $this->assertSame(0, AcademicSession::query()->where('name', '2027/2028')->count());
-        $this->assertSame(0, Term::query()->where('academic_session_id', $session->id)->count());
+        // Queried fresh rather than refreshed: refreshing a deleted row throws.
+        $this->assertFalse(AcademicSession::query()->where('name', '2028/2029')->exists());
+
+        // The terms never belonged to the session, so deleting the year does not
+        // delete them — nor the years that are still running them.
+        $this->assertSame(3, Term::query()->count());
+        $this->assertSame(3, $this->thisYear->refresh()->terms->count());
     }
 
-    /** Deleting the session the school is in would leave every screen without an answer. */
     public function test_the_current_session_cannot_be_deleted(): void
     {
         $this->actingAs($this->admin)
@@ -235,67 +297,49 @@ class AcademicCalendarTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertTrue($this->thisYear->refresh()->exists);
-        $this->assertTrue($this->thisYear->is_current);
     }
 
-    /**
-     * The reason this guard exists at all: the foreign key would have taken the
-     * child with the session, without a word.
-     */
-    public function test_a_session_holding_students_cannot_be_deleted_and_says_so(): void
+    public function test_a_session_holding_students_cannot_be_deleted_and_says_what_is_in_the_way(): void
     {
-        $next = AcademicSession::create(['name' => '2027/2028', 'is_current' => false]);
-        $this->student($next);
+        $this->student($this->nextYear);
+        $this->student($this->nextYear);
 
-        $response = $this->actingAs($this->admin)
-            ->delete(route('admin.settings.academic.sessions.destroy', $next));
-
-        $response->assertSessionHas('error');
+        $this->actingAs($this->admin)
+            ->delete(route('admin.settings.academic.sessions.destroy', $this->nextYear));
 
         $message = (string) session('error');
 
-        $this->assertStringContainsString('1 student', $message);
+        $this->assertStringContainsString('2 students', $message);
         $this->assertStringContainsString('2027/2028', $message);
-
-        $this->assertTrue($next->refresh()->exists);
-        $this->assertSame(1, $next->students()->count());
+        $this->assertTrue($this->nextYear->refresh()->exists);
+        $this->assertSame(2, $this->nextYear->students()->count());
     }
 
-    public function test_the_message_counts_everything_that_is_in_the_way(): void
+    public function test_an_unused_term_can_be_deleted_from_every_session(): void
     {
-        $next = AcademicSession::create(['name' => '2027/2028', 'is_current' => false]);
-        $this->student($next);
-        $this->student($next);
+        $third = $this->termAt(3);
 
         $this->actingAs($this->admin)
-            ->delete(route('admin.settings.academic.sessions.destroy', $next));
-
-        $this->assertStringContainsString('2 students', (string) session('error'));
-    }
-
-    public function test_an_unused_term_can_be_deleted(): void
-    {
-        $term = $this->term($this->thisYear, 'Third Term');
-
-        $this->actingAs($this->admin)
-            ->delete(route('admin.settings.academic.terms.destroy', $term))
+            ->delete(route('admin.settings.academic.terms.destroy', $third))
             ->assertSessionHas('status');
 
-        $this->assertSame(2, $this->thisYear->terms()->count());
+        $this->assertSame(2, Term::query()->count());
+        $this->assertSame(0, SessionTerm::query()->where('term_id', $third->id)->count());
+        $this->assertSame(['First Term', 'Second Term'], $this->thisYear->refresh()->terms->pluck('name')->all());
     }
 
     public function test_the_active_term_cannot_be_deleted(): void
     {
         $this->actingAs($this->admin)
-            ->delete(route('admin.settings.academic.terms.destroy', $this->term($this->thisYear, 'First Term')))
+            ->delete(route('admin.settings.academic.terms.destroy', $this->termAt(1)))
             ->assertSessionHas('error');
 
-        $this->assertSame(3, $this->thisYear->terms()->count());
+        $this->assertSame(3, Term::query()->count());
     }
 
-    public function test_a_term_holding_assessments_cannot_be_deleted(): void
+    public function test_a_term_holding_results_cannot_be_deleted(): void
     {
-        $term = $this->term($this->thisYear, 'Third Term');
+        $third = $this->termAt(3);
 
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $class = SchoolClass::create(['level_id' => $level->id, 'name' => 'JSS1A']);
@@ -304,17 +348,38 @@ class AcademicCalendarTest extends TestCase
         Assessment::create([
             'name' => 'CA1',
             'academic_session_id' => $this->thisYear->id,
-            'term_id' => $term->id,
+            'term_id' => $third->id,
             'school_class_id' => $class->id,
             'subject_id' => $subject->id,
         ]);
 
         $this->actingAs($this->admin)
-            ->delete(route('admin.settings.academic.terms.destroy', $term))
+            ->delete(route('admin.settings.academic.terms.destroy', $third))
             ->assertSessionHas('error');
 
         $this->assertStringContainsString('1 assessment', (string) session('error'));
-        $this->assertTrue($term->refresh()->exists);
+        $this->assertTrue($third->refresh()->exists);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Setting the dates of one session's term                             */
+    /* ------------------------------------------------------------------ */
+
+    public function test_term_dates_can_be_set_for_one_session_without_touching_another(): void
+    {
+        $this->actingAs($this->admin)->put(
+            route('admin.settings.academic.terms.dates', $this->termAt(2)),
+            [
+                'academic_session_id' => $this->nextYear->id,
+                'starts_on' => '2028-01-10',
+                'ends_on' => '2028-04-06',
+            ],
+        )->assertSessionHas('status');
+
+        $second = $this->termAt(2);
+
+        $this->assertSame('2028-01-10', $second->datesIn($this->nextYear)?->starts_on?->format('Y-m-d'));
+        $this->assertNull($second->datesIn($this->thisYear)?->starts_on);
     }
 
     /* ------------------------------------------------------------------ */
@@ -326,76 +391,70 @@ class AcademicCalendarTest extends TestCase
         $examOfficer = User::factory()->create();
         $examOfficer->assignRole('Exam Officer');
 
-        $term = $this->term($this->thisYear, 'Third Term');
-
         $this->actingAs($examOfficer)->post(route('admin.settings.academic.sessions.store'), [
-            'name' => '2027/2028',
+            'name' => '2028/2029',
         ])->assertForbidden();
 
-        $this->actingAs($examOfficer)
-            ->delete(route('admin.settings.academic.sessions.destroy', $this->thisYear))
-            ->assertForbidden();
-
         $this->actingAs($examOfficer)->post(route('admin.settings.academic.terms.store'), [
-            'academic_session_id' => $this->thisYear->id,
             'name' => 'Fourth Term',
         ])->assertForbidden();
 
         $this->actingAs($examOfficer)
-            ->delete(route('admin.settings.academic.terms.destroy', $term))
+            ->delete(route('admin.settings.academic.terms.destroy', $this->termAt(3)))
             ->assertForbidden();
 
-        $this->assertSame(3, $this->thisYear->terms()->count());
+        $this->assertSame(3, Term::query()->count());
     }
 
     /* ------------------------------------------------------------------ */
     /* The page                                                            */
     /* ------------------------------------------------------------------ */
 
-    public function test_the_page_shows_the_calendar_and_offers_the_deletions_that_would_work(): void
+    public function test_the_page_shows_sessions_and_terms_as_two_separate_lists(): void
     {
-        $next = AcademicSession::create(['name' => '2027/2028', 'is_current' => false]);
-        $this->student($next);
+        $this->student($this->nextYear);
 
-        $unused = AcademicSession::create(['name' => '2028/2029', 'is_current' => false]);
+        $this->addSession(['name' => '2028/2029']);
+        $unused = AcademicSession::query()->where('name', '2028/2029')->sole();
 
         $html = $this->actingAs($this->admin)
             ->get(route('admin.settings.index'))
             ->assertOk()
-            ->assertSee('Sessions and terms')
+            ->assertSee('Terms')
+            ->assertSee('Add a term')
             ->assertSee('Add an academic session')
-            ->assertSee('Add term')
+            ->assertSee('the same in every session')
+            ->assertSee('First Term')
+            ->assertSee('Second Term')
+            ->assertSee('Third Term')
             ->getContent();
 
-        // Nothing is offered for the session in use, or one holding a child.
+        // The terms are listed once for the school, not once per session: three
+        // terms means three date editors, however many sessions exist.
+        $this->assertSame(3, substr_count($html, 'Set dates for a session'));
+
+        // Deletions are offered only where they would work. Matched on the form
+        // action: the bare URL is also a prefix of that term's dates endpoint.
         $this->assertStringNotContainsString(
-            route('admin.settings.academic.sessions.destroy', $this->thisYear),
+            'action="' . route('admin.settings.academic.sessions.destroy', $this->thisYear) . '"',
             $html,
             'A delete button was offered for the current session.',
         );
 
         $this->assertStringNotContainsString(
-            route('admin.settings.academic.sessions.destroy', $next),
+            'action="' . route('admin.settings.academic.terms.destroy', $this->termAt(1)) . '"',
             $html,
-            'A delete button was offered for a session holding a student.',
+            'A delete button was offered for the active term.',
         );
 
-        // An empty one, and the term that is not active, are both offered.
-        $this->assertStringContainsString(route('admin.settings.academic.sessions.destroy', $unused), $html);
         $this->assertStringContainsString(
-            route('admin.settings.academic.terms.destroy', $this->term($this->thisYear, 'Third Term')),
+            'action="' . route('admin.settings.academic.sessions.destroy', $unused) . '"',
             $html,
         );
-    }
 
-    public function test_the_page_says_what_is_held_against_a_session_that_cannot_be_deleted(): void
-    {
-        $next = AcademicSession::create(['name' => '2027/2028', 'is_current' => false]);
-        $this->student($next);
-
-        $this->actingAs($this->admin)
-            ->get(route('admin.settings.index'))
-            ->assertOk()
-            ->assertSee('Holds 1 student');
+        $this->assertStringContainsString(
+            'action="' . route('admin.settings.academic.terms.destroy', $this->termAt(3)) . '"',
+            $html,
+        );
     }
 }

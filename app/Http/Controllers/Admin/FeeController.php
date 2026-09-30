@@ -93,7 +93,7 @@ class FeeController extends Controller
                 ->orderBy('level_id')
                 ->get(),
             'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
-            'terms' => Term::query()->with('academicSession')->orderByDesc('academic_session_id')->get(),
+            'terms' => Term::query()->orderBy('position')->get(),
             'levels' => SchoolLevel::query()->active()->get(),
         ]);
     }

@@ -6,6 +6,7 @@ use App\Models\AcademicSession;
 use App\Models\GradeScale;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
+use App\Models\SessionTerm;
 use App\Models\Subject;
 use App\Models\Term;
 use Illuminate\Database\Seeder;
@@ -35,9 +36,19 @@ class AcademicSeeder extends Seeder
             ['name' => 'Second Term', 'position' => 2, 'starts_on' => '2027-01-11', 'ends_on' => '2027-04-02', 'is_current' => false],
             ['name' => 'Third Term', 'position' => 3, 'starts_on' => '2027-04-26', 'ends_on' => '2027-07-31', 'is_current' => false],
         ] as $term) {
-            Term::updateOrCreate(
-                ['academic_session_id' => $session->id, 'position' => $term['position']],
-                $term + ['academic_session_id' => $session->id],
+            // A term belongs to every session, so it is created once by position —
+            // not once per session — and never rewritten once it exists. A school
+            // that renamed a term has said something.
+            $row = Term::firstOrCreate(
+                ['position' => $term['position']],
+                ['name' => $term['name'], 'is_current' => $term['is_current']],
+            );
+
+            // The dates are the part that is per session, and are only laid down if
+            // nobody has set them. Next year's dates will not overwrite this year's.
+            SessionTerm::firstOrCreate(
+                ['academic_session_id' => $session->id, 'term_id' => $row->id],
+                ['starts_on' => $term['starts_on'], 'ends_on' => $term['ends_on']],
             );
         }
 

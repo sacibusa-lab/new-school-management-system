@@ -34,11 +34,15 @@
                 @endif
             </p>
 
-            @if ($currentTerm && ($currentTerm->starts_on || $currentTerm->ends_on))
+            @php
+                // A term has no dates of its own; the dates belong to the pair of
+                // term and session, so this asks for the current session's.
+                $currentDates = $currentTerm?->datesIn($currentSession);
+            @endphp
+
+            @if ($currentDates && $currentDates->describe())
                 <p class="mt-0.5 text-xs text-muted">
-                    {{ $currentTerm->starts_on?->format('j M Y') ?? '—' }}
-                    to
-                    {{ $currentTerm->ends_on?->format('j M Y') ?? '—' }}
+                    {{ $currentDates->describe() }}
                 </p>
             @endif
         </div>
@@ -75,22 +79,18 @@
 
                 <div>
                     <label for="term_id" class="label">Active term</label>
-                    {{-- Grouped by session rather than swapped by script: one save sets
-                         both, and the pairing is visible instead of implied. --}}
+                    {{-- One flat list, not one grouped by session: a term belongs to
+                         every session, so there is nothing to group it by. --}}
                     <select id="term_id" name="term_id"
                             class="input @error('term_id') input-error @enderror">
-                        @foreach ($sessions as $session)
-                            <optgroup label="{{ $session->name }}">
-                                @forelse ($session->terms as $term)
-                                    <option value="{{ $term->id }}"
-                                            @selected((int) old('term_id', $currentTerm?->id) === $term->id)>
-                                        {{ $term->name }}
-                                    </option>
-                                @empty
-                                    <option value="" disabled>No terms yet — they will be created</option>
-                                @endforelse
-                            </optgroup>
-                        @endforeach
+                        @forelse ($terms as $term)
+                            <option value="{{ $term->id }}"
+                                    @selected((int) old('term_id', $currentTerm?->id) === $term->id)>
+                                {{ $term->name }}
+                            </option>
+                        @empty
+                            <option value="" disabled>No terms yet — add them below</option>
+                        @endforelse
                     </select>
 
                     @error('term_id')
@@ -100,7 +100,7 @@
             </div>
 
             <p class="hint mt-3">
-                A session with no terms has First, Second and Third Term laid down for it.
+                The active term is the term the school is in, for the session it is in.
             </p>
 
             <button type="submit" class="btn-primary mt-5">Set session and term</button>
@@ -123,11 +123,13 @@
             </div>
 
             <span class="badge-neutral">
-                {{ $sessions->sum(fn ($s) => $s->terms->count()) }} term(s) across {{ $sessions->count() }} session(s)
+                {{ $sessions->count() }} session(s) · {{ $terms->count() }} term(s), the same in every session
             </span>
         </div>
 
-        <div class="mt-5 space-y-4">
+        {{-- ================= Sessions =================
+             A year. Its terms are not listed under it, because they are not its. --}}
+        <div class="mt-5 space-y-3">
             @foreach ($sessions as $session)
                 @php
                     // Counted up front so a delete button is never offered for
@@ -135,124 +137,46 @@
                     $blockers = $academic->blockers($session);
                 @endphp
 
-                <div class="rounded-2xl border border-line">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft p-4">
-                        <div>
-                            <p class="flex items-center gap-2 font-display text-sm font-semibold text-ink">
-                                {{ $session->name }}
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-4">
+                    <div>
+                        <p class="flex items-center gap-2 font-display text-sm font-semibold text-ink">
+                            {{ $session->name }}
 
-                                @if ($session->is_current)
-                                    <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">Current</span>
-                                @endif
-                            </p>
-
-                            <p class="mt-0.5 text-xs text-muted">
-                                @if ($session->starts_on || $session->ends_on)
-                                    {{ $session->starts_on?->format('j M Y') ?? '—' }}
-                                    to
-                                    {{ $session->ends_on?->format('j M Y') ?? '—' }}
-                                @else
-                                    No dates set
-                                @endif
-                            </p>
-
-                            @if ($blockers !== [])
-                                <p class="mt-1 text-xs text-muted">
-                                    Holds {{ $academic->describe($blockers) }}
-                                </p>
+                            @if ($session->is_current)
+                                <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">Current</span>
                             @endif
-                        </div>
+                        </p>
 
-                        @if ($session->is_current)
-                            <p class="text-xs text-muted">The session the school is in cannot be deleted</p>
-                        @elseif ($blockers !== [])
-                            <p class="text-xs text-muted">Has records against it, so it cannot be deleted</p>
-                        @else
-                            <form method="POST"
-                                  action="{{ route('admin.settings.academic.sessions.destroy', $session) }}"
-                                  onsubmit="return confirm('Delete {{ $session->name }} and its {{ $session->terms->count() }} term(s)?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Delete session</button>
-                            </form>
+                        <p class="mt-0.5 text-xs text-muted">
+                            @if ($session->starts_on || $session->ends_on)
+                                {{ $session->starts_on?->format('j M Y') ?? '—' }}
+                                to
+                                {{ $session->ends_on?->format('j M Y') ?? '—' }}
+                            @else
+                                No dates set
+                            @endif
+                        </p>
+
+                        @if ($blockers !== [])
+                            <p class="mt-1 text-xs text-muted">
+                                Holds {{ $academic->describe($blockers) }}
+                            </p>
                         @endif
                     </div>
 
-                    <ul class="divide-y divide-line-soft">
-                        @forelse ($session->terms as $term)
-                            @php $termBlockers = $academic->termBlockers($term); @endphp
-
-                            <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                                <div class="min-w-0">
-                                    <p class="flex items-center gap-2 text-sm text-ink-soft">
-                                        {{ $term->name }}
-
-                                        @if ($term->is_current)
-                                            <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">Active</span>
-                                        @endif
-                                    </p>
-
-                                    <p class="mt-0.5 text-xs text-muted">
-                                        @if ($term->starts_on || $term->ends_on)
-                                            {{ $term->starts_on?->format('j M Y') ?? '—' }}
-                                            to
-                                            {{ $term->ends_on?->format('j M Y') ?? '—' }}
-                                        @else
-                                            No dates set
-                                        @endif
-                                    </p>
-                                </div>
-
-                                @if ($term->is_current)
-                                    <p class="text-xs text-muted">The active term cannot be deleted</p>
-                                @elseif ($termBlockers !== [])
-                                    <p class="text-xs text-muted">Holds {{ $academic->describe($termBlockers) }}</p>
-                                @else
-                                    <form method="POST"
-                                          action="{{ route('admin.settings.academic.terms.destroy', $term) }}"
-                                          onsubmit="return confirm('Delete {{ $term->name }} from {{ $session->name }}?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Delete</button>
-                                    </form>
-                                @endif
-                            </li>
-                        @empty
-                            <li class="px-4 py-3 text-xs text-muted">
-                                No terms yet — add one below, or set this session as current and the
-                                standard three will be created for it.
-                            </li>
-                        @endforelse
-
-                        {{-- Add a term, in place, under the terms it joins. --}}
-                        <li class="bg-surface-2 px-4 py-3">
-                            <form method="POST" action="{{ route('admin.settings.academic.terms.store') }}"
-                                  class="flex flex-wrap items-end gap-3">
-                                @csrf
-                                <input type="hidden" name="academic_session_id" value="{{ $session->id }}">
-
-                                <div class="min-w-40 flex-1">
-                                    <label for="term_name_{{ $session->id }}" class="sr-only">Term name</label>
-                                    <input id="term_name_{{ $session->id }}" name="name" type="text" required
-                                           placeholder="Term name, e.g. First Term" class="input py-2 text-sm">
-                                </div>
-
-                                <div>
-                                    <label for="term_starts_{{ $session->id }}" class="sr-only">Starts</label>
-                                    <input id="term_starts_{{ $session->id }}" name="starts_on" type="date"
-                                           class="input py-2 text-sm" title="Starts on">
-                                </div>
-
-                                <div>
-                                    <label for="term_ends_{{ $session->id }}" class="sr-only">Ends</label>
-                                    <input id="term_ends_{{ $session->id }}" name="ends_on" type="date"
-                                           class="input py-2 text-sm" title="Ends on">
-                                </div>
-
-                                <button type="submit" class="btn-secondary btn-sm">Add term</button>
-                            </form>
-                        </li>
-                    </ul>
+                    @if ($session->is_current)
+                        <p class="text-xs text-muted">The session the school is in cannot be deleted</p>
+                    @elseif ($blockers !== [])
+                        <p class="text-xs text-muted">Has records against it, so it cannot be deleted</p>
+                    @else
+                        <form method="POST"
+                              action="{{ route('admin.settings.academic.sessions.destroy', $session) }}"
+                              onsubmit="return confirm('Delete {{ $session->name }}? Its terms are shared, so they stay.')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Delete session</button>
+                        </form>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -265,8 +189,9 @@
 
             <p class="text-sm font-semibold text-ink">Add an academic session</p>
             <p class="mt-1 text-xs text-muted">
-                It is added without becoming the session the school is in — moving the school is a
-                separate step, so a session can be set up before it starts.
+                It arrives with every term already in it — terms are not created per session — and it
+                is not made current. Moving the school is a separate step, so a session can be set up
+                before it starts.
             </p>
 
             <div class="mt-3 flex flex-wrap items-end gap-3">
@@ -289,12 +214,6 @@
                            value="{{ old('ends_on') }}" class="input @error('ends_on') input-error @enderror">
                 </div>
 
-                <label class="flex items-center gap-2 pb-2 text-xs text-ink-soft">
-                    <input type="checkbox" name="with_terms" value="1" checked
-                           class="h-4 w-4 rounded border-line text-brand-700 dark:text-brand-200 focus:ring-brand-500">
-                    Create First, Second and Third Term for it
-                </label>
-
                 <button type="submit" class="btn-primary btn-sm">Add session</button>
             </div>
 
@@ -308,6 +227,152 @@
                 <p class="error-text">{{ $message }}</p>
             @enderror
         </form>
+
+        {{-- ================= Terms =================
+             One set for the school, not one set per session. The dates shown are for
+             the session the school is in; each term keeps its own dates in each
+             session, so setting next year's does not touch last year's. --}}
+        <div class="mt-8 rounded-2xl border border-line">
+            <div class="border-b border-line-soft p-4">
+                <p class="text-sm font-semibold text-ink">Terms</p>
+                <p class="mt-1 max-w-2xl text-xs text-muted">
+                    The same terms run in every session — First Term is First Term in 2026/2027 and in
+                    2027/2028. A term is added once here and belongs to every session from then on,
+                    including sessions added later. Results are stored against the term
+                    <em>and</em> the session, so moving the school on leaves every earlier session
+                    reachable.
+                </p>
+            </div>
+
+            <ul class="divide-y divide-line-soft">
+                @foreach ($terms as $term)
+                    @php
+                        $termBlockers = $academic->termBlockers($term);
+                        $datesHere = $term->datesIn($currentSession);
+                    @endphp
+
+                    <li class="px-4 py-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="flex items-center gap-2 text-sm text-ink-soft">
+                                    {{ $term->name }}
+
+                                    @if ($term->is_current)
+                                        <span class="badge bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20">Active</span>
+                                    @endif
+                                </p>
+
+                                <p class="mt-0.5 text-xs text-muted">
+                                    {{ $currentSession?->name ?? 'No current session' }}:
+                                    {{ $datesHere?->describe() ?? 'no dates set' }}
+                                </p>
+                            </div>
+
+                            @if ($term->is_current)
+                                <p class="text-xs text-muted">The active term cannot be deleted</p>
+                            @elseif ($termBlockers !== [])
+                                <p class="text-xs text-muted">Holds {{ $academic->describe($termBlockers) }}</p>
+                            @else
+                                <form method="POST"
+                                      action="{{ route('admin.settings.academic.terms.destroy', $term) }}"
+                                      onsubmit="return confirm('Delete {{ $term->name }}? It is removed from every session.')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn-ghost btn-sm text-rose-600 dark:text-rose-400">Delete</button>
+                                </form>
+                            @endif
+                        </div>
+
+                        {{-- Dates are the one thing that IS per session, so they are
+                             edited against a named session rather than the term. --}}
+                        <details class="mt-2">
+                            <summary class="cursor-pointer text-xs font-medium text-brand-700 hover:text-brand-900 dark:text-brand-200">
+                                Set dates for a session
+                            </summary>
+
+                            <form method="POST" action="{{ route('admin.settings.academic.terms.dates', $term) }}"
+                                  class="mt-3 flex flex-wrap items-end gap-3">
+                                @csrf
+                                @method('PUT')
+
+                                <div class="min-w-40">
+                                    <label for="dates_session_{{ $term->id }}" class="label">Session</label>
+                                    <select id="dates_session_{{ $term->id }}" name="academic_session_id" class="input py-2 text-sm">
+                                        @foreach ($sessions as $session)
+                                            <option value="{{ $session->id }}" @selected($session->id === $currentSession?->id)>
+                                                {{ $session->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="dates_starts_{{ $term->id }}" class="label">Starts</label>
+                                    <input id="dates_starts_{{ $term->id }}" name="starts_on" type="date"
+                                           value="{{ $datesHere?->starts_on?->format('Y-m-d') }}" class="input py-2 text-sm">
+                                </div>
+
+                                <div>
+                                    <label for="dates_ends_{{ $term->id }}" class="label">Ends</label>
+                                    <input id="dates_ends_{{ $term->id }}" name="ends_on" type="date"
+                                           value="{{ $datesHere?->ends_on?->format('Y-m-d') }}" class="input py-2 text-sm">
+                                </div>
+
+                                <button type="submit" class="btn-secondary btn-sm">Save dates</button>
+                            </form>
+                        </details>
+                    </li>
+                @endforeach
+            </ul>
+
+            {{-- Add a term. It joins every session at once. --}}
+            <form method="POST" action="{{ route('admin.settings.academic.terms.store') }}"
+                  class="flex flex-wrap items-end gap-3 border-t border-line-soft bg-surface-2 p-4">
+                @csrf
+
+                <div class="min-w-44 flex-1">
+                    <label for="new_term_name" class="label">Add a term</label>
+                    <input id="new_term_name" name="name" type="text" required
+                           value="{{ old('name') }}"
+                           placeholder="Term name, e.g. Fourth Term"
+                           class="input @error('name') input-error @enderror">
+                </div>
+
+                <div class="min-w-36">
+                    <label for="new_term_session" class="label">Dates in</label>
+                    <select id="new_term_session" name="dates_in" class="input">
+                        @foreach ($sessions as $session)
+                            <option value="{{ $session->id }}" @selected($session->id === $currentSession?->id)>
+                                {{ $session->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label for="new_term_starts" class="label">Starts</label>
+                    <input id="new_term_starts" name="starts_on" type="date"
+                           value="{{ old('starts_on') }}" class="input @error('starts_on') input-error @enderror">
+                </div>
+
+                <div>
+                    <label for="new_term_ends" class="label">Ends</label>
+                    <input id="new_term_ends" name="ends_on" type="date"
+                           value="{{ old('ends_on') }}" class="input @error('ends_on') input-error @enderror">
+                </div>
+
+                <button type="submit" class="btn-primary btn-sm">Add term</button>
+
+                <p class="hint mt-0 w-full">
+                    The dates are optional and belong to the session chosen — a term's dates are its
+                    own in each session.
+                </p>
+            </form>
+
+            @error('name')
+                <p class="error-text px-4 pb-4">{{ $message }}</p>
+            @enderror
+        </div>
     </div>
 </div>
 
