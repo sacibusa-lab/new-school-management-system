@@ -79,6 +79,10 @@
             @endif
 
             <div class="mt-10">
+                @if ($data['signature'])
+                    <img src="{{ asset('storage/' . $data['signature']) }}" alt="" class="mb-1 h-12 w-auto">
+                @endif
+
                 <p class="border-t border-slate-300 pt-2 text-sm font-semibold">
                     {{ $data['letter']['signatory'] ?: '_______________________' }}
                 </p>

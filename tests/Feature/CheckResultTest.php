@@ -248,6 +248,25 @@ class CheckResultTest extends TestCase
             ->assertDontSee('Not published to parents');
     }
 
+    /**
+     * The slip is the school's document, and it leaves the building signed with the
+     * same signature the admission letter carries: one upload, one hand.
+     */
+    public function test_the_printable_slip_carries_the_school_signature(): void
+    {
+        $result = $this->reportCard($this->session, $this->firstTerm, ResultStatus::Published);
+
+        Setting::put('signature_image', 'branding/signature.png');
+        Setting::flush();
+
+        $this->get(route('public.result.slip', $result).'?student_number=SAC/2026/001&surname=Okafor')
+            ->assertOk()
+            ->assertSee('storage/branding/signature.png', false)
+            // Unescaped: the caption is plain markup, and assertSee escapes what it
+            // is given, so the apostrophe was being looked for as &#039;.
+            ->assertSee("Principal's signature", false);
+    }
+
     public function test_it_says_when_the_student_has_no_result_for_that_year_and_term(): void
     {
         $this->reportCard($this->session, $this->firstTerm, ResultStatus::Published);

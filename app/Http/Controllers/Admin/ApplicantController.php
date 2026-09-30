@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\ApplicantStatus;
+use App\Enums\SequenceType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAdminApplicantRequest;
 use App\Models\AcademicSession;
@@ -17,7 +18,9 @@ use App\Services\Admissions\ApplicantPhotoService;
 use App\Services\Admissions\DuplicateApplicantService;
 use App\Services\ApplicantRegistrationService;
 use App\Services\NumberSequenceService;
+use App\Support\NigerianStates;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -36,8 +39,7 @@ class ApplicantController extends Controller
         private readonly ApplicantPhotoService $photos,
         private readonly ApplicantDocumentService $documents,
         private readonly DuplicateApplicantService $duplicates,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -77,7 +79,7 @@ class ApplicantController extends Controller
      * Shared deliberately: if the office filters the list and then exports it,
      * the file must contain exactly what they were looking at.
      *
-     * @return \Illuminate\Database\Eloquent\Builder<Applicant>
+     * @return Builder<Applicant>
      */
     protected function filtered(Request $request)
     {
@@ -142,11 +144,11 @@ class ApplicantController extends Controller
         $csv = (string) stream_get_contents($handle);
         fclose($handle);
 
-        $filename = 'applicants-' . now()->format('Y-m-d-His') . '.csv';
+        $filename = 'applicants-'.now()->format('Y-m-d-His').'.csv';
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -230,7 +232,7 @@ class ApplicantController extends Controller
             'guardian_relationship' => ['nullable', 'string', 'max:60'],
             'guardian_phone' => ['nullable', 'string', 'max:30'],
             'guardian_email' => ['nullable', 'email', 'max:150'],
-            'status' => ['required', 'string', 'in:' . implode(',', ApplicantStatus::values())],
+            'status' => ['required', 'string', 'in:'.implode(',', ApplicantStatus::values())],
             'admin_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -257,7 +259,7 @@ class ApplicantController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /* Registration — done by the office, not the applicant                */
+    /* Registration — done by the office, not the applicant */
     /* ------------------------------------------------------------------ */
 
     /** The form the officer fills in from a paper application. */
@@ -267,8 +269,8 @@ class ApplicantController extends Controller
 
         return view('admin.applicants.create', [
             'levels' => SchoolLevel::query()->where('is_active', true)->orderBy('order')->get(),
-            'states' => \App\Support\NigerianStates::options(),
-            'nextNumber' => $sequences->preview(\App\Enums\SequenceType::AdmissionRegistration),
+            'states' => NigerianStates::options(),
+            'nextNumber' => $sequences->preview(SequenceType::AdmissionRegistration),
             'session' => AcademicSession::query()->where('is_admission_open', true)->first()
                 ?? AcademicSession::current(),
         ]);
@@ -327,11 +329,11 @@ class ApplicantController extends Controller
             return;
         }
 
-        session()->flash('warning', 'Possible duplicate — ' . implode(' ', array_unique($found)) . ' Check it is not the same child, and delete one of the two if it is.');
+        session()->flash('warning', 'Possible duplicate — '.implode(' ', array_unique($found)).' Check it is not the same child, and delete one of the two if it is.');
     }
 
     /* ------------------------------------------------------------------ */
-    /* Bulk registration                                                   */
+    /* Bulk registration */
     /* ------------------------------------------------------------------ */
 
     public function import(Request $request): View
@@ -436,7 +438,7 @@ class ApplicantController extends Controller
         if ($result['imported'] === 0) {
             return redirect()
                 ->route('admin.applicants.import')
-                ->with('error', 'Nothing was registered. ' . collect($result['failed'])->pluck('reason')->unique()->implode(' '));
+                ->with('error', 'Nothing was registered. '.collect($result['failed'])->pluck('reason')->unique()->implode(' '));
         }
 
         $message = sprintf(
@@ -447,16 +449,16 @@ class ApplicantController extends Controller
         );
 
         if ($result['failed'] !== []) {
-            $message .= ' ' . count($result['failed']) . ' row(s) could not be registered and were skipped.';
+            $message .= ' '.count($result['failed']).' row(s) could not be registered and were skipped.';
         }
 
         return redirect()
             ->route('admin.applicants.index')
-            ->with('status', $message . ' They now appear in the applicants list and can be added to an examination.');
+            ->with('status', $message.' They now appear in the applicants list and can be added to an examination.');
     }
 
     /* ------------------------------------------------------------------ */
-    /* Photographs                                                         */
+    /* Photographs */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -489,17 +491,17 @@ class ApplicantController extends Controller
         $this->authorize('admissions.update');
 
         $request->validate([
-            'photos' => ['required', 'array', 'min:1', 'max:' . ApplicantPhotoService::MAX_FILES],
+            'photos' => ['required', 'array', 'min:1', 'max:'.ApplicantPhotoService::MAX_FILES],
             'photos.*' => [
                 'file',
-                'mimes:' . ApplicantPhotoService::EXTENSIONS,
-                'max:' . ApplicantPhotoService::MAX_KB,
+                'mimes:'.ApplicantPhotoService::EXTENSIONS,
+                'max:'.ApplicantPhotoService::MAX_KB,
             ],
         ], [
             'photos.required' => 'Choose the photographs to upload.',
-            'photos.max' => 'That is more than ' . ApplicantPhotoService::MAX_FILES . ' photographs. Split them into batches.',
+            'photos.max' => 'That is more than '.ApplicantPhotoService::MAX_FILES.' photographs. Split them into batches.',
             'photos.*.mimes' => 'Every file has to be a photograph — JPG, PNG or WEBP.',
-            'photos.*.max' => 'Each photograph has to be under ' . (int) (ApplicantPhotoService::MAX_KB / 1024) . ' MB.',
+            'photos.*.max' => 'Each photograph has to be under '.(int) (ApplicantPhotoService::MAX_KB / 1024).' MB.',
         ]);
 
         // A fresh upload replaces the previous batch, including its parked files.
@@ -553,13 +555,13 @@ class ApplicantController extends Controller
         if ($result['attached'] === 0) {
             return redirect()
                 ->route('admin.applicants.photos')
-                ->with('error', 'Nothing was attached. ' . implode(' ', $result['failed']));
+                ->with('error', 'Nothing was attached. '.implode(' ', $result['failed']));
         }
 
-        $message = $result['attached'] . ' photograph(s) attached to their candidates.';
+        $message = $result['attached'].' photograph(s) attached to their candidates.';
 
         if ($result['skipped'] > 0) {
-            $message .= ' ' . $result['skipped'] . ' file(s) were left alone.';
+            $message .= ' '.$result['skipped'].' file(s) were left alone.';
         }
 
         return redirect()
@@ -591,15 +593,15 @@ class ApplicantController extends Controller
         $this->authorize('admissions.update');
 
         $validated = $request->validate([
-            'photo' => ['required', 'file', 'mimes:' . ApplicantPhotoService::EXTENSIONS, 'max:' . ApplicantPhotoService::MAX_KB],
+            'photo' => ['required', 'file', 'mimes:'.ApplicantPhotoService::EXTENSIONS, 'max:'.ApplicantPhotoService::MAX_KB],
         ], [
             'photo.mimes' => 'That has to be a photograph — JPG, PNG or WEBP.',
-            'photo.max' => 'That photograph is over ' . (int) (ApplicantPhotoService::MAX_KB / 1024) . ' MB.',
+            'photo.max' => 'That photograph is over '.(int) (ApplicantPhotoService::MAX_KB / 1024).' MB.',
         ]);
 
         $this->photos->store($applicant, $validated['photo']);
 
-        return back()->with('status', 'Photograph saved for ' . $applicant->full_name . '.');
+        return back()->with('status', 'Photograph saved for '.$applicant->full_name.'.');
     }
 
     public function destroyPhoto(Applicant $applicant): RedirectResponse
@@ -608,7 +610,7 @@ class ApplicantController extends Controller
 
         $this->photos->remove($applicant);
 
-        return back()->with('status', 'Photograph removed from ' . $applicant->full_name . '.');
+        return back()->with('status', 'Photograph removed from '.$applicant->full_name.'.');
     }
 
     /**
@@ -620,17 +622,17 @@ class ApplicantController extends Controller
         $this->authorize('admissions.update');
 
         $request->validate([
-            'documents' => ['required', 'array', 'min:1', 'max:' . ApplicantDocumentService::MAX_PER_UPLOAD],
+            'documents' => ['required', 'array', 'min:1', 'max:'.ApplicantDocumentService::MAX_PER_UPLOAD],
             'documents.*' => [
                 'file',
-                'mimes:' . ApplicantDocumentService::EXTENSIONS,
-                'max:' . ApplicantDocumentService::MAX_KB,
+                'mimes:'.ApplicantDocumentService::EXTENSIONS,
+                'max:'.ApplicantDocumentService::MAX_KB,
             ],
         ], [
             'documents.required' => 'Choose the file(s) to attach.',
             'documents.*.mimes' => 'Documents have to be a PDF, JPG, PNG or WEBP.',
-            'documents.*.max' => 'A document may not be over ' . (int) (ApplicantDocumentService::MAX_KB / 1024) . ' MB.',
-            'documents.max' => 'Attach at most ' . ApplicantDocumentService::MAX_PER_UPLOAD . ' files at a time.',
+            'documents.*.max' => 'A document may not be over '.(int) (ApplicantDocumentService::MAX_KB / 1024).' MB.',
+            'documents.max' => 'Attach at most '.ApplicantDocumentService::MAX_PER_UPLOAD.' files at a time.',
         ]);
 
         $count = 0;
@@ -670,7 +672,7 @@ class ApplicantController extends Controller
             return back()->with('error', 'That document is not held against this applicant.');
         }
 
-        return back()->with('status', 'Document removed from ' . $applicant->full_name . '.');
+        return back()->with('status', 'Document removed from '.$applicant->full_name.'.');
     }
 
     /** Drop the previous batch's parked files so nothing is left behind. */
@@ -761,9 +763,10 @@ class ApplicantController extends Controller
             'This applicant has not been admitted, so no letter can be issued.',
         );
 
-        $pdf = Pdf::loadView('admin.applicants.letter-pdf', $letters->render($applicant))
-            ->setPaper('a4');
+        $pdf = Pdf::loadView('admin.applicants.letter-pdf', $letters->render($applicant) + [
+            'signatureData' => $letters->signatureDataUri(),
+        ])->setPaper('a4');
 
-        return $pdf->download('admission-letter-' . Str::slug((string) $applicant->registration_number) . '.pdf');
+        return $pdf->download('admission-letter-'.Str::slug((string) $applicant->registration_number).'.pdf');
     }
 }

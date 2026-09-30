@@ -104,6 +104,8 @@ class SettingLayout
             'admission_letter_body',
             'admission_letter_signatory',
             'admission_letter_signatory_title',
+            // The picture of the signature, under the name and title it belongs to.
+            'signature_image',
             'admission_letter_note',
         ],
 

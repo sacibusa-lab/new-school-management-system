@@ -44,6 +44,7 @@ class SettingsSeeder extends Seeder
             ['key' => 'admission_letter_body', 'value' => "Dear {guardian_name},\n\nWe are pleased to inform you that {full_name} has been offered admission into {class} at {school_name} for the {session} academic session.\n\nAdmission number: {admission_number}\nRegistration number: {registration_number}\nEntrance examination average: {average} (cutoff mark: {cutoff})\n\nPlease report to the school office with this letter to complete registration and pay the required fees. This offer is subject to verification of the documents you submitted.\n\nCongratulations.", 'group' => 'letters', 'type' => 'text', 'label' => 'Letter body'],
             ['key' => 'admission_letter_signatory_title', 'value' => 'Principal', 'group' => 'letters', 'label' => 'Signatory title'],
             ['key' => 'admission_letter_signatory', 'value' => '', 'group' => 'letters', 'label' => 'Signatory name'],
+            ['key' => 'signature_image', 'value' => null, 'group' => 'letters', 'type' => 'image', 'label' => 'Signature image'],
             ['key' => 'admission_letter_note', 'value' => 'This offer is subject to verification of the documents you submitted. Please bring the originals when you report.', 'group' => 'letters', 'type' => 'text', 'label' => 'Note printed at the foot of the letter'],
 
             // Messaging

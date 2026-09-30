@@ -131,6 +131,10 @@
             </div>
 
             <div class="text-center">
+                @if ($signature)
+                    <img src="{{ asset('storage/' . $signature) }}" alt="" class="mx-auto h-12 w-auto">
+                @endif
+
                 <div class="w-48 border-b border-slate-400"></div>
                 <p class="mt-1.5 text-xs text-slate-500">Principal's signature</p>
             </div>

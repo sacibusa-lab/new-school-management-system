@@ -5,7 +5,10 @@
     $inputId = 'setting_' . $setting->key;
     $errorKey = 'settings.' . $setting->key . '.file';
     $isFavicon = $setting->key === 'school_favicon';
-    $what = $isFavicon ? 'favicon' : 'logo';
+    $isSignature = $setting->key === 'signature_image';
+    // Named after the setting itself rather than assumed to be the logo: this is
+    // also the crest, the favicon, and the Principal's signature.
+    $what = strtolower($setting->label ?? 'image');
     $accept = \App\Services\Branding\BrandingService::ACCEPT;
     $maxMb = round(\App\Services\Branding\BrandingService::MAX_KB / 1024);
 @endphp
@@ -52,7 +55,11 @@
         @enderror
 
         <p class="hint">
-            @if ($isFavicon)
+            @if ($isSignature)
+                A scan or a photograph of the signature itself, on a plain white background and
+                cropped close to it. It is printed above the signatory's name on admission
+                letters, and above the line on a result slip.
+            @elseif ($isFavicon)
                 The little picture on the browser tab. A square PNG works best, 512 × 512 or smaller.
             @else
                 Shown in the site header, the footer and the admin sidebar.

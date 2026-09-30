@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\TermResult;
 use App\Support\Surname;
 use Illuminate\Http\Request;
@@ -16,7 +17,19 @@ class ResultSlipController extends Controller
 {
     public function __invoke(Request $request, TermResult $termResult): View
     {
-        $termResult->load(['student.level', 'student.schoolClass', 'term.academicSession', 'items.subject', 'schoolClass']);
+        // A term has no session of its own — terms are shared by every session, and
+        // the pair of them is what a result belongs to. Asking for `term.academicSession`
+        // here was a relationship that does not exist, which took the whole slip down
+        // with it: the printable report card answered 500 to everybody who asked for
+        // one. The session the slip prints is the result's own.
+        $termResult->load([
+            'student.level',
+            'student.schoolClass',
+            'term',
+            'academicSession',
+            'items.subject',
+            'schoolClass',
+        ]);
 
         $student = $termResult->student;
 
@@ -41,7 +54,10 @@ class ResultSlipController extends Controller
         return view('public.result-slip', [
             'result' => $termResult,
             'student' => $student,
-            'currency' => \App\Models\Setting::get('currency_symbol', '₦'),
+            'currency' => Setting::get('currency_symbol', '₦'),
+            // The same signature the admission letter carries: it is the Principal's
+            // either way, and it is the office that uploads it once.
+            'signature' => Setting::get('signature_image'),
         ]);
     }
 }

@@ -46,6 +46,9 @@
         table.facts td.value { font-weight: bold; text-align: right; }
 
         .signature { margin-top: 40pt; }
+        /* Height only: DomPDF keeps the proportions from the image itself, and a
+           signature stretched to a fixed box is worse than none at all. */
+        .signature .sig { height: 16mm; }
         .signature .name { font-size: 12pt; }
         .signature .line {
             margin-top: 22pt;
@@ -127,6 +130,10 @@
 </table>
 
 <div class="signature">
+    @if ($signatureData)
+        <img class="sig" src="{{ $signatureData }}" alt="">
+    @endif
+
     @if ($letter['signatory'])
         <p class="name">{{ $letter['signatory'] }}</p>
     @endif

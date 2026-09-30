@@ -63,8 +63,10 @@ class SchoolBrandingTest extends TestCase
             ->assertSee('School branding')
             ->assertSee('School logo')
             ->assertSee('Browser favicon')
-            ->assertSee('No logo yet')
-            ->assertSee('No favicon yet');
+            // The empty state is named after the setting itself: this partial also
+            // draws the Principal's signature, which is not a logo.
+            ->assertSee('No school logo yet')
+            ->assertSee('No browser favicon yet');
     }
 
     public function test_the_settings_form_can_carry_a_file(): void

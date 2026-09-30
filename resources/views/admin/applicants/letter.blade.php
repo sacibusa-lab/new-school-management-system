@@ -108,6 +108,11 @@
 
         {{-- Signature --}}
         <div class="mt-12">
+            @if ($signature)
+                {{-- Decorative: the name under it says who signed. --}}
+                <img src="{{ asset('storage/' . $signature) }}" alt="" class="mb-1 h-14 w-auto">
+            @endif
+
             @if ($letter['signatory'])
                 <p class="font-display text-lg text-slate-900">{{ $letter['signatory'] }}</p>
             @endif

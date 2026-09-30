@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AcademicSession;
 use App\Models\Applicant;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Gathers everything the admission letter and registration slip need, so the
@@ -46,7 +47,33 @@ class AdmissionLetterService
             'issuedOn' => now(),
             'reference' => $applicant->registration_number,
             'studentNumber' => $applicant->student?->student_number,
+            // The signature the school signs with, wherever it signs: the path on the
+            // public disk, or nothing at all — a letter with no signature on it is a
+            // letter the office can print and sign by hand.
+            'signature' => Setting::get('signature_image'),
         ];
+    }
+
+    /**
+     * The signature as the PDF renderer can draw it.
+     *
+     * A data URI, because DomPDF does not fetch images over HTTP: an <img> pointing
+     * at the site comes out as a broken icon in the middle of a letter. Only the PDF
+     * needs this — the pages use the URL, and inlining a scanned signature into a
+     * sheet of forty letters would be a megabyte of base64 nobody asked for.
+     */
+    public function signatureDataUri(): ?string
+    {
+        $path = Setting::get('signature_image');
+
+        if (! $path || ! Storage::disk('public')->exists($path)) {
+            return null;
+        }
+
+        $disk = Storage::disk('public');
+
+        return 'data:'.($disk->mimeType($path) ?: 'image/png').';base64,'
+            .base64_encode((string) $disk->get($path));
     }
 
     /**
@@ -163,11 +190,11 @@ class AdmissionLetterService
             'level' => $level,
             'session' => (string) ($data['session'] ?? '—'),
 
-            'average' => $data['average'] !== null ? number_format((float) $data['average'], 2) . '%' : '—',
-            'cutoff' => $data['cutoff'] !== null ? number_format((float) $data['cutoff'], 2) . '%' : '—',
+            'average' => $data['average'] !== null ? number_format((float) $data['average'], 2).'%' : '—',
+            'cutoff' => $data['cutoff'] !== null ? number_format((float) $data['cutoff'], 2).'%' : '—',
             'position' => $data['position'] !== null ? (string) $data['position'] : '—',
 
-            'application_fee' => $currency . number_format((float) Setting::get('application_fee', 0), 2),
+            'application_fee' => $currency.number_format((float) Setting::get('application_fee', 0), 2),
             'date' => now()->format('j F, Y'),
         ];
     }

@@ -21,6 +21,8 @@ use App\Services\Admissions\AdmissionService;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -96,12 +98,12 @@ class AdmissionPaperworkTest extends TestCase
     private function sitExam(string $firstName, string $lastName, array $marks): Applicant
     {
         $applicant = Applicant::create([
-            'registration_number' => 'SAC-' . str_pad((string) Applicant::query()->count() + 1, 5, '0', STR_PAD_LEFT),
+            'registration_number' => 'SAC-'.str_pad((string) Applicant::query()->count() + 1, 5, '0', STR_PAD_LEFT),
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'guardian_name' => 'Mrs. ' . $lastName,
+            'guardian_name' => 'Mrs. '.$lastName,
             'guardian_phone' => '08031234567',
-            'guardian_email' => strtolower($firstName) . '@example.com',
+            'guardian_email' => strtolower($firstName).'@example.com',
             'level_applied_for_id' => $this->level->id,
             'academic_session_id' => $this->session->id,
             'status' => ApplicantStatus::Registered,
@@ -156,7 +158,7 @@ class AdmissionPaperworkTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The merit list                                                      */
+    /* The merit list */
     /* ------------------------------------------------------------------ */
 
     public function test_the_merit_list_prints_every_candidate_in_merit_order(): void
@@ -246,7 +248,7 @@ class AdmissionPaperworkTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The admission letters                                               */
+    /* The admission letters */
     /* ------------------------------------------------------------------ */
 
     public function test_a_letter_is_written_for_every_admitted_candidate_and_no_one_else(): void
@@ -284,8 +286,74 @@ class AdmissionPaperworkTest extends TestCase
             ->assertSee('Nobody has been admitted');
     }
 
+    /**
+     * The signature the office uploads is printed on the letter, above the name it
+     * belongs to — on the page the office prints and on the sheet of letters for a
+     * whole examination.
+     */
+    public function test_an_admission_letter_carries_the_uploaded_signature(): void
+    {
+        [$top] = $this->threeCandidatesWithTwoPlaces();
+
+        Setting::put('signature_image', 'branding/signature.png');
+        Setting::flush();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter', $top))
+            ->assertOk()
+            ->assertSee('storage/branding/signature.png', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.admissions.letters', $this->exam))
+            ->assertOk()
+            ->assertSee('storage/branding/signature.png', false);
+    }
+
+    /**
+     * The PDF draws its own copy of the signature, inlined: DomPDF does not fetch an
+     * image over HTTP, so a letter pointing at the site would have a broken picture
+     * in the middle of it. A clean 200 is what proves it built.
+     */
+    public function test_the_letter_pdf_builds_with_a_signature_inlined(): void
+    {
+        [$top] = $this->threeCandidatesWithTwoPlaces();
+
+        Storage::fake('public');
+        Storage::disk('public')->put(
+            'branding/signature.png',
+            (string) UploadedFile::fake()->image('signature.png')->get(),
+        );
+
+        Setting::put('signature_image', 'branding/signature.png');
+        Setting::flush();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter.pdf', $top))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    /** Nothing uploaded is not a gap on the page: the letter reads as it always did. */
+    public function test_a_letter_with_no_signature_uploaded_reads_as_it_always_did(): void
+    {
+        [$top] = $this->threeCandidatesWithTwoPlaces();
+
+        $this->assertNull(Setting::get('signature_image'));
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter', $top))
+            ->assertOk()
+            ->assertSee('Letter of Admission')
+            ->assertSee('Principal')
+            ->assertDontSee('<img', false);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.applicants.letter.pdf', $top))
+            ->assertOk();
+    }
+
     /* ------------------------------------------------------------------ */
-    /* The waiting list                                                    */
+    /* The waiting list */
     /* ------------------------------------------------------------------ */
 
     public function test_the_waiting_list_lists_only_those_held_back_and_closest_to_the_line_first(): void
@@ -320,7 +388,7 @@ class AdmissionPaperworkTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Promoting from the waiting list                                     */
+    /* Promoting from the waiting list */
     /* ------------------------------------------------------------------ */
 
     public function test_a_waiting_candidate_can_be_given_a_place_that_came_free(): void
@@ -430,7 +498,7 @@ class AdmissionPaperworkTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The admit cards                                                     */
+    /* The admit cards */
     /* ------------------------------------------------------------------ */
 
     public function test_an_admit_card_is_produced_for_every_candidate(): void
