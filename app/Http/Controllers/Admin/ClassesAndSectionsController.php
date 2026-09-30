@@ -101,15 +101,19 @@ class ClassesAndSectionsController extends Controller
         $this->authorize('academics.manage');
 
         $validated = $request->validate([
-            'class_name' => ['required', 'string', 'max:20', 'unique:school_levels,name'],
-            'order' => ['nullable', 'integer', 'min:0', 'max:255'],
-        ], [
-            'class_name.unique' => 'That class is already there.',
+            'class_name' => ['required', 'string', 'max:20'],
+            'section_id' => ['required', 'integer', 'exists:sections,id'],
         ]);
 
-        $level = $this->structure->addClassName($validated['class_name'], $validated['order'] ?? null);
+        $section = Section::query()->findOrFail($validated['section_id']);
 
-        return back()->with('status', "Class {$level->name} added. Give it a section below.");
+        try {
+            $class = $this->structure->addClassFrom($validated['class_name'], $section, $request->user());
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', "{$class->name} added.");
     }
 
     public function destroyClass(SchoolLevel $level): RedirectResponse

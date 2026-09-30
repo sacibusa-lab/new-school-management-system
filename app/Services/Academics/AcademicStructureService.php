@@ -214,6 +214,24 @@ class AcademicStructureService
     /* ------------------------------------------------------------------ */
 
     /**
+     * A class name and a section, which is what the Create Class form collects.
+     *
+     * The officer types the class name — JSS1 — because that is how a class name
+     * comes into being, and picks the section from the ones that already exist. If
+     * the class name is already there this is simply its next section: JSS1 + A, then
+     * JSS1 + B, is how JSS1A and JSS1B are made.
+     *
+     * @throws RuntimeException when that class is already there
+     */
+    public function addClassFrom(string $name, Section $section, ?User $actor = null): SchoolClass
+    {
+        $level = SchoolLevel::query()->where('name', $this->tidy($name))->first()
+            ?? $this->addClassName($name);
+
+        return $this->addClass($level, $section, $actor);
+    }
+
+    /**
      * Build the class a class name and a section make between them: JSS1 + A.
      *
      * @throws RuntimeException when that class is already there

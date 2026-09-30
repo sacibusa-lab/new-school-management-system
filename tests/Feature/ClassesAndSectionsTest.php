@@ -56,9 +56,28 @@ class ClassesAndSectionsTest extends TestCase
             ->get(route('admin.students-results.academics.classes'))
             ->assertOk()
             ->assertSee('Create Class')
+            ->assertSee('Class List')
             ->assertSee('Create Section')
+            ->assertSee('Section List');
+    }
+
+    /** The arrangement the office drew: #, class name, its sections, then actions. */
+    public function test_the_class_list_is_a_table_of_names_with_their_sections(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+        $this->class($level, $a, 'JSS1A');
+        $this->class($level, $b, 'JSS1B');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes'))
+            ->assertOk()
             ->assertSee('Class Name')
-            ->assertSee('Section');
+            ->assertSee('Action')
+            ->assertSee('JSS1')
+            ->assertSee('A')
+            ->assertSee('B');
     }
 
     /** The Section tab is the one that answers "there is nothing in the dropdown". */
@@ -164,29 +183,83 @@ class ClassesAndSectionsTest extends TestCase
     /* Class names */
     /* ------------------------------------------------------------------ */
 
-    public function test_a_class_name_is_added_and_takes_the_next_position_by_default(): void
+    /**
+     * The form is a class name and a section, which is what a class is — so typing
+     * JSS1 and picking A makes JSS1A, and the class name comes into being with it.
+     */
+    public function test_a_class_is_made_from_the_name_and_the_section_in_one_step(): void
     {
-        $this->actingAs($this->admin)
-            ->post(route('admin.students-results.academics.classes.names.store'), ['class_name' => 'jss1'])
-            ->assertSessionHas('status');
+        $a = Section::create(['name' => 'A', 'order' => 1]);
 
         $this->actingAs($this->admin)
-            ->post(route('admin.students-results.academics.classes.names.store'), ['class_name' => 'SS1'])
+            ->post(route('admin.students-results.academics.classes.names.store'), [
+                'class_name' => 'jss1',
+                'section_id' => $a->id,
+            ])
             ->assertSessionHas('status');
 
-        $this->assertSame(['JSS1', 'SS1'], SchoolLevel::query()->orderBy('order')->pluck('name')->all());
-        $this->assertSame([1, 2], SchoolLevel::query()->orderBy('order')->pluck('order')->all());
+        $level = SchoolLevel::query()->sole();
+
+        $this->assertSame('JSS1', $level->name);
+        $this->assertSame(['JSS1A'], SchoolClass::query()->pluck('name')->all());
+        $this->assertSame($level->id, SchoolClass::query()->sole()->level_id);
     }
 
-    public function test_a_class_name_that_is_already_there_is_refused_with_the_reason(): void
+    /** The second section of a class that is already there: JSS1 + B is JSS1B. */
+    public function test_the_same_class_name_picks_up_another_section(): void
     {
-        SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $a = Section::create(['name' => 'A', 'order' => 1]);
+        $b = Section::create(['name' => 'B', 'order' => 2]);
+
+        foreach ([$a, $b] as $section) {
+            $this->actingAs($this->admin)
+                ->post(route('admin.students-results.academics.classes.names.store'), [
+                    'class_name' => 'JSS1',
+                    'section_id' => $section->id,
+                ])
+                ->assertSessionHas('status');
+        }
+
+        // One class name, two classes — not two class names.
+        $this->assertSame(1, SchoolLevel::query()->count());
+        $this->assertSame(['JSS1A', 'JSS1B'], SchoolClass::query()->orderBy('name')->pluck('name')->all());
+    }
+
+    public function test_the_same_class_cannot_be_made_twice(): void
+    {
+        $a = Section::create(['name' => 'A', 'order' => 1]);
 
         $this->actingAs($this->admin)
-            ->post(route('admin.students-results.academics.classes.names.store'), ['class_name' => 'JSS1'])
-            ->assertSessionHasErrors(['class_name' => 'That class is already there.']);
+            ->post(route('admin.students-results.academics.classes.names.store'), ['class_name' => 'JSS1', 'section_id' => $a->id])
+            ->assertSessionHas('status');
 
-        $this->assertSame(1, SchoolLevel::query()->count());
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.academics.classes.names.store'), ['class_name' => 'JSS1', 'section_id' => $a->id])
+            ->assertSessionHas('error', 'JSS1A is already there.');
+
+        $this->assertSame(1, SchoolClass::query()->count());
+    }
+
+    /** A class cannot be built out of a section that is not there. */
+    public function test_a_class_cannot_be_made_from_a_section_that_does_not_exist(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.academics.classes.names.store'), ['class_name' => 'JSS1', 'section_id' => 99])
+            ->assertSessionHasErrors(['section_id']);
+
+        $this->assertSame(0, SchoolLevel::query()->count());
+        $this->assertSame(0, SchoolClass::query()->count());
+    }
+
+    /** With no sections there is nothing to build a class from, and the page says so. */
+    public function test_the_form_says_where_to_go_when_there_are_no_sections_yet(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes'))
+            ->assertOk()
+            ->assertSee('No sections yet')
+            ->assertSee('Create one on the')
+            ->assertDontSee('name="section_id"', false);
     }
 
     /* ------------------------------------------------------------------ */
@@ -316,7 +389,7 @@ class ClassesAndSectionsTest extends TestCase
         $this->assertSame([$a->id, $b->id], $classes->pluck('section_id')->all());
     }
 
-    public function test_the_same_class_cannot_be_made_twice(): void
+    public function test_the_same_class_cannot_be_made_twice_by_the_row_form(): void
     {
         $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
         $section = Section::create(['name' => 'A', 'order' => 1]);
@@ -329,18 +402,6 @@ class ClassesAndSectionsTest extends TestCase
             ->assertSessionHas('error', 'JSS1A is already there.');
 
         $this->assertSame(1, SchoolClass::query()->count());
-    }
-
-    /** A class cannot be built out of a section that is not there. */
-    public function test_a_class_cannot_be_made_from_a_section_that_does_not_exist(): void
-    {
-        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
-
-        $this->actingAs($this->admin)
-            ->post(route('admin.students-results.academics.classes.store-class', $level), ['section_id' => 99])
-            ->assertSessionHasErrors(['section_id']);
-
-        $this->assertSame(0, SchoolClass::query()->count());
     }
 
     public function test_an_empty_class_can_be_deleted(): void
