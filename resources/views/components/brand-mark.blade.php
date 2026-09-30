@@ -15,6 +15,7 @@
     $dimensions = match ($size) {
         'sm' => 'h-9 w-9 text-sm rounded-xl',
         'lg' => 'h-12 w-12 text-lg rounded-2xl',
+        'xl' => 'h-14 w-14 text-xl rounded-2xl',
         default => 'h-10 w-10 text-base rounded-xl',
     };
 @endphp

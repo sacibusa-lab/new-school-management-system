@@ -528,4 +528,34 @@ class AdmissionPaperworkTest extends TestCase
             ->assertOk()
             ->assertSee('No candidates registered');
     }
+
+    public function test_every_admit_card_carries_the_school_crest(): void
+    {
+        $this->threeCandidatesWithTwoPlaces();
+
+        Setting::query()->where('key', 'school_logo')->update(['value' => 'branding/crest.png']);
+        Setting::flush();
+
+        $content = $this->actingAs($this->admin)
+            ->get(route('admin.exams.admit-cards', $this->exam))
+            ->assertOk()
+            ->getContent();
+
+        // One crest per card, not one per sheet: the cards are cut apart at the
+        // gate, and a card without the school's mark on it is not worth much.
+        $this->assertSame(3, substr_count($content, 'storage/branding/crest.png'));
+    }
+
+    public function test_a_card_falls_back_to_the_school_monogram_before_a_crest_is_uploaded(): void
+    {
+        $this->threeCandidatesWithTwoPlaces();
+
+        // "Saci Schools" in the seeded settings, so the monogram is SS. Matched on
+        // the markup rather than the letters: JSS1 is on every card too.
+        $this->actingAs($this->admin)
+            ->get(route('admin.exams.admit-cards', $this->exam))
+            ->assertOk()
+            ->assertDontSee('storage/branding')
+            ->assertSee('aria-hidden="true">SS</span>', false);
+    }
 }

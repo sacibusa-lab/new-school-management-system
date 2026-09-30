@@ -55,13 +55,16 @@
     @else
         <div class="grid gap-3 sm:grid-cols-2">
             @foreach ($candidates as $candidate)
-                <article class="card flex gap-3 p-4 print:break-inside-avoid print:rounded-lg">
+                {{-- The sheet is cut up at the gate, so every card has to stand on its
+                     own: the school's crest sits beside the candidate's details, the
+                     way it does on a card the school had printed for it. --}}
+                <article class="card flex items-stretch gap-4 p-4 print:break-inside-avoid print:rounded-lg">
                     @if ($candidate->photo_path)
                         <img src="{{ asset('storage/' . $candidate->photo_path) }}"
                              alt="Passport photograph of {{ $candidate->full_name }}"
-                             class="h-20 w-16 shrink-0 rounded-lg object-cover ring-1 ring-slate-200">
+                             class="h-24 w-20 shrink-0 rounded-lg object-cover ring-1 ring-slate-200">
                     @else
-                        <span class="inline-flex h-20 w-16 shrink-0 items-center justify-center rounded-lg bg-brand-900 font-display text-lg font-semibold text-gold-300">
+                        <span class="inline-flex h-24 w-20 shrink-0 items-center justify-center rounded-lg bg-brand-900 font-display text-lg font-semibold text-gold-300">
                             {{ $candidate->initials }}
                         </span>
                     @endif
@@ -75,24 +78,33 @@
                         </p>
                         <p class="font-mono text-xs text-slate-500">{{ $candidate->registration_number }}</p>
 
-                        <dl class="mt-2 space-y-0.5 text-[11px] text-slate-600">
-                            <div class="flex gap-1">
-                                <dt class="text-slate-400">Class</dt>
-                                <dd class="font-medium">{{ $candidate->levelAppliedFor?->name ?? '—' }}</dd>
+                        {{-- Labelled like a form rather than written out as a sentence:
+                             it is read at a glance by whoever is on the gate. --}}
+                        <dl class="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-slate-600">
+                            <div>
+                                <dt class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Class</dt>
+                                <dd class="text-[11px] font-medium">{{ $candidate->levelAppliedFor?->name ?? '—' }}</dd>
                             </div>
-                            <div class="flex gap-1">
-                                <dt class="text-slate-400">Date</dt>
-                                <dd class="font-medium">{{ $exam->exam_date?->format('j M Y') ?? 'To be announced' }}</dd>
+                            <div>
+                                <dt class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Date</dt>
+                                <dd class="text-[11px] font-medium">{{ $exam->exam_date?->format('j M Y') ?? 'To be announced' }}</dd>
                             </div>
-                            <div class="flex gap-1">
-                                <dt class="text-slate-400">Time</dt>
-                                <dd class="font-medium">{{ $exam->starts_at ? substr((string) $exam->starts_at, 0, 5) : 'To be announced' }}</dd>
+                            <div>
+                                <dt class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Time</dt>
+                                <dd class="text-[11px] font-medium">{{ $exam->starts_at ? substr((string) $exam->starts_at, 0, 5) : 'To be announced' }}</dd>
                             </div>
-                            <div class="flex gap-1">
-                                <dt class="text-slate-400">Venue</dt>
-                                <dd class="font-medium">{{ $exam->venue ?? 'School campus' }}</dd>
+                            <div>
+                                <dt class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Venue</dt>
+                                <dd class="text-[11px] font-medium">{{ $exam->venue ?? 'School campus' }}</dd>
                             </div>
                         </dl>
+                    </div>
+
+                    {{-- The school's own crest, which is what makes the card look like
+                         the school issued it. Falls back to its monogram when no logo
+                         has been uploaded. --}}
+                    <div class="flex shrink-0 flex-col items-center justify-center border-l border-slate-200 pl-4">
+                        <x-brand-mark size="xl" />
                     </div>
                 </article>
             @endforeach
