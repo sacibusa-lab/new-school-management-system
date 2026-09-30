@@ -13,8 +13,30 @@
             </p>
         </div>
 
-        <form method="POST" action="{{ route('admin.students-results.teachers.store') }}" class="space-y-5 p-5 sm:p-6">
+        <form method="POST" action="{{ route('admin.students-results.teachers.store') }}"
+              enctype="multipart/form-data" class="space-y-5 p-5 sm:p-6">
             @csrf
+
+            {{-- Not required: a teacher is taken on before their photograph is to
+                 hand, and a record without a picture is still a record. --}}
+            <div class="flex items-center gap-4 rounded-xl border border-line-soft bg-surface-2 p-4">
+                <span class="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-surface-3 text-muted">
+                    <x-nav-icon name="camera" class="h-6 w-6" />
+                </span>
+
+                <div class="min-w-0 flex-1">
+                    <label for="avatar" class="label">Profile image</label>
+
+                    <input id="avatar" name="avatar" type="file" accept=".jpg,.jpeg,.png,.webp"
+                           class="block w-full text-xs text-ink-soft file:mr-2 file:rounded-md file:border-0 file:bg-surface-3 file:px-2.5 file:py-1.5 file:text-xs">
+
+                    <p class="hint">Optional. JPG, PNG or WebP, up to 2 MB.</p>
+
+                    @error('avatar')
+                        <p class="error-text">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
 
             <x-field name="name" label="Full name" placeholder="Chidera Okafor" required />
 
@@ -22,8 +44,8 @@
                 <x-field name="email" type="email" label="Email" placeholder="chidera@example.com" required
                          autocomplete="off" />
 
-                <x-field name="phone" label="Phone" placeholder="080 1234 5678"
-                         hint="Optional, but it is how the school reaches them." />
+                <x-field name="phone" label="Phone" placeholder="080 1234 5678" required
+                         hint="The school texts teachers, so this is how they are reached." />
             </div>
 
             <div class="grid gap-5 sm:grid-cols-2">

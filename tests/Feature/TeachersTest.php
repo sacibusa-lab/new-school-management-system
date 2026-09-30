@@ -10,6 +10,8 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -70,6 +72,8 @@ class TeachersTest extends TestCase
             ->assertSee('Add a teacher')
             ->assertSee('name="name"', false)
             ->assertSee('name="email"', false)
+            ->assertSee('name="phone"', false)
+            ->assertSee('name="avatar"', false)
             ->assertSee('name="password"', false);
     }
 
@@ -134,6 +138,7 @@ class TeachersTest extends TestCase
             ->post(route('admin.students-results.teachers.store'), [
                 'name' => 'Chidera Okafor',
                 'email' => 'chidera@example.com',
+                'phone' => '080 1234 5678',
                 'password' => 'password',
                 'password_confirmation' => 'password',
                 // A posted role is ignored: this form is only ever Teachers.
@@ -179,8 +184,11 @@ class TeachersTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'chidera@example.com']);
     }
 
-    /** An account with no role would be a login nobody can do anything with. */
-    public function test_a_teacher_without_a_phone_number_can_still_be_added(): void
+    /**
+     * The school texts teachers, so a teacher nobody can text is one the office
+     * cannot reach — and the message says why rather than just refusing.
+     */
+    public function test_a_teacher_cannot_be_added_without_a_phone_number(): void
     {
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.store'), [
@@ -189,9 +197,106 @@ class TeachersTest extends TestCase
                 'password' => 'password',
                 'password_confirmation' => 'password',
             ])
+            ->assertSessionHasErrors([
+                'phone' => 'A phone number is needed: the school reaches teachers by text message.',
+            ]);
+
+        $this->assertDatabaseMissing('users', ['email' => 'chidera@example.com']);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The profile image */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_teacher_can_be_added_with_a_profile_image(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.store'), [
+                'name' => 'Chidera Okafor',
+                'email' => 'chidera@example.com',
+                'phone' => '080 1234 5678',
+                'avatar' => UploadedFile::fake()->image('chidera.jpg'),
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])
             ->assertSessionHas('status');
 
-        $this->assertNull($this->addedTeacher()->phone);
+        $teacher = $this->addedTeacher();
+
+        $this->assertNotNull($teacher->avatar_path);
+        Storage::disk('public')->assertExists($teacher->avatar_path);
+
+        // And the register shows it, rather than holding a photograph nobody sees.
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.list'))
+            ->assertOk()
+            ->assertSee('storage/'.$teacher->avatar_path, false);
+    }
+
+    /**
+     * Not required, and the register falls back to their initials rather than to a
+     * broken image: a teacher is taken on before their photograph is to hand.
+     */
+    public function test_a_teacher_can_be_added_without_a_profile_image(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.store'), [
+                'name' => 'Chidera Okafor',
+                'email' => 'chidera@example.com',
+                'phone' => '080 1234 5678',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertNull($this->addedTeacher()->avatar_path);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.list'))
+            ->assertOk()
+            ->assertSee('Chidera Okafor')
+            // No picture, and no broken one either: their initials stand in for it.
+            ->assertDontSee('storage/photos/teachers', false);
+    }
+
+    public function test_a_profile_image_has_to_be_an_image(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.store'), [
+                'name' => 'Chidera Okafor',
+                'email' => 'chidera@example.com',
+                'phone' => '080 1234 5678',
+                'avatar' => UploadedFile::fake()->create('curriculum-vitae.pdf', 100),
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])
+            ->assertSessionHasErrors('avatar');
+
+        $this->assertDatabaseMissing('users', ['email' => 'chidera@example.com']);
+    }
+
+    public function test_a_profile_image_bigger_than_two_megabytes_is_refused(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.store'), [
+                'name' => 'Chidera Okafor',
+                'email' => 'chidera@example.com',
+                'phone' => '080 1234 5678',
+                'avatar' => UploadedFile::fake()->image('huge.jpg')->size(3000),
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])
+            ->assertSessionHasErrors('avatar');
+
+        $this->assertDatabaseMissing('users', ['email' => 'chidera@example.com']);
     }
 
     /* ------------------------------------------------------------------ */

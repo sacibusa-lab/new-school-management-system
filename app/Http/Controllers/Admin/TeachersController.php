@@ -55,16 +55,23 @@ class TeachersController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            // Required, and not merely preferred: the school texts teachers, and a
+            // teacher nobody can text is a teacher the office cannot reach.
+            'phone' => ['required', 'string', 'max:30'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'password' => ['required', 'confirmed', Password::defaults()],
         ], [
             'email.unique' => 'That email already has an account. Staff & roles is where an account that exists is changed.',
+            'phone.required' => 'A phone number is needed: the school reaches teachers by text message.',
         ]);
 
         $teacher = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
+            'phone' => $validated['phone'],
+            // A photograph is added once they have been taken on, so it is asked for
+            // and not required: the record matters more than the picture.
+            'avatar_path' => $request->file('avatar')?->store(config('saci.uploads.photos').'/teachers', 'public'),
             'password' => Hash::make($validated['password']),
             'is_active' => true,
             'must_change_password' => true,

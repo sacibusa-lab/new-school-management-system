@@ -35,10 +35,27 @@
                             <td class="border-r border-line p-3 text-center align-top">{{ $loop->iteration }}</td>
 
                             <td class="border-r border-line p-3 align-top">
-                                <span class="block font-medium text-ink">{{ $teacher->name }}</span>
-                                <span class="mt-0.5 block text-xs text-muted">
-                                    Signs in as {{ $teacher->primaryRole() }}
-                                </span>
+                                <div class="flex items-center gap-3">
+                                    @if ($teacher->avatar_path)
+                                        <img src="{{ asset('storage/' . $teacher->avatar_path) }}"
+                                             alt="Photograph of {{ $teacher->name }}"
+                                             class="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line">
+                                    @else
+                                        {{-- No picture is not an empty cell: it is the teacher's initials, the
+                                             same as the top bar falls back to. --}}
+                                        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-semibold text-gold-300"
+                                              aria-hidden="true">
+                                            {{ $teacher->initials }}
+                                        </span>
+                                    @endif
+
+                                    <span class="min-w-0">
+                                        <span class="block font-medium text-ink">{{ $teacher->name }}</span>
+                                        <span class="mt-0.5 block text-xs text-muted">
+                                            Signs in as {{ $teacher->primaryRole() }}
+                                        </span>
+                                    </span>
+                                </div>
                             </td>
 
                             <td class="border-r border-line p-3 align-top">
