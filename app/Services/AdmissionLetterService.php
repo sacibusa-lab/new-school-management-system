@@ -98,15 +98,16 @@ class AdmissionLetterService
             return ['data' => $data, 'width' => null, 'height' => null];
         }
 
-        // The width of the text column on A4 under the letter's own 18mm margins,
-        // and no taller than a quarter of the page: a letterhead is a heading, not
-        // the letter.
+        // The width of the text column on A4 under the letter's own 18mm margins, so
+        // the letterhead prints edge to edge like a school's head paper. Only a
+        // picture too tall to be a letterhead is shrunk, and then the width follows
+        // it: stretching the crest is worse than leaving a margin.
         $width = 174.0;
         $height = $width * ($size[1] / $size[0]);
 
-        if ($height > 40.0) {
-            $width *= 40.0 / $height;
-            $height = 40.0;
+        if ($height > 60.0) {
+            $width *= 60.0 / $height;
+            $height = 60.0;
         }
 
         return [

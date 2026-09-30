@@ -448,7 +448,9 @@ class AdmissionPaperworkTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.admissions.merit', $this->exam))
             ->assertOk()
-            ->assertSee('storage/branding/letterhead.png', false);
+            ->assertSee('storage/branding/letterhead.png', false)
+            // Head paper: the width of the sheet, centred, with nothing beside it.
+            ->assertSee('class="mx-auto block w-full"', false);
 
         $this->actingAs($this->admin)
             ->get(route('admin.applicants.letter', $top))
@@ -476,7 +478,8 @@ class AdmissionPaperworkTest extends TestCase
 
     /**
      * The PDF is given the letterhead's own proportions, not just a width: DomPDF
-     * will stretch whatever it is handed to fill the box it was given.
+     * will stretch whatever it is handed to fill the box it was given, and a crest
+     * pulled across the page is worse than no crest at all.
      */
     public function test_the_letterhead_reaches_the_pdf_at_its_own_proportions(): void
     {
@@ -499,6 +502,31 @@ class AdmissionPaperworkTest extends TestCase
         $this->assertGreaterThan(36.0, (float) $head['height']);
         $this->assertLessThan(37.0, (float) $head['height']);
         $this->assertStringStartsWith('data:image/', $head['data']);
+    }
+
+    /**
+     * A banner the shape a school actually uses — four to one — is printed edge to
+     * edge, not shrunk to sit under a line of text.
+     */
+    public function test_a_wide_letterhead_is_printed_edge_to_edge_in_the_pdf(): void
+    {
+        $this->threeCandidatesWithTwoPlaces();
+
+        Storage::fake('public');
+        Storage::disk('public')->put(
+            'branding/letterhead.png',
+            (string) UploadedFile::fake()->image('letterhead.png', 1600, 400)->get(),
+        );
+
+        Setting::put('letterhead_image', 'branding/letterhead.png');
+        Setting::flush();
+
+        $head = app(AdmissionLetterService::class)->letterheadForPdf();
+
+        // The whole 174mm text column, and the height that follows from it.
+        $this->assertSame('174mm', $head['width']);
+        $this->assertGreaterThan(43.0, (float) $head['height']);
+        $this->assertLessThan(44.0, (float) $head['height']);
     }
 
     /** No letterhead uploaded is not a gap: the name and address print as before. */

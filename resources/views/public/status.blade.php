@@ -57,12 +57,13 @@
                      anonymous: a sheet a parent hands to a relative or an employer with
                      nothing on it saying which school it came from. This is that
                      identity, restored for paper. --}}
-                <div class="hidden print:mb-5 print:flex print:items-start print:justify-between print:gap-6 print:border-b print:border-line print:pb-4">
+                <div class="hidden print:mb-5 print:flex print:flex-wrap print:items-start print:justify-between print:gap-6 print:border-b print:border-line print:pb-4">
                     @if ($school->letterhead)
-                        {{-- The school's own letterhead, when one has been uploaded. --}}
+                        {{-- Head paper: the school's own letterhead, across the whole width
+                             of the sheet and nothing beside it. --}}
                         <img src="{{ asset('storage/' . $school->letterhead) }}"
                              alt="{{ $school->name }}"
-                             class="max-h-24 max-w-[65%] object-contain">
+                             class="w-full">
                     @else
                         <div class="flex items-center gap-3">
                             <x-brand-mark size="lg" />
@@ -82,7 +83,7 @@
                         </div>
                     @endif
 
-                    <div class="shrink-0 text-right">
+                    <div class="shrink-0 text-right print:ml-auto">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-muted">
                             Admission status record
                         </p>

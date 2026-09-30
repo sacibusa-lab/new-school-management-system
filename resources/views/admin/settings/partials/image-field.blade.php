@@ -68,9 +68,9 @@
                 letters, and above the line on a result slip.
             @elseif ($isLetterhead)
                 The whole letterhead as one picture — crest, school name, address and motto.
-                It is printed across the top of the admission letter, the merit list and the
-                admission status record. A wide banner works best; the documents keep its
-                own proportions.
+                It is printed across the full width at the top of the admission letter, the
+                merit list and the admission status record, with nothing beside it. A wide
+                banner works best; the documents keep its own proportions.
             @elseif ($isFavicon)
                 The little picture on the browser tab. A square PNG works best, 512 × 512 or smaller.
             @else

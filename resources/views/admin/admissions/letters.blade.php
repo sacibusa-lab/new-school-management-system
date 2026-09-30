@@ -44,10 +44,12 @@
         <article class="letter card mb-6 p-8 print:mb-0 print:rounded-none print:border-0 print:p-0 print:shadow-none">
             <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
                 @if ($data['letterhead']['image'])
-                    {{-- The school's own letterhead, as the office printed it. --}}
+                    {{-- Head paper: the school's own letterhead, across the whole width of
+                         the sheet and nothing beside it. The date and the reference drop to
+                         the line underneath, where a letter puts them. --}}
                     <img src="{{ asset('storage/' . $data['letterhead']['image']) }}"
                          alt="{{ $data['letterhead']['name'] }}"
-                         class="max-h-24 max-w-[70%] object-contain">
+                         class="mx-auto block w-full">
                 @else
                     <div>
                         <h1 class="font-display text-lg font-semibold">{{ $data['letterhead']['name'] }}</h1>
@@ -60,7 +62,10 @@
                     </div>
                 @endif
 
-                <div class="text-right text-xs text-slate-500">
+                <div @class([
+                    'text-right text-xs text-slate-500',
+                    'ml-auto' => (bool) $data['letterhead']['image'],
+                ])>
                     <p>{{ $data['issuedOn']->format('j F Y') }}</p>
                     <p class="font-mono">{{ $data['reference'] }}</p>
                 </div>

@@ -31,11 +31,12 @@
     <div class="card p-6 print:border-0 print:p-0 print:shadow-none">
         <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
             @if ($school->letterhead)
-                {{-- The school's own letterhead, exactly as the office prints it, rather
-                     than its name typed out again under a crest. --}}
+                {{-- Head paper: the school's own letterhead, across the whole width of
+                     the sheet and nothing beside it. The sheet's own title drops to the
+                     line underneath, the way a headed document reads. --}}
                 <img src="{{ asset('storage/' . $school->letterhead) }}"
                      alt="{{ $school->name }}"
-                     class="max-h-24 max-w-[70%] object-contain">
+                     class="mx-auto block w-full">
             @else
                 <div>
                     <h1 class="font-display text-xl font-semibold">{{ $school->name }}</h1>
@@ -48,7 +49,10 @@
                 </div>
             @endif
 
-            <div class="text-right">
+            <div @class([
+                'text-right' => ! $school->letterhead,
+                'mx-auto text-center' => (bool) $school->letterhead,
+            ])>
                 <p class="eyebrow">Merit list</p>
                 <p class="mt-2 text-sm font-semibold">{{ $exam->title }}</p>
                 <p class="text-xs text-slate-500">

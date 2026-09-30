@@ -36,11 +36,11 @@
         {{-- Letterhead --}}
         <header class="border-b border-slate-300 pb-6 text-center">
             @if ($letterhead['image'])
-                {{-- The school's own letterhead, as the office printed it, instead of
-                     the name and address underneath it typed out again. --}}
+                {{-- Head paper: the school's own letterhead, across the whole width of
+                     the sheet and nothing beside it. --}}
                 <img src="{{ asset('storage/' . $letterhead['image']) }}"
                      alt="{{ $letterhead['name'] }}"
-                     class="mx-auto max-h-28 max-w-full object-contain">
+                     class="mx-auto block w-full">
             @else
                 <h1 class="font-display text-2xl font-semibold tracking-tight text-slate-900">
                     {{ $letterhead['name'] }}
