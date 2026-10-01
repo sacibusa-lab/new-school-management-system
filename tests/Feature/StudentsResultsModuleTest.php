@@ -66,9 +66,9 @@ class StudentsResultsModuleTest extends TestCase
     public function test_a_blank_page_says_it_is_blank_rather_than_looking_empty(): void
     {
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.pins'))
+            ->get(route('admin.students-results.performance'))
             ->assertOk()
-            ->assertSee('Generate Pin')
+            ->assertSee('Performance Analytics')
             ->assertSee('This page has not been built yet');
     }
 
@@ -83,12 +83,12 @@ class StudentsResultsModuleTest extends TestCase
             ->get(route('admin.students-results.exam-master'))
             ->assertOk()
             ->assertSee('Term examinations and the subjects each class sits')
-            ->assertDontSee('what a parent buys to check a result');
+            ->assertDontSee('Will compare performance across classes');
 
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.pins'))
+            ->get(route('admin.students-results.performance'))
             ->assertOk()
-            ->assertSee('what a parent buys to check a result')
+            ->assertSee('Will compare performance across classes')
             ->assertDontSee('Term examinations and the subjects each class sits');
     }
 

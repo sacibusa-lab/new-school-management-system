@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PrintingController;
 use App\Http\Controllers\Admin\ResultController;
+use App\Http\Controllers\Admin\ResultPinController;
 use App\Http\Controllers\Admin\ScoreEntryController;
 use App\Http\Controllers\Admin\ScoreImportController;
 use App\Http\Controllers\Admin\SettingController;
@@ -225,7 +226,12 @@ Route::middleware(['auth'])
             // report card in it now, not a page saying it has not been built.
             Route::get('check-result', CheckResultController::class)->name('check-result');
             Route::get('performance', [StudentsResultsController::class, 'performance'])->name('performance');
-            Route::get('pins', [StudentsResultsController::class, 'pins'])->name('pins');
+            Route::get('pins', [ResultPinController::class, 'index'])->name('pins');
+            Route::post('pins', [ResultPinController::class, 'store'])->name('pins.generate');
+
+            // The sheet the office cuts up. A literal path, declared with the rest so
+            // that nothing can read "sheet" as the id of anything.
+            Route::get('pins/sheet', [ResultPinController::class, 'sheet'])->name('pins.sheet');
             Route::get('students', [StudentsResultsController::class, 'students'])->name('students');
 
             /*
