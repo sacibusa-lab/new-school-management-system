@@ -24,6 +24,11 @@
 _ide_helper.php
 Homestead.json
 Homestead.yaml
+
+# A test run redirected to a file by hand and committed by accident in 90b602c.
+# It is a dump of test output, not part of the project.
+output.txt
+
 Thumbs.db
 
 # Laravel Boost: local tooling state rather than part of the project. The
