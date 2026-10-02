@@ -15,12 +15,12 @@
 
         <x-field
             name="email"
-            label="Email address"
-            type="email"
+            label="Phone number or email"
+            type="text"
             required
             autofocus
             autocomplete="username"
-            placeholder="you@school.edu.ng" />
+            placeholder="080 1234 5678" />
 
         <x-field
             name="password"
