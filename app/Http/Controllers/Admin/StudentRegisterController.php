@@ -10,20 +10,27 @@ use App\Models\Section;
 use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
- * The student register: who is on the roll, and the class each one is in.
+ * The student register: who is on the roll, one class at a time.
  *
- * Two dropdowns and a button. A class here is a year group plus a section — JSS1 and
- * A are JSS1A — so the two are asked for separately rather than making the office
- * hunt for the combination in one long list of every class the school runs. Either
- * one can be left blank, which widens the list rather than emptying it.
+ * The page opens on its two dropdowns and nothing else. A register is read a class at a
+ * time — that is how the school is organised, and how the office is asked about it — so
+ * an unfiltered list of every child in the school is neither what anybody came here for
+ * nor something this page should spend a query on. Choose a class, a section, or both,
+ * and press Filter.
  *
- * Each line carries the photograph, the guardian and how far the fees have got,
- * because those are the three things the office is asked about across a counter. The
- * class and section are not repeated: they are what the two dropdowns just said.
+ * A class here is a year group plus a section: JSS1 and A are JSS1A. They are asked for
+ * separately rather than making the office hunt for the combination in one long list of
+ * every class the school runs. Either one is enough on its own — a class without a
+ * section is every arm of that year, a section without a class is that arm of every
+ * year — and both together pick out the one class.
+ *
+ * Each line carries the photograph, the guardian and how far the fees have got, because
+ * those are the three things the office is asked about across a counter.
  */
 class StudentRegisterController extends Controller
 {
@@ -37,35 +44,11 @@ class StudentRegisterController extends Controller
         $levelId = $request->integer('class');
         $sectionId = $request->integer('section');
 
-        $students = Student::query()
-            ->with(['schoolClass', 'level'])
-            // Billed and paid are summed rather than read off each student, so a page
-            // of twenty-five costs two queries instead of fifty. Cancelled invoices are
-            // left out, which is what Student::totalBilled() does with the same figures.
-            ->withSum(
-                ['invoices as billed_total' => fn ($query) => $query
-                    ->where('status', '!=', InvoiceStatus::Cancelled->value)],
-                'total',
-            )
-            ->withSum(
-                ['invoices as paid_total' => fn ($query) => $query
-                    ->where('status', '!=', InvoiceStatus::Cancelled->value)],
-                'amount_paid',
-            )
-            ->when($levelId, fn ($query) => $query->where('level_id', $levelId))
-            // The section lives on the class rather than on the student, so this asks
-            // the class they are in rather than the student row itself.
-            ->when($sectionId, fn ($query) => $query->whereHas(
-                'schoolClass',
-                fn ($classes) => $classes->where('section_id', $sectionId),
-            ))
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->paginate(self::PER_PAGE)
-            ->withQueryString();
+        $searched = $levelId !== 0 || $sectionId !== 0;
 
         return view('admin.students-results.students', [
-            'students' => $students,
+            'students' => $searched ? $this->register($levelId, $sectionId) : null,
+            'searched' => $searched,
             'levels' => SchoolLevel::query()->active()->orderBy('order')->orderBy('name')->get(),
             'sections' => Section::query()->orderBy('order')->orderBy('name')->get(),
             'filters' => ['class' => $levelId, 'section' => $sectionId],
@@ -87,9 +70,9 @@ class StudentRegisterController extends Controller
     /**
      * Take the ticked students off the register.
      *
-     * Each id is re-read rather than trusted, so a tick that was tampered with can
-     * only ever name a student who exists — and the count that comes back is the
-     * number actually removed, not the number that was posted.
+     * Each id is re-read rather than trusted, so a tick that was tampered with can only
+     * ever name a student who exists — and the count that comes back is the number
+     * actually removed, not the number that was posted.
      */
     public function destroySelected(Request $request): RedirectResponse
     {
@@ -113,12 +96,48 @@ class StudentRegisterController extends Controller
     }
 
     /**
+     * The register itself, for the class and section asked for.
+     *
+     * Kept out of the action because the page has two states and this is reached in only
+     * one of them: when nothing has been asked for, the query is never built at all.
+     */
+    private function register(int $levelId, int $sectionId): LengthAwarePaginator
+    {
+        return Student::query()
+            ->with(['schoolClass', 'level'])
+            // Billed and paid are summed rather than read off each student, so a page of
+            // twenty-five costs two queries instead of fifty. Cancelled invoices are left
+            // out, which is what Student::totalBilled() does with the same figures.
+            ->withSum(
+                ['invoices as billed_total' => fn ($query) => $query
+                    ->where('status', '!=', InvoiceStatus::Cancelled->value)],
+                'total',
+            )
+            ->withSum(
+                ['invoices as paid_total' => fn ($query) => $query
+                    ->where('status', '!=', InvoiceStatus::Cancelled->value)],
+                'amount_paid',
+            )
+            ->when($levelId, fn ($query) => $query->where('level_id', $levelId))
+            // The section lives on the class rather than on the student, so this asks the
+            // class they are in rather than the student row itself.
+            ->when($sectionId, fn ($query) => $query->whereHas(
+                'schoolClass',
+                fn ($classes) => $classes->where('section_id', $sectionId),
+            ))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+    }
+
+    /**
      * Take students off the register.
      *
-     * A soft delete, and deliberately so: the record stops appearing on the register
-     * and the family lose the portal, but nothing is destroyed. A child removed by
-     * mistake is put back rather than reconstructed from paper — which matters more
-     * here than on the teacher register, because this is a child's record.
+     * A soft delete, and deliberately so: the record stops appearing on the register and
+     * the family lose the portal, but nothing is destroyed. A child removed by mistake is
+     * put back rather than reconstructed from paper — which matters more here than on the
+     * teacher register, because this is a child's record.
      *
      * @param  Collection<int,Student>  $students
      */

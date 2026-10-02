@@ -19,12 +19,15 @@ use Tests\TestCase;
 /**
  * The module's own student register.
  *
- * Three things are worth checking here. The filter is two dropdowns that mean what
- * they say — a class is a year group plus a section, and the section is on the class
- * rather than on the student, which is the sort of join that looks right on one row
- * and wrong across a whole school. The fees column reads two sums rather than fifty
- * reads. And removal is a soft delete, so a child taken off by mistake is put back
- * rather than reconstructed.
+ * The page has two states, and both are worth pinning down. It opens on its two
+ * dropdowns with no list at all, because a register is read a class at a time and an
+ * unfiltered list of the whole school is neither useful nor cheap. Past that, the two
+ * dropdowns have to mean what they say — a class is a year group plus a section, and the
+ * section is on the class rather than on the student, which is the sort of join that
+ * looks right on one row and wrong across a whole school.
+ *
+ * Removal is a soft delete, so a child taken off by mistake is put back rather than
+ * reconstructed.
  */
 class StudentsDetailsTest extends TestCase
 {
@@ -77,10 +80,77 @@ class StudentsDetailsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The list itself */
+    /* The two states of the page */
     /* ------------------------------------------------------------------ */
 
-    public function test_the_register_lists_a_student_with_their_number_and_guardian(): void
+    public function test_the_page_opens_on_the_filter_and_not_on_a_list(): void
+    {
+        $this->student($this->jss1a, 'Ada', 'Okonkwo');
+
+        $this->actingAs($this->admin)
+            ->get($this->page())
+            ->assertOk()
+            ->assertSee('Choose a class and press Filter')
+            // The list itself is absent, not empty: no table, and no child's name on the
+            // page until somebody has asked for a class.
+            ->assertDontSee('Student List')
+            ->assertDontSee('Bulk Delete')
+            ->assertDontSee('Ada Okonkwo');
+    }
+
+    public function test_the_list_appears_once_a_class_is_asked_for(): void
+    {
+        $this->student($this->jss1a, 'Ada', 'Okonkwo');
+
+        $this->actingAs($this->admin)
+            ->get($this->page(['class' => $this->jss1->id]))
+            ->assertOk()
+            ->assertSee('Student List')
+            ->assertSee('Ada Okonkwo')
+            ->assertDontSee('Choose a class and press Filter');
+    }
+
+    public function test_the_filter_it_came_in_with_is_the_one_it_shows(): void
+    {
+        $this->student($this->jss1a, 'Ada', 'Okonkwo');
+
+        // Arriving on a url — a bookmark, a link from elsewhere — reads the register, so
+        // the two dropdowns have to be drawn holding what was asked for rather than
+        // resetting to "All classes" over a list that is plainly filtered.
+        $html = $this->actingAs($this->admin)
+            ->get($this->page(['class' => $this->jss1->id, 'section' => $this->sectionA->id]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<option value="'.$this->jss1->id.'"\s+selected/',
+            $html,
+            'The class dropdown does not show the class that was asked for.',
+        );
+
+        $this->assertMatchesRegularExpression(
+            '/<option value="'.$this->sectionA->id.'"\s+selected/',
+            $html,
+            'The section dropdown does not show the section that was asked for.',
+        );
+    }
+
+    public function test_the_register_does_not_open_for_someone_without_the_permission(): void
+    {
+        // No role at all, so no students.view. A roll of every child in the school is
+        // the office's to hold, not the staff room's.
+        $outsider = User::factory()->create();
+
+        $this->actingAs($outsider)
+            ->get($this->page())
+            ->assertForbidden();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* A line of the register */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_line_carries_the_photograph_the_guardian_and_the_admission_number(): void
     {
         // The admission number, not the registration number: the school's SAC/2026/014,
         // which lives in `student_number` because those two columns are named the wrong
@@ -92,9 +162,8 @@ class StudentsDetailsTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students'))
+            ->get($this->page(['class' => $this->jss1->id]))
             ->assertOk()
-            ->assertSee('Student List')
             ->assertSee('Ada Okonkwo')
             // No photograph on file, so the initials stand in for one rather than
             // leaving the column empty.
@@ -106,15 +175,23 @@ class StudentsDetailsTest extends TestCase
             ->assertSee('Bulk Delete');
     }
 
-    public function test_the_register_does_not_open_for_someone_without_the_permission(): void
+    public function test_a_student_with_no_class_is_shown_under_their_year_group(): void
     {
-        // No role at all, so no students.view. A roll of every child in the school is
-        // the office's to hold, not the staff room's.
-        $outsider = User::factory()->create();
+        $this->student(null, 'Ada', 'Okonkwo', level: $this->jss1);
 
-        $this->actingAs($outsider)
-            ->get(route('admin.students-results.students'))
-            ->assertForbidden();
+        // Enrolled but not yet put in an arm of the year. The line carries the year
+        // group in place of a class rather than being left blank: somebody has to go
+        // and put them in one.
+        $html = $this->actingAs($this->admin)
+            ->get($this->page(['class' => $this->jss1->id]))
+            ->assertOk()
+            ->getContent();
+
+        // Read against the table, because JSS1 is also an option in the dropdown above.
+        $table = str($html)->after('<tbody')->before('</tbody>')->value();
+
+        $this->assertStringContainsString('Ada Okonkwo', $table);
+        $this->assertStringContainsString('JSS1', $table);
     }
 
     public function test_it_says_so_when_no_class_and_section_pair_matches(): void
@@ -123,10 +200,7 @@ class StudentsDetailsTest extends TestCase
 
         // JSS2 has no B in this school.
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students', [
-                'class' => $this->jss2->id,
-                'section' => $this->sectionB->id,
-            ]))
+            ->get($this->page(['class' => $this->jss2->id, 'section' => $this->sectionB->id]))
             ->assertOk()
             ->assertSee('Nobody to show')
             ->assertDontSee('Ada Okonkwo');
@@ -142,7 +216,7 @@ class StudentsDetailsTest extends TestCase
         $this->student($this->jss2a, 'Bola', 'Adeyemi');
 
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students', ['class' => $this->jss1->id]))
+            ->get($this->page(['class' => $this->jss1->id]))
             ->assertOk()
             ->assertSee('Ada Okonkwo')
             ->assertDontSee('Bola Adeyemi');
@@ -156,7 +230,7 @@ class StudentsDetailsTest extends TestCase
         // The section is on the class, not on the student, so this is the join that
         // has to be read through the class they are in.
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students', ['section' => $this->sectionA->id]))
+            ->get($this->page(['section' => $this->sectionA->id]))
             ->assertOk()
             ->assertSee('Ada Okonkwo')
             ->assertDontSee('Bola Adeyemi');
@@ -171,10 +245,7 @@ class StudentsDetailsTest extends TestCase
         // JSS1 and A together are JSS1A: not JSS1B, which shares the section, and not
         // JSS2A, which shares the class.
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students', [
-                'class' => $this->jss1->id,
-                'section' => $this->sectionA->id,
-            ]))
+            ->get($this->page(['class' => $this->jss1->id, 'section' => $this->sectionA->id]))
             ->assertOk()
             ->assertSee('Ada Okonkwo')
             ->assertDontSee('Bola Adeyemi')
@@ -192,7 +263,7 @@ class StudentsDetailsTest extends TestCase
         $this->invoice($student, total: 100_000, paid: 25_000);
 
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students'))
+            ->get($this->page(['class' => $this->jss1->id]))
             ->assertOk()
             ->assertSee('25%');
     }
@@ -207,7 +278,7 @@ class StudentsDetailsTest extends TestCase
         // 50,000 of 100,000 — the cancelled nine hundred thousand is not owed and must
         // not drag the figure down to nothing.
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students'))
+            ->get($this->page(['class' => $this->jss1->id]))
             ->assertOk()
             ->assertSee('50%');
     }
@@ -219,7 +290,7 @@ class StudentsDetailsTest extends TestCase
         // A confident 0% would say the family owes everything. Nothing raised is a
         // different thing from nothing paid.
         $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students'))
+            ->get($this->page(['class' => $this->jss1->id]))
             ->assertOk()
             ->assertSee('No invoice');
     }
@@ -243,7 +314,7 @@ class StudentsDetailsTest extends TestCase
         $this->assertSoftDeleted('students', ['id' => $gone->id]);
 
         $html = $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students'))
+            ->get($this->page(['class' => $this->jss1->id]))
             ->assertOk()
             ->getContent();
 
@@ -313,6 +384,18 @@ class StudentsDetailsTest extends TestCase
     /* Fixtures */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * The register, for whichever class and section are being asked about.
+     *
+     * Called with nothing, it is the page as it opens: the two dropdowns and no list.
+     *
+     * @param  array<string,mixed>  $filters
+     */
+    private function page(array $filters = []): string
+    {
+        return route('admin.students-results.students', $filters);
+    }
+
     private function schoolClass(SchoolLevel $level, Section $section, string $name): SchoolClass
     {
         return SchoolClass::create([
@@ -324,14 +407,14 @@ class StudentsDetailsTest extends TestCase
     }
 
     /** @param  array<string,mixed>  $extra */
-    private function student(SchoolClass $class, string $firstName, string $lastName, array $extra = []): Student
+    private function student(?SchoolClass $class, string $firstName, string $lastName, array $extra = [], ?SchoolLevel $level = null): Student
     {
         return Student::create($extra + [
             'student_number' => 'SAC/'.fake()->unique()->numberBetween(100000, 999999),
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'level_id' => $class->level_id,
-            'school_class_id' => $class->id,
+            'level_id' => $level?->id ?? $class?->level_id,
+            'school_class_id' => $class?->id,
             'academic_session_id' => $this->year->id,
             'status' => StudentStatus::Active->value,
         ]);
