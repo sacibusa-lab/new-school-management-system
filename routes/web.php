@@ -295,6 +295,7 @@ Route::middleware('auth')
             Route::post('academics/classes/names', [ClassesAndSectionsController::class, 'storeClass'])->name('academics.classes.names.store');
             Route::put('academics/classes/names/{level}', [ClassesAndSectionsController::class, 'updateClass'])->name('academics.classes.names.update');
             Route::delete('academics/classes/names/{level}', [ClassesAndSectionsController::class, 'destroyClass'])->name('academics.classes.names.destroy');
+            Route::patch('academics/classes/names/{level}/status', [ClassesAndSectionsController::class, 'updateClassStatus'])->name('academics.classes.names.status');
 
             // The class teacher belongs to the class rather than the class name:
             // JSS1A and JSS1B have one each. The allocation form names the class the

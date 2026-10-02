@@ -6,7 +6,6 @@ use App\Models\AcademicSession;
 use App\Models\FeeCategory;
 use App\Models\FeeStructure;
 use App\Models\SchoolLevel;
-use App\Models\Term;
 use Illuminate\Database\Seeder;
 
 class FeeSeeder extends Seeder
@@ -43,12 +42,16 @@ class FeeSeeder extends Seeder
             return;
         }
 
-        // JSS3 and SS3 are not offered by this school, so they carry no fees.
+        // A template bill per year group. The leaving years carry the same lines as
+        // the year below them — JSS3 what JSS2 pays, SS3 what SS2 pays — because the
+        // real amounts are the office's and are set on the Fee Structure screen.
         $amounts = [
             'JSS1' => ['TUITION' => 85000, 'DEVLEVY' => 15000, 'REGFEE' => 10000, 'BOOKS' => 25000, 'UNIFORM' => 20000, 'PTA' => 5000, 'ICT' => 5000],
             'JSS2' => ['TUITION' => 85000, 'DEVLEVY' => 10000, 'BOOKS' => 20000, 'PTA' => 5000, 'ICT' => 5000],
+            'JSS3' => ['TUITION' => 85000, 'DEVLEVY' => 10000, 'BOOKS' => 20000, 'PTA' => 5000, 'ICT' => 5000],
             'SS1' => ['TUITION' => 105000, 'DEVLEVY' => 15000, 'REGFEE' => 10000, 'BOOKS' => 30000, 'PTA' => 5000, 'ICT' => 5000],
             'SS2' => ['TUITION' => 105000, 'DEVLEVY' => 10000, 'BOOKS' => 25000, 'PTA' => 5000, 'ICT' => 5000],
+            'SS3' => ['TUITION' => 105000, 'DEVLEVY' => 10000, 'BOOKS' => 25000, 'PTA' => 5000, 'ICT' => 5000],
         ];
 
         foreach ($amounts as $levelName => $lines) {

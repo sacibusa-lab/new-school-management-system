@@ -109,7 +109,8 @@
                             <th class="w-12 border-b border-r border-line p-3 text-center">#</th>
                             <th class="border-b border-r border-line p-3">Class Name</th>
                             <th class="border-b border-r border-line p-3">Section</th>
-                            <th class="w-32 border-b border-line p-3 text-center">Action</th>
+                            <th class="w-32 border-b border-r border-line p-3">Status</th>
+                            <th class="w-56 border-b border-line p-3 text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-line text-ink-soft">
@@ -138,8 +139,41 @@
                                     @endforelse
                                 </td>
 
+                                {{-- Whether the school is running this year at all. This is the only
+                                     switch of its kind, and it is here because it has to be
+                                     somewhere: a year group that is not offered is not offered in
+                                     any dropdown in the platform, and an office that cannot reach
+                                     the switch has no way back once somebody else has thrown it. --}}
+                                <td class="border-r border-line p-3 align-top">
+                                    <span @class([
+                                        'inline-flex items-center gap-2 text-xs font-semibold',
+                                        'text-emerald-700 dark:text-emerald-300' => $level->is_active,
+                                        'text-muted' => ! $level->is_active,
+                                    ])>
+                                        <span @class([
+                                            'h-2 w-2 shrink-0 rounded-full',
+                                            'bg-emerald-500 dark:bg-emerald-400' => $level->is_active,
+                                            'bg-ink-soft/50' => ! $level->is_active,
+                                        ])></span>
+                                        {{ $level->is_active ? 'Offered' : 'Not offered' }}
+                                    </span>
+                                </td>
+
                                 <td class="p-3 align-top">
                                     <div class="flex justify-center gap-2">
+                                        {{-- One click, no confirmation: it is one click back, and it
+                                             takes no record with it. Withdrawing hides the year and
+                                             its arms everywhere; it deletes nothing. --}}
+                                        <form method="POST"
+                                              action="{{ route('admin.students-results.academics.classes.names.status', $level) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="is_active" value="{{ $level->is_active ? 0 : 1 }}">
+                                            <button type="submit" class="btn-ghost btn-sm">
+                                                {{ $level->is_active ? 'Withdraw' : 'Offer' }}
+                                            </button>
+                                        </form>
+
                                         <a href="{{ route('admin.students-results.academics.classes', ['edit' => $level->id]) }}"
                                            class="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-soft transition hover:bg-surface-3"
                                            title="Edit {{ $level->name }}">
@@ -161,7 +195,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="p-8 text-center text-sm text-muted">
+                                <td colspan="5" class="p-8 text-center text-sm text-muted">
                                     No classes yet. Create one on the left.
                                 </td>
                             </tr>

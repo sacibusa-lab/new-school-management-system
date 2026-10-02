@@ -448,6 +448,127 @@ class ClassesAndSectionsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* Offering a year group, or not */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Withdrawing is not deleting. JSS3 leaves at the end of the junior school, and
+     * the year comes back with everything that was written against it — which is the
+     * whole reason it is a switch and not the dustbin next to it.
+     */
+    public function test_a_year_group_can_be_withdrawn_and_offered_again(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS3', 'order' => 3]);
+        $section = Section::create(['name' => 'A', 'order' => 1]);
+        $class = $this->class($level, $section, 'JSS3A');
+        $student = $this->student($class, $level);
+
+        $this->actingAs($this->admin)
+            ->patch(route('admin.students-results.academics.classes.names.status', $level), ['is_active' => 0])
+            ->assertSessionHas('status', 'JSS3 is no longer offered.');
+
+        $this->assertFalse($level->refresh()->is_active);
+        // Its arms go with it: JSS3A cannot be offered at a school that is not running
+        // JSS3, and the two lists would otherwise disagree with each other.
+        $this->assertFalse($class->refresh()->is_active);
+        // Nothing written against the year moved.
+        $this->assertDatabaseHas('students', ['id' => $student->id, 'deleted_at' => null]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('admin.students-results.academics.classes.names.status', $level), ['is_active' => 1])
+            ->assertSessionHas('status', 'JSS3 is offered again.');
+
+        $this->assertTrue($level->refresh()->is_active);
+        $this->assertTrue($class->refresh()->is_active);
+    }
+
+    /**
+     * The bug this switch exists for: a year group that is off is off in every
+     * dropdown in the platform at once — and until now nothing anywhere could put it
+     * back on, so an office that found its year missing had nowhere to go.
+     */
+    public function test_a_withdrawn_year_group_is_off_the_dropdowns_and_an_offered_one_is_on_them(): void
+    {
+        $jss1 = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+        $jss3 = SchoolLevel::create(['name' => 'JSS3', 'order' => 2]);
+        $section = Section::create(['name' => 'A', 'order' => 1]);
+        $this->class($jss1, $section, 'JSS1A');
+        $this->class($jss3, $section, 'JSS3A');
+
+        $register = route('admin.students-results.students');
+
+        $this->assertStringContainsString('JSS3', $this->classOptions($register));
+
+        $this->actingAs($this->admin)
+            ->patch(route('admin.students-results.academics.classes.names.status', $jss3), ['is_active' => 0]);
+
+        // Read off the dropdown rather than off the page: the flash left by the
+        // withdrawal names the year, and it is on the page when this is read.
+        $options = $this->classOptions($register);
+
+        $this->assertStringNotContainsString('JSS3', $options);
+        $this->assertStringContainsString('JSS1', $options);
+
+        // Withdrawn, not gone: the year and its arm are still there to be offered
+        // again next September.
+        $this->assertTrue(SchoolLevel::query()->where('id', $jss3->id)->exists());
+        $this->assertTrue(SchoolClass::query()->where('name', 'JSS3A')->exists());
+    }
+
+    /** A new arm of a year that is not running is not a way back in. */
+    public function test_a_new_arm_of_a_withdrawn_year_group_is_not_offered_either(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS3', 'order' => 1, 'is_active' => false]);
+        $section = Section::create(['name' => 'E', 'order' => 1]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.academics.classes.store-class', $level), [
+                'section_id' => $section->id,
+            ])
+            ->assertSessionHas('status');
+
+        $this->assertFalse(SchoolClass::query()->sole()->is_active);
+    }
+
+    /** The list says which years are offered, because that is the question it answers. */
+    public function test_the_class_list_says_which_year_groups_are_offered(): void
+    {
+        SchoolLevel::create(['name' => 'JSS1', 'order' => 1, 'is_active' => true]);
+        SchoolLevel::create(['name' => 'JSS3', 'order' => 2, 'is_active' => false]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.classes'))
+            ->assertOk()
+            ->assertSee('Status')
+            ->assertSee('Offered')
+            ->assertSee('Not offered')
+            ->assertSee('Withdraw')
+            ->assertSee('Offer');
+    }
+
+    public function test_offering_a_year_group_is_closed_to_a_role_without_the_permission(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+
+        $this->actingAs($this->teacher())
+            ->patch(route('admin.students-results.academics.classes.names.status', $level), ['is_active' => 0])
+            ->assertForbidden();
+
+        $this->assertTrue($level->refresh()->is_active);
+    }
+
+    public function test_the_switch_asks_for_a_yes_or_a_no(): void
+    {
+        $level = SchoolLevel::create(['name' => 'JSS1', 'order' => 1]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('admin.students-results.academics.classes.names.status', $level), [])
+            ->assertSessionHasErrors('is_active');
+
+        $this->assertTrue($level->refresh()->is_active);
+    }
+
+    /* ------------------------------------------------------------------ */
     /* A class: a class name and a section */
     /* ------------------------------------------------------------------ */
 
@@ -752,6 +873,14 @@ class ClassesAndSectionsTest extends TestCase
             'name' => $name,
             'is_active' => true,
         ]);
+    }
+
+    /** What the class dropdown of another page is offering, and nothing else on it. */
+    private function classOptions(string $url): string
+    {
+        $html = $this->actingAs($this->admin)->get($url)->assertOk()->getContent();
+
+        return str($html)->after('id="class"')->before('</select>')->value();
     }
 
     private function teacher(string $name = 'Chidera Okafor'): User

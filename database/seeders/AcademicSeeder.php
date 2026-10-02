@@ -57,9 +57,14 @@ class AcademicSeeder extends Seeder
         // Sections, levels and the classes they make
         // ---------------------------------------------------------------
         // Sections first, because a class is named from one: JSS1 on its own is not
-        // a class anybody sits in until it has a section. The school does not run
-        // JSS3 or SS3, so they are not offered anywhere a class is chosen. `order`
-        // stays contiguous for the classes that exist.
+        // a class anybody sits in until it has a section. The school runs all six
+        // years of a secondary school, so all six are seeded.
+        //
+        // A year the school is not running — one it has not opened yet, or one whose
+        // children have left — is switched off on the Classes & Sections page rather
+        // than removed from here, and that is why `is_active` is written only when a
+        // year or a class is first created. After that it belongs to the office: a
+        // seeder run must not quietly open a year they have withdrawn.
         $sections = ['A', 'B', 'C', 'D'];
 
         foreach ($sections as $index => $section) {
@@ -72,27 +77,37 @@ class AcademicSeeder extends Seeder
         $levels = [
             ['name' => 'JSS1', 'order' => 1, 'sections' => ['A', 'B', 'C', 'D']],
             ['name' => 'JSS2', 'order' => 2, 'sections' => ['A', 'B', 'C', 'D']],
-            ['name' => 'SS1', 'order' => 3, 'sections' => ['A', 'B', 'C', 'D']],
-            ['name' => 'SS2', 'order' => 4, 'sections' => ['A', 'B', 'C']],
+            ['name' => 'JSS3', 'order' => 3, 'sections' => ['A', 'B', 'C', 'D']],
+            ['name' => 'SS1', 'order' => 4, 'sections' => ['A', 'B', 'C', 'D']],
+            ['name' => 'SS2', 'order' => 5, 'sections' => ['A', 'B', 'C']],
+            ['name' => 'SS3', 'order' => 6, 'sections' => ['A', 'B', 'C']],
         ];
 
         foreach ($levels as $levelData) {
-            $level = SchoolLevel::updateOrCreate(
-                ['name' => $levelData['name']],
-                ['order' => $levelData['order'], 'is_active' => true],
-            );
+            $level = SchoolLevel::firstOrNew(['name' => $levelData['name']]);
+
+            if (! $level->exists) {
+                $level->is_active = true;
+            }
+
+            $level->order = $levelData['order'];
+            $level->save();
 
             foreach ($levelData['sections'] as $sectionName) {
                 $section = Section::query()->where('name', $sectionName)->sole();
 
-                SchoolClass::updateOrCreate(
-                    ['level_id' => $level->id, 'section_id' => $section->id],
-                    [
-                        'name' => $level->name.$section->name,
-                        'capacity' => 40,
-                        'is_active' => true,
-                    ],
-                );
+                $class = SchoolClass::firstOrNew([
+                    'level_id' => $level->id,
+                    'section_id' => $section->id,
+                ]);
+
+                if (! $class->exists) {
+                    $class->is_active = true;
+                }
+
+                $class->name = $level->name.$section->name;
+                $class->capacity = 40;
+                $class->save();
             }
         }
 

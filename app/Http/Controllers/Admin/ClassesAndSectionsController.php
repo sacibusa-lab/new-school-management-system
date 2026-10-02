@@ -185,6 +185,33 @@ class ClassesAndSectionsController extends Controller
         return back()->with('status', "{$level->refresh()->name} saved.");
     }
 
+    /**
+     * Offer a year group, or withdraw it.
+     *
+     * Withdrawing is not deleting. JSS3 leaves at the end of the junior school and
+     * SS3 with the seniors, and the school stops offering one of them long before it
+     * stops having taught it — so this takes the year out of every list in the
+     * platform at once and leaves every record written against it alone. There is no
+     * confirmation step for the same reason there is none on the deletes above: it is
+     * one click back, and it takes nothing with it.
+     */
+    public function updateClassStatus(Request $request, SchoolLevel $level): RedirectResponse
+    {
+        $this->authorize('academics.manage');
+
+        $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $offered = $request->boolean('is_active');
+
+        $this->structure->setClassNameActive($level, $offered, $request->user());
+
+        return back()->with('status', $offered
+            ? "{$level->name} is offered again."
+            : "{$level->name} is no longer offered.");
+    }
+
     /* ------------------------------------------------------------------ */
     /* A class: a class name and a section */
     /* ------------------------------------------------------------------ */

@@ -156,6 +156,45 @@ class AcademicStructureService
     }
 
     /**
+     * Offer a year group, or take it out of the lists.
+     *
+     * A school does not run every year every year. JSS3 goes at the end of the junior
+     * school and SS3 with the seniors, a year the school has not opened yet is not a
+     * year an applicant can be offered, and a class that has left should not go on
+     * being filled in. This is the switch for that, and it is the only one there is —
+     * which is the point, because a year group that is not offered is not offered
+     * anywhere, and where that was decided was a seeder far from the school office.
+     *
+     * Nothing written against the year is touched. Its classes, its fee structures,
+     * its marks and its children all stay exactly where they are, so the year can be
+     * offered again with everything intact. That is why this is not a delete.
+     *
+     * The arms of a year group go with it. JSS3A cannot be offered at a school that is
+     * not running JSS3 — and a class left switched on under a year that is switched
+     * off is two screens in the same platform disagreeing with each other, which is
+     * how a child ends up on a register for a class nobody is teaching.
+     */
+    public function setClassNameActive(SchoolLevel $level, bool $isActive, ?User $actor = null): SchoolLevel
+    {
+        if ($level->is_active === $isActive) {
+            return $level;
+        }
+
+        $level->update(['is_active' => $isActive]);
+        $level->classes()->update(['is_active' => $isActive]);
+
+        $this->log(
+            $actor,
+            $isActive ? 'class.offered' : 'class.withdrawn',
+            $level,
+            $isActive ? "Offered {$level->name}" : "Withdrew {$level->name}",
+            ['module' => 'academics'],
+        );
+
+        return $level;
+    }
+
+    /**
      * What is written against a class name in its own right.
      *
      * @return array<string,int>
@@ -291,7 +330,10 @@ class AcademicStructureService
             'level_id' => $level->id,
             'section_id' => $section->id,
             'name' => $name,
-            'is_active' => true,
+            // A new arm of a year group the school is not running is not offered
+            // either. Adding section E to a withdrawn JSS3 makes JSS3E, not a way back
+            // in.
+            'is_active' => $level->is_active,
         ]);
 
         $this->log($actor, 'class.created', $class, "Added class {$class->name}", [
