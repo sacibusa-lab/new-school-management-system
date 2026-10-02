@@ -207,6 +207,14 @@ Route::middleware('auth')
         Route::resource('students', StudentController::class)->only(['index', 'show', 'edit', 'update']);
         Route::post('students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset-password');
 
+        // One student's photograph, added or replaced from their own record. It is the
+        // same picture the termly results sheet and the fee slip will print, so it is
+        // kept on the student rather than on the application they came in on.
+        Route::post('students/{student}/photo', [StudentController::class, 'updatePhoto'])
+            ->name('students.photo.update');
+        Route::delete('students/{student}/photo', [StudentController::class, 'destroyPhoto'])
+            ->name('students.photo.destroy');
+
         /* ---------------- Results ---------------- */
         Route::get('results', [ResultController::class, 'index'])->name('results.index');
         Route::get('results/{termResult}', [ResultController::class, 'show'])->name('results.show');

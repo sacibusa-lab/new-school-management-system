@@ -358,6 +358,68 @@
 
     {{-- ================= Their details ================= --}}
     <div class="space-y-6">
+        {{-- The one thing on this page that has to be added by hand — names and
+             numbers arrive with the class list, faces do not. It lives on the record
+             rather than on the application they came in on because it outlives the
+             admission: this is the face the results sheet and the fee slip print. --}}
+        <div class="card">
+            <div class="border-b border-line px-5 py-4">
+                <h2 class="font-display text-base font-semibold text-ink">Photograph</h2>
+            </div>
+
+            <div class="p-5">
+                @if ($student->photo_path)
+                    {{-- asset() rather than Storage::url(): the disk URL is built from
+                         APP_URL, which is not the host the office actually browses on. --}}
+                    <a href="{{ asset('storage/'.$student->photo_path) }}" target="_blank"
+                       class="mx-auto block w-32 overflow-hidden rounded-xl ring-1 ring-line transition hover:ring-brand-400">
+                        <img src="{{ asset('storage/'.$student->photo_path) }}"
+                             alt="Photograph of {{ $student->full_name }}"
+                             class="h-36 w-32 object-cover">
+                    </a>
+                @else
+                    <div class="mx-auto flex h-36 w-32 items-center justify-center rounded-xl border border-dashed border-line bg-surface-2">
+                        <span class="text-xs text-muted">No photograph</span>
+                    </div>
+                @endif
+
+                @can('update', $student)
+                    <form method="POST" action="{{ route('admin.students.photo.update', $student) }}"
+                          enctype="multipart/form-data" class="mt-4">
+                        @csrf
+
+                        <label for="student-photo" class="sr-only">Photograph</label>
+                        <input id="student-photo" name="photo" type="file" required
+                               accept=".jpg,.jpeg,.png,.webp"
+                               class="block w-full text-xs text-ink-soft file:mr-2 file:rounded-md file:border-0 file:bg-surface-3 file:px-2.5 file:py-1.5 file:text-xs">
+
+                        @error('photo')
+                            <p class="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                        @enderror
+
+                        <button type="submit" class="btn-secondary btn-sm mt-2 w-full">
+                            {{ $student->photo_path ? 'Replace' : 'Upload' }}
+                        </button>
+                    </form>
+
+                    @if ($student->photo_path)
+                        {{-- The name is left out of the question on purpose: it would have
+                             to be escaped into the script, and a name with an apostrophe in
+                             it would break the page. --}}
+                        <form method="POST" action="{{ route('admin.students.photo.destroy', $student) }}"
+                              class="mt-1.5"
+                              onsubmit="return confirm('Remove this student’s photograph?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn-ghost btn-sm w-full text-rose-600 dark:text-rose-400">
+                                Remove
+                            </button>
+                        </form>
+                    @endif
+                @endcan
+            </div>
+        </div>
+
         <div class="card">
             <div class="border-b border-line px-5 py-4">
                 <h2 class="font-display text-base font-semibold text-ink">Student</h2>

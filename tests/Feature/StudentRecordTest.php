@@ -21,6 +21,8 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -55,6 +57,10 @@ class StudentRecordTest extends TestCase
         $this->seed(SettingsSeeder::class);
         $this->seed(RolePermissionSeeder::class);
         Setting::flush();
+
+        // A photograph belongs on the disk the office browses, not on the disk the test
+        // happens to be running against.
+        Storage::fake('public');
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('Super Admin');
@@ -389,6 +395,125 @@ class StudentRecordTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* The photograph */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_photograph_is_added_to_the_student_record(): void
+    {
+        $student = $this->student();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students.photo.update', $student), [
+                'photo' => UploadedFile::fake()->image('ada.jpg', 300, 400),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status');
+
+        $path = $student->refresh()->photo_path;
+
+        $this->assertNotNull($path);
+        // Kept where the rest of the school's photographs are kept, so the results sheet
+        // and the fee slip can find it without knowing when it was uploaded.
+        $this->assertStringStartsWith('photos/students/', $path);
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_the_photograph_is_shown_on_the_record(): void
+    {
+        $student = $this->student();
+        $path = $this->attachPhoto($student);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students.show', $student))
+            ->assertOk()
+            // asset() and not the raw path: the page is browsed on a host other than the
+            // one APP_URL names, so a storage url built from the disk would 404.
+            ->assertSee(asset('storage/'.$path), false)
+            ->assertDontSee('No photograph')
+            // There is a photograph now, so the same button offers the other thing it can do.
+            ->assertSee('Replace');
+    }
+
+    public function test_replacing_a_photograph_takes_the_old_one_with_it(): void
+    {
+        $student = $this->student();
+
+        $first = $this->attachPhoto($student, 'ada.jpg');
+        $second = $this->attachPhoto($student, 'ada-again.jpg');
+
+        $this->assertNotSame($first, $second);
+        Storage::disk('public')->assertMissing($first);
+        Storage::disk('public')->assertExists($second);
+    }
+
+    public function test_the_photograph_can_be_taken_off_again(): void
+    {
+        $student = $this->student();
+        $path = $this->attachPhoto($student);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.students.photo.destroy', $student))
+            ->assertRedirect()
+            ->assertSessionHas('status');
+
+        $this->assertNull($student->refresh()->photo_path);
+        Storage::disk('public')->assertMissing($path);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students.show', $student))
+            ->assertOk()
+            ->assertSee('No photograph');
+    }
+
+    public function test_something_that_is_not_a_photograph_is_refused(): void
+    {
+        $student = $this->student();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students.photo.update', $student), [
+                'photo' => UploadedFile::fake()->create('timetable.pdf', 40, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('photo');
+
+        $this->assertNull($student->refresh()->photo_path);
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
+    public function test_a_photograph_that_is_too_big_is_refused(): void
+    {
+        $student = $this->student();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students.photo.update', $student), [
+                'photo' => UploadedFile::fake()->image('huge.jpg', 300, 400)->size(6000),
+            ])
+            ->assertSessionHasErrors('photo');
+
+        $this->assertNull($student->refresh()->photo_path);
+    }
+
+    public function test_photographs_are_closed_to_a_role_that_may_only_read_the_roll(): void
+    {
+        $teacher = User::factory()->create();
+        $teacher->assignRole('Teacher');
+
+        $student = $this->student();
+
+        $this->actingAs($teacher)
+            ->post(route('admin.students.photo.update', $student), [
+                'photo' => UploadedFile::fake()->image('ada.jpg', 300, 400),
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($teacher)
+            ->delete(route('admin.students.photo.destroy', $student))
+            ->assertForbidden();
+
+        $this->assertNull($student->refresh()->photo_path);
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Fixtures */
     /* ------------------------------------------------------------------ */
 
@@ -408,6 +533,18 @@ class StudentRecordTest extends TestCase
             'status' => StudentStatus::Active->value,
             'admitted_at' => now(),
         ]);
+    }
+
+    /** Attach a photograph the way the office would, and hand back where it landed. */
+    private function attachPhoto(Student $student, string $name = 'ada.jpg'): string
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.students.photo.update', $student), [
+                'photo' => UploadedFile::fake()->image($name, 300, 400),
+            ])
+            ->assertSessionHasNoErrors();
+
+        return $student->refresh()->photo_path;
     }
 
     private function invoice(Student $student, float $total, float $paid): Invoice

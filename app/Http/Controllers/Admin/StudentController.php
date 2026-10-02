@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\ActivityLog;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -131,5 +133,66 @@ class StudentController extends Controller
         ]);
 
         return back()->with('status', "Portal password reset. {$student->first_name} signs in with {$student->student_number}.");
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The photograph */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Put a photograph on a student, or replace the one there.
+     *
+     * It hangs off the student rather than the applicant they came in on, because it
+     * outlives the admission: this is the face the termly results sheet and the fee
+     * slip print beside the name, and a transfer in never had an application at all.
+     *
+     * The old file goes rather than being left on the disk. A replaced photograph is
+     * usually a replaced photograph because somebody objected to the first one, and
+     * leaving it in a folder is leaving it lying about.
+     */
+    public function updatePhoto(Request $request, Student $student): RedirectResponse
+    {
+        $this->authorize('update', $student);
+
+        $validated = $request->validate([
+            'photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'photo.mimes' => 'That has to be a photograph — JPG, PNG or WEBP.',
+            'photo.max' => 'That photograph is over 5 MB.',
+        ]);
+
+        $previous = $student->photo_path;
+
+        $student->update([
+            'photo_path' => $validated['photo']->store(config('saci.uploads.photos').'/students', 'public'),
+        ]);
+
+        if ($previous) {
+            Storage::disk('public')->delete($previous);
+        }
+
+        ActivityLog::record('student.photo', $student, "Added a photograph for {$student->student_number}", [
+            'module' => 'students',
+        ]);
+
+        return back()->with('status', 'Photograph saved for '.$student->full_name.'.');
+    }
+
+    /** Take a student's photograph off their record, and off the disk with it. */
+    public function destroyPhoto(Student $student): RedirectResponse
+    {
+        $this->authorize('update', $student);
+
+        if ($student->photo_path) {
+            Storage::disk('public')->delete($student->photo_path);
+
+            ActivityLog::record('student.photo.removed', $student, "Removed the photograph for {$student->student_number}", [
+                'module' => 'students',
+            ]);
+        }
+
+        $student->update(['photo_path' => null]);
+
+        return back()->with('status', 'Photograph removed from '.$student->full_name.'.');
     }
 }
