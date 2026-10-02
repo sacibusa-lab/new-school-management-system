@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
@@ -46,6 +47,10 @@ class StudentController extends Controller
         $student->load([
             'level', 'schoolClass', 'academicSession', 'applicant', 'user',
             'termResults.term', 'termResults.academicSession',
+            // How they got here, and the examination they came in on.
+            'promotions.fromSession', 'promotions.toSession',
+            'promotions.fromClass', 'promotions.toClass', 'promotions.decidedBy',
+            'applicant.scores.examSubject.subject',
         ]);
 
         return view('admin.students.show', [
@@ -92,6 +97,15 @@ class StudentController extends Controller
             'results_portal_enabled' => ['nullable', 'boolean'],
             'fees_portal_enabled' => ['nullable', 'boolean'],
         ]);
+
+        // The year group is a property of the class, not a second opinion about it.
+        // A child in JSS2A is in JSS2, and letting the two be set apart is how somebody
+        // ends up filed under a year the register does not look for them in — the
+        // register filters on the year group, so they would simply go missing from
+        // their own class. Where a class is named, it decides.
+        if ($class = SchoolClass::query()->find($validated['school_class_id'] ?? null)) {
+            $validated['level_id'] = $class->level_id;
+        }
 
         $student->update($validated + [
             'results_portal_enabled' => $request->boolean('results_portal_enabled'),

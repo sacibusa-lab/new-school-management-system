@@ -5,9 +5,7 @@
 
 @section('actions')
     @can('students.manage')
-        {{-- No Edit button: `admin.students.edit` is a route with a controller and no
-             view, and a link to a page that errors is worse than no link. It comes back
-             when the form does. --}}
+        <a href="{{ route('admin.students.edit', $student) }}" class="btn-secondary btn-sm">Edit</a>
 
         {{-- Only offered where there is an account to reset: a student who has never
              been given portal access would be told about a password that is not there. --}}
@@ -198,7 +196,7 @@
         @if ($student->termResults->isNotEmpty())
             <div class="card">
                 <div class="border-b border-line px-5 py-4">
-                    <h2 class="font-display text-base font-semibold text-ink">Results</h2>
+                    <h2 class="font-display text-base font-semibold text-ink">Term results</h2>
                 </div>
 
                 <div class="table-wrap">
@@ -236,6 +234,126 @@
                 </div>
             </div>
         @endif
+
+        {{-- How they got from one year to the next. The student row says where they are
+             now and nothing about how many times they got there, which is the question
+             asked whenever an old record is being picked up again. --}}
+        <div class="card">
+            <div class="border-b border-line px-5 py-4">
+                <h2 class="font-display text-base font-semibold text-ink">Promotion history</h2>
+            </div>
+
+            @if ($student->promotions->isEmpty())
+                <p class="px-5 py-10 text-center text-sm text-muted">
+                    No decision has been recorded about this student at the end of a session yet.
+                </p>
+            @else
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>At the end of</th>
+                                <th>From</th>
+                                <th>To</th>
+                                <th>Decision</th>
+                                <th>Decided</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($student->promotions->sortByDesc('decided_at') as $promotion)
+                                <tr>
+                                    <td>
+                                        <p class="text-sm font-medium text-ink">
+                                            {{ $promotion->fromSession?->name ?? '—' }}
+                                        </p>
+
+                                        @if ($promotion->toSession)
+                                            <p class="text-xs text-muted">into {{ $promotion->toSession->name }}</p>
+                                        @endif
+                                    </td>
+
+                                    <td class="text-sm">{{ $promotion->fromClass?->name ?? '—' }}</td>
+
+                                    {{-- A student who left or graduated has no class to go
+                                         to, and a dash says that better than a blank. --}}
+                                    <td class="text-sm">{{ $promotion->toClass?->name ?? '—' }}</td>
+
+                                    <td>
+                                        <span class="badge {{ $promotion->action->badge() }}">
+                                            {{ $promotion->action->label() }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <p class="text-sm">{{ $promotion->decided_at?->format('j M Y') ?? '—' }}</p>
+                                        <p class="text-xs text-muted">{{ $promotion->decidedBy?->name ?? '—' }}</p>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+
+        @php
+            // The examination belongs to the application rather than the student, so it
+            // is read through them. A student who joined without sitting one — a
+            // transfer in, say — simply has nothing here.
+            $examScores = $student->applicant?->scores ?? collect();
+        @endphp
+
+        <div class="card">
+            <div class="border-b border-line px-5 py-4">
+                <h2 class="font-display text-base font-semibold text-ink">Examination results</h2>
+                <p class="mt-0.5 text-xs text-muted">The entrance examination they came in on</p>
+            </div>
+
+            @if ($examScores->isEmpty())
+                <p class="px-5 py-10 text-center text-sm text-muted">
+                    {{ $student->applicant
+                        ? 'No examination scores were captured for this student.'
+                        : 'This student has no application on file, so there is no entrance examination behind them.' }}
+                </p>
+            @else
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th class="text-right">Score</th>
+                                <th class="text-right">Out of</th>
+                                <th class="text-right">Percentage</th>
+                                <th>Grade</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($examScores as $score)
+                                <tr>
+                                    <td class="font-medium text-ink">{{ $score->examSubject?->subject?->name ?? '—' }}</td>
+
+                                    <td class="text-right font-medium">
+                                        {{ $score->is_absent ? 'Absent' : ($score->score !== null ? rtrim(rtrim(number_format((float) $score->score, 2), '0'), '.') : '—') }}
+                                    </td>
+
+                                    <td class="text-right text-sm text-muted">
+                                        {{ rtrim(rtrim(number_format((float) ($score->examSubject?->total_marks ?? 0), 2), '0'), '.') }}
+                                    </td>
+
+                                    <td class="text-right text-sm">
+                                        {{ $score->percentage() !== null ? rtrim(rtrim(number_format($score->percentage(), 2), '0'), '.').'%' : '—' }}
+                                    </td>
+
+                                    <td class="text-sm font-semibold text-ink">{{ $score->grade ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
     </div>
 
     {{-- ================= Their details ================= --}}
