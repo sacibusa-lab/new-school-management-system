@@ -16,7 +16,7 @@
 
         <div class="mt-6 space-y-5">
             <x-field name="name" label="Full name" required :value="$user->name" />
-            <x-field name="email" label="Email address" type="email" required :value="$user->email" />
+            <x-field name="email" label="Email address (optional)" type="email" :value="$user->email" />
             <x-field name="phone" label="Phone number" :value="$user->phone" />
         </div>
 
@@ -30,15 +30,7 @@
 
         <h2 class="text-base font-semibold text-ink">Change your password</h2>
 
-        @if ($user->must_change_password)
-            <div class="mt-4">
-                <x-alert tone="warning" title="Please change your password">
-                    You are still using the password you were given. Choose a new one now.
-                </x-alert>
-            </div>
-        @else
-            <p class="mt-1 text-sm text-muted">Use at least 8 characters.</p>
-        @endif
+        <p class="mt-1 text-sm text-muted">Use at least 8 characters.</p>
 
         <div class="mt-6 space-y-5">
             <x-field name="current_password" label="Current password" type="password" required autocomplete="current-password" />

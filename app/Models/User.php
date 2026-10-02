@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'phone', 'avatar_path', 'is_active', 'must_change_password'])]
+#[Fillable(['name', 'email', 'password', 'phone', 'avatar_path', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -31,13 +31,12 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
-            'must_change_password' => 'boolean',
             'last_login_at' => 'datetime',
         ];
     }
 
     /* ------------------------------------------------------------------ */
-    /* Relationships                                                       */
+    /* Relationships */
     /* ------------------------------------------------------------------ */
 
     public function applicant(): HasOne
@@ -67,7 +66,7 @@ class User extends Authenticatable
     }
 
     /* ------------------------------------------------------------------ */
-    /* Helpers                                                             */
+    /* Helpers */
     /* ------------------------------------------------------------------ */
 
     public function getInitialsAttribute(): string

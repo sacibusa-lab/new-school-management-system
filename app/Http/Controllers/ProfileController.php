@@ -21,7 +21,9 @@ class ProfileController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'string', 'email', 'max:150', 'unique:users,email,' . $request->user()->id],
+            // Optional: a teacher signs in with a phone number, so an address is not
+            // something every account has to carry.
+            'email' => ['nullable', 'string', 'email', 'max:150', 'unique:users,email,'.$request->user()->id],
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
 
@@ -39,7 +41,6 @@ class ProfileController extends Controller
 
         $request->user()->update([
             'password' => Hash::make($validated['password']),
-            'must_change_password' => false,
         ]);
 
         return back()->with('status', 'Your password has been changed.');

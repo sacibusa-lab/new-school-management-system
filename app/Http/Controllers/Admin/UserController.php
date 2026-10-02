@@ -23,7 +23,7 @@ class UserController extends Controller
             'users' => User::query()
                 ->with('roles')
                 ->when($request->filled('q'), function ($q) use ($request) {
-                    $term = '%' . trim($request->string('q')->toString()) . '%';
+                    $term = '%'.trim($request->string('q')->toString()).'%';
 
                     $q->where(fn ($inner) => $inner
                         ->where('name', 'like', $term)
@@ -57,7 +57,6 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'password' => Hash::make($validated['password']),
             'is_active' => true,
-            'must_change_password' => true,
         ]);
 
         $user->assignRole($validated['role']);

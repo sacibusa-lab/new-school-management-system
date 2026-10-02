@@ -2,12 +2,14 @@
 
 namespace App\Services\Admissions;
 
+use App\Enums\AdmissionDecisionStatus;
 use App\Enums\ApplicantStatus;
 use App\Enums\StudentStatus;
 use App\Models\AcademicSession;
 use App\Models\ActivityLog;
 use App\Models\AdmissionDecision;
 use App\Models\Applicant;
+use App\Models\Exam;
 use App\Models\PipelineEvent;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
@@ -37,8 +39,7 @@ class StudentEnrolmentService
         private readonly NumberSequenceService $sequences,
         private readonly InvoiceGenerationService $invoices,
         private readonly SmsNotifier $sms,
-    ) {
-    }
+    ) {}
 
     /**
      * Enrol an admitted applicant. Safe to call repeatedly — a student is only
@@ -147,12 +148,11 @@ class StudentEnrolmentService
         }
 
         $user = User::create([
-            'name' => $student->first_name . ' ' . $student->last_name,
+            'name' => $student->first_name.' '.$student->last_name,
             'email' => $email,
             'phone' => $student->phone,
             'password' => Hash::make($student->student_number),
             'is_active' => true,
-            'must_change_password' => true,
         ]);
 
         $user->assignRole('Student');
@@ -217,12 +217,12 @@ class StudentEnrolmentService
      *
      * @return array{enrolled:int,skipped:int,students:array<int,Student>,withoutInvoice:array<int,string>}
      */
-    public function enrolExam(\App\Models\Exam $exam, ?User $actor = null): array
+    public function enrolExam(Exam $exam, ?User $actor = null): array
     {
         $decisions = AdmissionDecision::query()
             ->with(['applicant.levelAppliedFor', 'applicant.academicSession'])
             ->where('exam_id', $exam->id)
-            ->where('decision', \App\Enums\AdmissionDecisionStatus::Admitted->value)
+            ->where('decision', AdmissionDecisionStatus::Admitted->value)
             ->get();
 
         $enrolled = [];

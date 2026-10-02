@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Nothing of our own to add now that the password gate is gone — but this
+        // callback still has to be made, because it is what registers the framework's
+        // default groups. Left out, "web" is not a group and every page 500s.
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -23,7 +23,6 @@ class StaffUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'phone' => '08000000000',
                 'is_active' => true,
-                'must_change_password' => true,
                 'email_verified_at' => now(),
             ],
         );

@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
-use App\Models\Payment;
+use App\Models\SchoolLevel;
 use App\Models\Student;
-use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -34,7 +34,7 @@ class StudentController extends Controller
 
         return view('admin.students.index', [
             'students' => $students,
-            'levels' => \App\Models\SchoolLevel::query()->active()->with('classes')->get(),
+            'levels' => SchoolLevel::query()->active()->with('classes')->get(),
             'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
         ]);
     }
@@ -66,7 +66,7 @@ class StudentController extends Controller
 
         return view('admin.students.edit', [
             'student' => $student,
-            'levels' => \App\Models\SchoolLevel::query()->active()->with('classes')->get(),
+            'levels' => SchoolLevel::query()->active()->with('classes')->get(),
         ]);
     }
 
@@ -88,7 +88,7 @@ class StudentController extends Controller
             'guardian_name' => ['nullable', 'string', 'max:120'],
             'guardian_phone' => ['nullable', 'string', 'max:30'],
             'guardian_email' => ['nullable', 'email', 'max:150'],
-            'status' => ['required', Rule::enum(\App\Enums\StudentStatus::class)],
+            'status' => ['required', Rule::enum(StudentStatus::class)],
             'results_portal_enabled' => ['nullable', 'boolean'],
             'fees_portal_enabled' => ['nullable', 'boolean'],
         ]);
@@ -114,7 +114,6 @@ class StudentController extends Controller
 
         $student->user->update([
             'password' => Hash::make($student->student_number),
-            'must_change_password' => true,
         ]);
 
         return back()->with('status', "Portal password reset. {$student->first_name} signs in with {$student->student_number}.");
