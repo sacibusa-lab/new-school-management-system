@@ -17,6 +17,10 @@ class SettingsSeeder extends Seeder
             ['key' => 'contact_email', 'value' => 'info@saci.test', 'group' => 'branding', 'label' => 'Contact email'],
             ['key' => 'contact_phone', 'value' => '0800 000 0000', 'group' => 'branding', 'label' => 'Contact phone'],
             ['key' => 'contact_address', 'value' => '1 School Road, Lagos, Nigeria', 'group' => 'branding', 'label' => 'Address'],
+            // Where staff sign in. Left empty here because it is the school's own
+            // address rather than this installation's, and a guess would be worse
+            // than none — the cards fall back to wherever the app actually answers.
+            ['key' => 'school_website', 'value' => '', 'group' => 'branding', 'label' => 'Website address'],
             // Uploaded images, not typed text. See the add_branding_image_settings
             // migration: adding these here alone would not reach a live database,
             // because this seeder overwrites every value it touches.

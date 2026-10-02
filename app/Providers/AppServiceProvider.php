@@ -86,6 +86,10 @@ class AppServiceProvider extends ServiceProvider
                 'email' => Setting::get('contact_email'),
                 'phone' => Setting::get('contact_phone'),
                 'address' => Setting::get('contact_address'),
+                // The school's own address for the cards and letters that tell somebody
+                // where to go, falling back to wherever this installation answers — which
+                // is the right answer on an installation nobody has corrected yet.
+                'website' => Setting::get('school_website') ?: config('app.url'),
                 'logo' => Setting::get('school_logo'),
                 'favicon' => Setting::get('school_favicon'),
                 'letterhead' => Setting::get('letterhead_image'),
@@ -99,6 +103,7 @@ class AppServiceProvider extends ServiceProvider
                 'email' => null,
                 'phone' => null,
                 'address' => null,
+                'website' => config('app.url'),
                 'logo' => null,
                 'favicon' => null,
                 'letterhead' => null,

@@ -76,6 +76,7 @@ class SettingLayout
             'contact_address',
             'contact_phone',
             'contact_email',
+            'school_website',
             'school_logo',
             'school_favicon',
             // Last of the branding, because it is the picture that carries all of
