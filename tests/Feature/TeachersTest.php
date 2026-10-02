@@ -11,6 +11,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -128,10 +129,48 @@ class TeachersTest extends TestCase
         $teacher = $this->addedTeacher();
 
         $this->assertSame('Chidera Okafor', $teacher->name);
-        $this->assertSame('080 1234 5678', $teacher->phone);
+        $this->assertSame('08012345678', $teacher->phone);
         $this->assertTrue($teacher->hasRole('Teacher'));
-        $this->assertTrue($teacher->must_change_password);
         $this->assertTrue($teacher->is_active);
+    }
+
+    /**
+     * The password an office sets is not a temporary one.
+     *
+     * It used to be: the account was held on the profile screen until it chose its
+     * own, and a banner there said so. The gate and the banner are both gone, so what
+     * a teacher is given here stands for as long as they leave it alone. Worth
+     * pinning down, because a redirect back to the profile is exactly the sort of
+     * thing that gets reintroduced as a safety measure by somebody who cannot tell
+     * it was taken out on purpose.
+     */
+    public function test_a_teacher_is_not_made_to_replace_the_password_they_were_given(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.store'), [
+                'name' => 'Chidera Okafor',
+                'email' => 'chidera@example.com',
+                'phone' => '080 1234 5678',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+
+        $teacher = $this->addedTeacher();
+
+        // The password set for them is the one the account answers to.
+        $this->assertTrue(Hash::check('password', $teacher->password));
+
+        // And nothing sends them off to replace it before they can get anywhere.
+        $this->assertFalse(
+            $this->actingAs($teacher)->get(route('admin.dashboard'))->isRedirect(route('profile.edit')),
+            'Nothing should hold a teacher on the profile screen.'
+        );
+
+        // Nor does the profile page still carry the banner that told them to.
+        $this->actingAs($teacher)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertDontSee('Change your password to carry on');
     }
 
     /** The role is what the page means, so it is not something the form can get wrong. */
@@ -188,8 +227,9 @@ class TeachersTest extends TestCase
     }
 
     /**
-     * The school texts teachers, so a teacher nobody can text is one the office
-     * cannot reach — and the message says why rather than just refusing.
+     * The phone number is the sign-in detail now, so a teacher without one is a
+     * teacher who cannot get in — and the message says why rather than just
+     * refusing.
      */
     public function test_a_teacher_cannot_be_added_without_a_phone_number(): void
     {
@@ -201,7 +241,7 @@ class TeachersTest extends TestCase
                 'password_confirmation' => 'password',
             ])
             ->assertSessionHasErrors([
-                'phone' => 'A phone number is needed: the school reaches teachers by text message.',
+                'phone' => 'A phone number is needed: it is the number the teacher signs in with.',
             ]);
 
         $this->assertDatabaseMissing('users', ['email' => 'chidera@example.com']);
@@ -602,7 +642,7 @@ class TeachersTest extends TestCase
 
         $this->assertSame('Chidera Okafor-Eze', $teacher->name);
         $this->assertSame('chidera.eze@example.com', $teacher->email);
-        $this->assertSame('080 9999 1111', $teacher->phone);
+        $this->assertSame('08099991111', $teacher->phone);
         $this->assertTrue($teacher->is_active);
         // Still a teacher, and still only a teacher.
         $this->assertSame(['Teacher'], $teacher->getRoleNames()->all());
@@ -662,7 +702,7 @@ class TeachersTest extends TestCase
         $this->assertNotSame('taken@example.com', $teacher->refresh()->email);
     }
 
-    /** The school texts teachers, so the number cannot be emptied out afterwards. */
+    /** The number is the sign-in detail, so it cannot be emptied out afterwards. */
     public function test_a_teacher_cannot_be_left_without_a_phone_number(): void
     {
         $teacher = $this->teacher('Chidera Okafor');
@@ -675,7 +715,7 @@ class TeachersTest extends TestCase
                 'is_active' => '1',
             ])
             ->assertSessionHasErrors([
-                'phone' => 'A phone number is needed: the school reaches teachers by text message.',
+                'phone' => 'A phone number is needed: it is the number the teacher signs in with.',
             ]);
 
         $this->assertSame($teacher->phone, $teacher->refresh()->phone);
@@ -811,7 +851,9 @@ class TeachersTest extends TestCase
     {
         $teacher = User::factory()->create([
             'name' => $name,
-            'phone' => '080 1234 5678',
+            // One number, one account: the column carries a unique index now, so a
+            // test that makes three teachers needs three different numbers.
+            'phone' => fake()->unique()->numerify('080########'),
         ]);
         $teacher->assignRole('Teacher');
 

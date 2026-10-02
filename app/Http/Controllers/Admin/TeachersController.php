@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
 use App\Models\User;
 use App\Services\Teachers\TeacherImportService;
 use App\Services\Teachers\TeacherRegisterService;
+use App\Support\PhoneNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -32,6 +34,15 @@ class TeachersController extends Controller
 {
     /** Where a parsed upload waits between the preview and the commit. */
     private const IMPORT_SESSION_KEY = 'teacher_import';
+
+    /**
+     * Where the made-up passwords wait, for exactly one request.
+     *
+     * Flashed rather than kept: they are written down nowhere else, so the page that
+     * hands them out reads them once and a refresh finds nothing. That is what lets
+     * the page promise they are not stored and mean it.
+     */
+    private const IMPORT_CREDENTIALS_KEY = 'teacher_import_credentials';
 
     public function __construct(
         private readonly TeacherImportService $imports,
@@ -75,34 +86,36 @@ class TeachersController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            // Required, and not merely preferred: the school texts teachers, and a
-            // teacher nobody can text is a teacher the office cannot reach.
-            'phone' => ['required', 'string', 'max:30'],
+            // Optional: not every teacher has an address the school knows, and the
+            // phone number is what they sign in with.
+            'email' => ['nullable', 'email', 'max:150', 'unique:users,email'],
+            // Required, and not merely preferred: it is the number they sign in with,
+            // and the one the school texts them on.
+            'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'password' => ['required', 'confirmed', Password::defaults()],
         ], [
             'email.unique' => 'That email already has an account. Staff & roles is where an account that exists is changed.',
-            'phone.required' => 'A phone number is needed: the school reaches teachers by text message.',
+            'phone.required' => 'A phone number is needed: it is the number the teacher signs in with.',
+            'phone.unique' => 'That phone number is already the sign-in number for another account.',
         ]);
 
         $teacher = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'phone' => PhoneNumber::normalize($validated['phone']),
             // A photograph is added once they have been taken on, so it is asked for
             // and not required: the record matters more than the picture.
             'avatar_path' => $request->file('avatar')?->store(config('saci.uploads.photos').'/teachers', 'public'),
             'password' => Hash::make($validated['password']),
             'is_active' => true,
-            'must_change_password' => true,
         ]);
 
         $teacher->assignRole('Teacher');
 
         return redirect()
             ->route('admin.students-results.teachers.list')
-            ->with('status', "{$teacher->name} added as a teacher. They change the password the first time they sign in.");
+            ->with('status', "{$teacher->name} added as a teacher. The password is theirs to keep.");
     }
 
     public function edit(User $teacher): View
@@ -138,14 +151,15 @@ class TeachersController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($teacher->id)],
-            'phone' => ['required', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:150', Rule::unique('users', 'email')->ignore($teacher->id)],
+            'phone' => ['required', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($teacher->id)],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_avatar' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
         ], [
             'email.unique' => 'That email belongs to another account.',
-            'phone.required' => 'A phone number is needed: the school reaches teachers by text message.',
+            'phone.required' => 'A phone number is needed: it is the number the teacher signs in with.',
+            'phone.unique' => 'That phone number is already the sign-in number for another account.',
         ]);
 
         $previous = $teacher->avatar_path;
@@ -163,8 +177,8 @@ class TeachersController extends Controller
 
         $teacher->update([
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'phone' => PhoneNumber::normalize($validated['phone']),
             'avatar_path' => $avatar,
             'is_active' => $request->boolean('is_active'),
         ]);
@@ -343,7 +357,7 @@ class TeachersController extends Controller
 
         if ($parsed['rows'] === []) {
             return back()->withErrors([
-                'file' => 'No teacher rows were found in that file. Each row needs a name, a phone number and an email address.',
+                'file' => 'No teacher rows were found in that file. Each row needs a name and a phone number.',
             ]);
         }
 
@@ -374,9 +388,11 @@ class TeachersController extends Controller
     /**
      * Open the accounts for the rows the office left ticked.
      *
-     * The password is asked for here rather than on the upload, and reaches the
-     * office's hands rather than a file: every account made this way is forced to
-     * change it the first time it is signed in with.
+     * No password is asked for. Each account is given one of its own, and the plain
+     * ones are flashed to the next screen to be written down and handed over; nothing
+     * is stored, so that screen is the only chance to read them. Every account is
+     * still forced to change it the first time it is signed in with, so a sheet of
+     * paper is not the way in a term later.
      */
     public function commitImport(Request $request): RedirectResponse
     {
@@ -393,7 +409,6 @@ class TeachersController extends Controller
         $validated = $request->validate([
             'lines' => ['required', 'array', 'min:1'],
             'lines.*' => ['integer'],
-            'password' => ['required', 'confirmed', Password::defaults()],
         ], [
             'lines.required' => 'Tick at least one teacher to add.',
             'lines.min' => 'Tick at least one teacher to add.',
@@ -402,7 +417,6 @@ class TeachersController extends Controller
         $result = $this->imports->commit(
             $staged['rows'],
             $validated['lines'],
-            $validated['password'],
             $request->user(),
         );
 
@@ -421,8 +435,57 @@ class TeachersController extends Controller
         }
 
         return redirect()
-            ->route('admin.students-results.teachers.list')
-            ->with('status', $message.' They change the password the first time they sign in.');
+            ->route('admin.students-results.teachers.import.done')
+            ->with(self::IMPORT_CREDENTIALS_KEY, $result['credentials'])
+            ->with('status', $message.' Print them now and hand each card over.');
+    }
+
+    /**
+     * The handover: a card per teacher, to print and cut up.
+     *
+     * Reached from the commit and nowhere else, and readable for that one request.
+     * A refresh, a bookmark or the back button finds nothing, which is what "shown
+     * once" has to mean when the passwords are never written down anywhere.
+     *
+     * A card rather than a row in a table: the password has to leave the screen to
+     * reach the teacher, and a printed card that carries the school's own heading is
+     * the difference between something handed over at the gate and something copied
+     * out by hand.
+     */
+    public function importDone(Request $request): View
+    {
+        $this->authorize('teachers.manage');
+
+        return view('admin.students-results.teachers.import-done', [
+            'credentials' => $request->session()->get(self::IMPORT_CREDENTIALS_KEY, []),
+            'academicSession' => AcademicSession::current(),
+        ]);
+    }
+
+    /**
+     * Give a teacher a new password, to be read out once.
+     *
+     * The way back from a password that never reached anybody: the import shows each
+     * one a single time and keeps none of them, so this makes another rather than
+     * trying to recall the first. It lands on the same handover screen and prints on
+     * the same card, and the one it replaces stops working.
+     */
+    public function resetPassword(User $teacher): RedirectResponse
+    {
+        $this->authorize('teachers.manage');
+
+        $this->assertIsTeacher($teacher);
+
+        $password = $this->register->issuePassword($teacher);
+
+        return redirect()
+            ->route('admin.students-results.teachers.import.done')
+            ->with(self::IMPORT_CREDENTIALS_KEY, [[
+                'name' => $teacher->name,
+                'phone' => $teacher->phone,
+                'password' => $password,
+            ]])
+            ->with('status', "A new password was made for {$teacher->name}. Read it out now — it is not stored.");
     }
 
     /** The sheet to fill in, with the headings the reader looks for. */
@@ -432,7 +495,7 @@ class TeachersController extends Controller
 
         $rows = [
             $this->imports->templateHeaders(),
-            ['Chidera Okafor', '08031234567', 'chidera@example.com'],
+            ['Chidera Okafor', '08031234567'],
         ];
 
         $handle = fopen('php://temp', 'r+');

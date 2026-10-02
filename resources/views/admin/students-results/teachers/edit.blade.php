@@ -57,11 +57,10 @@
             <x-field name="name" label="Full name" required :value="$teacher->name" />
 
             <div class="grid gap-5 sm:grid-cols-2">
-                <x-field name="email" type="email" label="Email" required :value="$teacher->email"
+                <x-field name="email" type="email" label="Email (optional)" :value="$teacher->email"
                          autocomplete="off" />
 
-                <x-field name="phone" label="Phone" required :value="$teacher->phone"
-                         hint="The school texts teachers, so this is how they are reached." />
+                <x-field name="phone" label="Phone" required :value="$teacher->phone" />
             </div>
 
             {{-- A teacher who has left is deactivated rather than deleted: the classes

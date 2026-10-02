@@ -75,9 +75,10 @@
         </div>
 
         <p class="mt-4 rounded-xl bg-surface-2 p-3 text-xs text-ink-soft ring-1 ring-line">
-            Every teacher added this way gets a login with the Teacher role, and has to change the password
-            the first time they sign in. Photographs are added one at a time afterwards, from the pencil
-            beside their name on the register.
+            Every teacher added this way gets a login with the Teacher role and a password of their own,
+            shown once when you add them so it can be written down and handed over. It stays in use
+            until they change it from their profile. Photographs are added one at a time afterwards,
+            from the pencil beside their name on the register.
         </p>
     </details>
 
@@ -182,29 +183,22 @@
                                     <td class="font-mono text-xs text-muted">{{ $row['line'] }}</td>
                                     <td class="font-medium text-ink">{{ $row['data']['name'] }}</td>
                                     <td>{{ $row['data']['phone'] }}</td>
-                                    <td>{{ $row['data']['email'] }}</td>
+                                    <td>{{ $row['data']['email'] ?: '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
 
-                {{-- Asked for here rather than with the file: it is given out by hand,
-                     and every account made this way is made to change it. --}}
+                {{-- Nothing is asked for here: each account is given a password of its
+                     own as it is added, and the next screen shows them all once, to be
+                     written down. A password typed here would be one for the lot. --}}
                 <div class="card-pad mt-6">
-                    <h3 class="font-display text-base font-semibold text-ink">The password to give them</h3>
+                    <h3 class="font-display text-base font-semibold text-ink">Their passwords</h3>
                     <p class="mt-1 text-sm text-muted">
-                        Every teacher in this upload is given this password, and has to change it the first
-                        time they sign in.
+                        Every teacher here is given a password of their own. The next screen shows them
+                        once, to print and hand over — they are not stored, and cannot be shown again.
                     </p>
-
-                    <div class="mt-4 grid gap-5 sm:grid-cols-2">
-                        <x-field name="password" type="password" label="Password" required
-                                 hint="At least 8 characters." autocomplete="new-password" />
-
-                        <x-field name="password_confirmation" type="password" label="Confirm password" required
-                                 autocomplete="new-password" />
-                    </div>
 
                     <div class="mt-5 flex flex-wrap items-center justify-end gap-4 border-t border-line-soft pt-5">
                         <a href="{{ route('admin.students-results.teachers.list') }}"

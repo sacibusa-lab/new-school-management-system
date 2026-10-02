@@ -9,6 +9,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -69,8 +70,8 @@ class TeacherImportTest extends TestCase
         // The byte-order mark is there for Excel; it is not part of the first heading.
         $rows = array_map('str_getcsv', array_filter(explode("\n", trim(preg_replace('/^\xEF\xBB\xBF/', '', $csv) ?? ''))));
 
-        $this->assertSame(['Name', 'Phone', 'Email'], $rows[0]);
-        $this->assertSame(['Chidera Okafor', '08031234567', 'chidera@example.com'], $rows[1]);
+        $this->assertSame(['Name', 'Phone'], $rows[0]);
+        $this->assertSame(['Chidera Okafor', '08031234567'], $rows[1]);
     }
 
     public function test_bulk_upload_is_closed_to_a_role_without_the_permission(): void
@@ -160,6 +161,21 @@ class TeacherImportTest extends TestCase
         $this->assertSame('Chidera Ngozi Okafor', $row['data']['name']);
     }
 
+    /** A sheet with no Email column at all is the ordinary case now, not a fault. */
+    public function test_a_sheet_with_no_email_column_is_accepted(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.import.preview'), [
+                'file' => $this->csv("Name,Phone\nChidera Okafor,08031234567\n"),
+            ])
+            ->assertRedirect(route('admin.students-results.teachers.import'));
+
+        $row = session('teacher_import')['rows'][0];
+
+        $this->assertSame([], $row['errors']);
+        $this->assertNull($row['data']['email']);
+    }
+
     /**
      * A title row above the headings is what a spreadsheet from an office looks
      * like — and it is the line with the most spaces in the file, which is why the
@@ -231,10 +247,10 @@ class TeacherImportTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.import.preview'), [
-                'file' => $this->csv("Name,Phone\nChidera Okafor,08031234567\n"),
+                'file' => $this->csv("Phone,Email\n08031234567,chidera@example.com\n"),
             ])
             ->assertSessionHasErrors([
-                'file' => 'The sheet has no Email column. It needs “Name”, “Phone” and “Email” across the top — download the template to see the layout.',
+                'file' => 'The sheet has no Name column. It needs “Name” and “Phone” across the top — download the template to see the layout.',
             ]);
 
         $this->assertNull(session('teacher_import'));
@@ -367,10 +383,8 @@ class TeacherImportTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.import.commit'), [
                 'lines' => [$lines[0], $lines[2]],
-                'password' => 'password',
-                'password_confirmation' => 'password',
             ])
-            ->assertRedirect(route('admin.students-results.teachers.list'));
+            ->assertRedirect(route('admin.students-results.teachers.import.done'));
 
         $teachers = User::query()->role('Teacher')->orderBy('id')->get();
 
@@ -381,9 +395,6 @@ class TeacherImportTest extends TestCase
         foreach ($teachers as $teacher) {
             $this->assertSame(['Teacher'], $teacher->getRoleNames()->all());
             $this->assertTrue($teacher->is_active);
-            // The password is the office's to give out, and it is changed on first use.
-            $this->assertTrue($teacher->must_change_password);
-            $this->assertTrue(password_verify('password', $teacher->password));
         }
 
         // And the staged upload is cleared so it cannot be submitted twice.
@@ -403,35 +414,224 @@ class TeacherImportTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.import.commit'), [
                 'lines' => collect($rows)->pluck('line')->all(),
-                'password' => 'password',
-                'password_confirmation' => 'password',
             ])
-            ->assertRedirect(route('admin.students-results.teachers.list'))
-            ->assertSessionHas('status', '1 teacher(s) added as teachers. 1 row(s) could not be added and were skipped. They change the password the first time they sign in.');
+            ->assertRedirect(route('admin.students-results.teachers.import.done'))
+            ->assertSessionHas('status', '1 teacher(s) added as teachers. 1 row(s) could not be added and were skipped. Print them now and hand each card over.');
 
         $this->assertSame(['Chidera Okafor'], User::query()->role('Teacher')->pluck('name')->all());
     }
 
-    /** The password is what every one of them signs in with, so it has to be the one meant. */
-    public function test_the_password_is_required_and_has_to_be_confirmed(): void
+    /**
+     * The form posts the ticked rows as strings, not numbers.
+     *
+     * The parsed rows carry real row numbers as integers and the match between the
+     * two is strict, so "2" against 2 finds nothing at all: every row is skipped and
+     * the office is told only "No teacher was added", with no reason to show for it.
+     * The tests around this one post integers and so never saw it.
+     */
+    public function test_the_ticked_rows_are_added_when_the_form_posts_them_as_strings(): void
+    {
+        $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
+
+        $line = (string) session('teacher_import')['rows'][0]['line'];
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]])
+            ->assertRedirect(route('admin.students-results.teachers.import.done'))
+            ->assertSessionHas('status');
+
+        $this->assertSame(['Chidera Okafor'], User::query()->role('Teacher')->pluck('name')->all());
+    }
+
+    /**
+     * Nothing on the preview asks for a password.
+     *
+     * A field here is the one way the shared password could come back: it would be
+     * filled in once and given to the whole file, which is the thing this screen is
+     * here to avoid. The passwords are made per account instead, and read out after.
+     */
+    public function test_the_preview_never_asks_for_one_password_for_everybody(): void
+    {
+        $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.import'))
+            ->assertOk()
+            ->assertSee('Their passwords')
+            ->assertDontSee('name="password"', false);
+    }
+
+    /**
+     * One password each, rather than one password for the whole staff.
+     *
+     * They are written on paper and handed over, so they have to be readable, they
+     * have to differ from one another, and the plain one the office is shown has to
+     * be the one actually on the account.
+     */
+    public function test_every_account_is_given_a_password_of_its_own(): void
+    {
+        $this->stage(
+            "Name,Phone,Email\n"
+            ."Chidera Okafor,08031234567,chidera@example.com\n"
+            ."Ngozi Eze,08031234568,ngozi@example.com\n",
+        );
+
+        $lines = collect(session('teacher_import')['rows'])->pluck('line')->all();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => $lines])
+            ->assertRedirect(route('admin.students-results.teachers.import.done'));
+
+        $credentials = session('teacher_import_credentials');
+
+        $this->assertCount(2, $credentials);
+        $this->assertNotSame($credentials[0]['password'], $credentials[1]['password']);
+
+        foreach ($credentials as $credential) {
+            $teacher = User::query()->where('phone', $credential['phone'])->firstOrFail();
+
+            $this->assertSame($teacher->name, $credential['name']);
+            $this->assertTrue(Hash::check($credential['password'], $teacher->password));
+        }
+    }
+
+    /**
+     * Six digits, and nothing else.
+     *
+     * The shape is the point: it is read off a printed card and typed on a phone by
+     * somebody who has never seen the screen, so there are no letters to mistake for
+     * numbers and no leading zero to lose. Whatever comes out has to be accepted by
+     * the account exactly as it was printed.
+     */
+    public function test_a_handed_over_password_is_six_digits(): void
     {
         $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
 
         $line = session('teacher_import')['rows'][0]['line'];
 
         $this->actingAs($this->admin)
-            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]])
-            ->assertSessionHasErrors('password');
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]]);
+
+        $password = session('teacher_import_credentials')[0]['password'];
+
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $password);
+
+        $teacher = User::query()->where('phone', '08031234567')->firstOrFail();
+
+        $this->assertTrue(Hash::check($password, $teacher->password));
+    }
+
+    /**
+     * The handover is a printable sheet, not a table to copy out.
+     *
+     * Nothing is stored, so this one page is the only route a password has to the
+     * teacher: a card per account, under the school's own name, in the arrangement
+     * the examination's admit cards already use and with the same print button.
+     */
+    public function test_the_handover_prints_a_card_for_each_teacher(): void
+    {
+        $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
+
+        $line = session('teacher_import')['rows'][0]['line'];
 
         $this->actingAs($this->admin)
-            ->post(route('admin.students-results.teachers.import.commit'), [
-                'lines' => [$line],
-                'password' => 'password',
-                'password_confirmation' => 'something else',
-            ])
-            ->assertSessionHasErrors('password');
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]]);
 
-        $this->assertSame(0, User::query()->role('Teacher')->count());
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.import.done'))
+            ->assertOk()
+            ->assertSee('Staff sign-in card')
+            ->assertSee('Print 1 card(s)')
+            ->assertSee(Setting::get('school_name'))
+            ->assertSee('Any time, from your profile');
+    }
+
+    /**
+     * The card says where to go.
+     *
+     * A password and a phone number get a teacher to the door but not through it, and
+     * the door is not the school's website — it is the sign-in page. The address is a
+     * fact about the school rather than about this installation, so the office can
+     * correct it without waiting for a deploy.
+     */
+    public function test_the_card_carries_the_address_the_school_signs_in_at(): void
+    {
+        Setting::query()->where('key', 'school_website')->update(['value' => 'sacischools.com']);
+        Setting::flush();
+
+        $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
+
+        $line = session('teacher_import')['rows'][0]['line'];
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.import.done'))
+            ->assertOk()
+            ->assertSee('Sign in at')
+            ->assertSee('sacischools.com/login');
+    }
+
+    /**
+     * Shown once, and kept nowhere.
+     *
+     * That is the promise the page makes, so the second look — a refresh, a
+     * bookmark, the back button — has to find nothing rather than the same list.
+     */
+    public function test_the_handover_page_shows_the_passwords_once_and_keeps_none(): void
+    {
+        $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
+
+        $line = session('teacher_import')['rows'][0]['line'];
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]]);
+
+        $password = session('teacher_import_credentials')[0]['password'];
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.import.done'))
+            ->assertOk()
+            ->assertSee('Passwords to give out')
+            ->assertSee('Chidera Okafor')
+            ->assertSee('08031234567')
+            ->assertSee($password);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.teachers.import.done'))
+            ->assertOk()
+            ->assertSee('Nothing left to hand out')
+            ->assertDontSee($password);
+    }
+
+    /**
+     * A password read out once and written down nowhere can be lost on the way back
+     * from the office, so it can be replaced — and the replaced one stops working.
+     */
+    public function test_a_lost_password_can_be_replaced_from_the_register(): void
+    {
+        $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
+
+        $line = session('teacher_import')['rows'][0]['line'];
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.import.commit'), ['lines' => [$line]]);
+
+        $first = session('teacher_import_credentials')[0]['password'];
+        $teacher = User::query()->role('Teacher')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.students-results.teachers.password.reset', $teacher))
+            ->assertRedirect(route('admin.students-results.teachers.import.done'))
+            ->assertSessionHas('status');
+
+        $second = session('teacher_import_credentials')[0]['password'];
+        $teacher->refresh();
+
+        $this->assertNotSame($first, $second);
+        $this->assertTrue(Hash::check($second, $teacher->password));
+        $this->assertFalse(Hash::check($first, $teacher->password));
     }
 
     public function test_at_least_one_teacher_has_to_be_ticked(): void
@@ -441,8 +641,6 @@ class TeacherImportTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.import.commit'), [
                 'lines' => [],
-                'password' => 'password',
-                'password_confirmation' => 'password',
             ])
             ->assertSessionHasErrors('lines');
 
@@ -454,8 +652,6 @@ class TeacherImportTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.import.commit'), [
                 'lines' => [2],
-                'password' => 'password',
-                'password_confirmation' => 'password',
             ])
             ->assertRedirect(route('admin.students-results.teachers.import'))
             ->assertSessionHas('error', 'That upload has expired. Please choose the file again.');
@@ -471,15 +667,18 @@ class TeacherImportTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('admin.students-results.teachers.import.commit'), [
                 'lines' => [$line],
-                'password' => 'password',
-                'password_confirmation' => 'password',
             ])
             ->assertSessionHas('status');
 
         $this->stage("Name,Phone,Email\nChidera Okafor,08031234567,chidera@example.com\n");
 
         $this->assertSame(
-            ['chidera@example.com already has an account.'],
+            [
+                // The phone number is the login now, so the second upload is refused
+                // on the number as well as on the address.
+                '08031234567 already has an account.',
+                'chidera@example.com already has an account.',
+            ],
             session('teacher_import')['rows'][0]['errors'],
         );
 

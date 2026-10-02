@@ -4,6 +4,7 @@ namespace App\Services\Teachers;
 
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Support\PhoneNumber;
 use App\Support\Spreadsheet\SheetReader;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -20,10 +21,12 @@ use RuntimeException;
  * kept — the parsed rows ride in the session between the preview and the commit.
  *
  * A teacher here is what a teacher is everywhere else in this module: an account
- * with the Teacher role. So this creates logins, and a login needs an email and a
- * password: the email comes from the sheet, one per teacher, and the password is
- * one the office types on the preview screen and gives out — every account made
- * this way is forced to change it the first time it is signed in with.
+ * with the Teacher role. So this creates logins, and a login needs a password: the
+ * phone and email come from the sheet, and every account is given a password of its
+ * own. Those plain passwords are handed back to the office to write down and hand
+ * over, and are never stored — a staff sharing one password is one password too
+ * many. Each account is forced to change it the first time it is signed in with, so
+ * the handwritten one does not survive first contact either.
  */
 class TeacherImportService
 {
@@ -63,10 +66,12 @@ class TeacherImportService
         'surname' => 'Only if the sheet keeps the surname and the given name apart.',
         'first_name' => 'Used with the surname to make the full name.',
         'middle_name' => 'Optional, and added to the name when present.',
+        'email' => 'Optional. Read and checked when the sheet has one; the phone number is what they sign in with.',
     ];
 
     public function __construct(
         private readonly SheetReader $sheets,
+        private readonly TeacherRegisterService $register,
     ) {}
 
     /**
@@ -78,8 +83,7 @@ class TeacherImportService
     {
         return [
             ['key' => 'name', 'label' => 'Name', 'required' => true, 'note' => 'The teacher’s full name, as the school says it.'],
-            ['key' => 'phone', 'label' => 'Phone', 'required' => true, 'note' => 'Required: the school reaches teachers by text message.'],
-            ['key' => 'email', 'label' => 'Email', 'required' => true, 'note' => 'The address they sign in with. One account per address.'],
+            ['key' => 'phone', 'label' => 'Phone', 'required' => true, 'note' => 'Required: it is the number they sign in with, and how the school texts them.'],
         ];
     }
 
@@ -96,7 +100,7 @@ class TeacherImportService
     {
         $columns = $this->columns();
 
-        foreach (['surname' => 'Surname', 'first_name' => 'First name', 'middle_name' => 'Middle name'] as $key => $label) {
+        foreach (['surname' => 'Surname', 'first_name' => 'First name', 'middle_name' => 'Middle name', 'email' => 'Email'] as $key => $label) {
             $columns[] = [
                 'key' => $key,
                 'label' => $label,
@@ -136,14 +140,14 @@ class TeacherImportService
 
         if ($headerIndex === null) {
             throw new RuntimeException(
-                'Could not find the column headings. The sheet needs “Name”, “Phone” and “Email” '
+                'Could not find the column headings. The sheet needs “Name” and “Phone” '
                 .'across the top — download the template to see the layout.',
             );
         }
 
         if (($missing = $this->missingColumns($map)) !== []) {
             throw new RuntimeException(sprintf(
-                'The sheet has no %s column. It needs “Name”, “Phone” and “Email” across the top — download the template to see the layout.',
+                'The sheet has no %s column. It needs “Name” and “Phone” across the top — download the template to see the layout.',
                 $this->and($missing),
             ));
         }
@@ -195,16 +199,25 @@ class TeacherImportService
      * Create the chosen rows, each as an account with the Teacher role.
      *
      * Each row is independent: one failure never abandons the rest of a file the
-     * office has already checked.
+     * office has already checked. Each account is given a password of its own, and
+     * the plain ones are handed back for the office to write down — they are never
+     * stored, so what is returned here is the only place they exist.
      *
      * @param  array<int,array<string,mixed>>  $rows
      * @param  array<int,int>  $lines  which rows to add
-     * @return array{created:int,names:array<int,string>,failed:array<int,array{line:int,reason:string}>}
+     * @return array{created:int,names:array<int,string>,credentials:array<int,array{name:string,phone:string,password:string}>,failed:array<int,array{line:int,reason:string}>}
      */
-    public function commit(array $rows, array $lines, string $password, ?User $actor = null): array
+    public function commit(array $rows, array $lines, ?User $actor = null): array
     {
+        // A form posts the ticked rows as strings, while the parsed rows carry them as
+        // numbers — and the match below is strict. Left as they arrive, nothing matches,
+        // every row is skipped, and the office is told "No teacher was added" with no
+        // reason beside it. So the two sides are put in the same shape first.
+        $lines = array_map('intval', $lines);
+
         $created = 0;
         $names = [];
+        $credentials = [];
         $failed = [];
 
         foreach ($rows as $row) {
@@ -218,26 +231,32 @@ class TeacherImportService
                 continue;
             }
 
-            $email = (string) $row['data']['email'];
+            $phone = (string) $row['data']['phone'];
+            $email = $row['data']['email'] ?: null;
 
             // Checked again rather than trusted: the preview may be minutes old, and
             // an account opened in between is the one case a unique index would
             // otherwise report as a database error.
-            if (User::query()->where('email', $email)->exists()) {
-                $failed[] = ['line' => $row['line'], 'reason' => "{$email} already has an account."];
+            if (User::query()->where('phone', $phone)->exists()
+                || ($email !== null && User::query()->where('email', $email)->exists())) {
+                $failed[] = ['line' => $row['line'], 'reason' => "{$phone} already has an account."];
 
                 continue;
             }
 
+            // One password per teacher, made here rather than typed on a screen: a
+            // sheet of paper carrying one password for a whole staff is a sheet that
+            // opens every account on it.
+            $password = $this->register->newPassword();
+
             try {
-                $teacher = DB::transaction(function () use ($row, $password) {
+                $teacher = DB::transaction(function () use ($row, $password, $email, $phone) {
                     $teacher = User::create([
                         'name' => $row['data']['name'],
-                        'email' => $row['data']['email'],
-                        'phone' => $row['data']['phone'],
+                        'email' => $email,
+                        'phone' => $phone,
                         'password' => Hash::make($password),
                         'is_active' => true,
-                        'must_change_password' => true,
                     ]);
 
                     $teacher->assignRole('Teacher');
@@ -246,6 +265,11 @@ class TeacherImportService
                 });
 
                 $names[] = $teacher->name;
+                $credentials[] = [
+                    'name' => $teacher->name,
+                    'phone' => $phone,
+                    'password' => $password,
+                ];
                 $created++;
             } catch (\Throwable $e) {
                 $failed[] = ['line' => $row['line'], 'reason' => $e->getMessage()];
@@ -261,7 +285,12 @@ class TeacherImportService
             );
         }
 
-        return ['created' => $created, 'names' => $names, 'failed' => $failed];
+        return [
+            'created' => $created,
+            'names' => $names,
+            'credentials' => $credentials,
+            'failed' => $failed,
+        ];
     }
 
     /* ------------------------------------------------------------------ */
@@ -270,7 +299,7 @@ class TeacherImportService
 
     /**
      * @param  array<string,string|null>  $values
-     * @param  array<string,int>  $seen  emails already on an earlier row of this file
+     * @param  array<string,int>  $seen  phones and emails already on an earlier row of this file
      * @return array<string,mixed>
      */
     private function prepareRow(array $values, int $line, array &$seen): array
@@ -278,27 +307,42 @@ class TeacherImportService
         $errors = [];
 
         $name = $values['name'] ?? $this->composeName($values);
-        $phone = $values['phone'] ?? null;
+        $phone = PhoneNumber::normalize($values['phone'] ?? null);
+
+        // A blank cell and an absent column both mean the same thing here.
         $email = $values['email'] ?? null;
+        $email = ($email === null || trim($email) === '') ? null : trim($email);
 
         if ($name === null) {
             $errors[] = 'The name is missing.';
         }
 
+        // The phone number is the login, so it is the column that cannot be left out,
+        // and the one that belongs to exactly one account.
         if ($phone === null) {
             $errors[] = 'The phone number is missing.';
+        } else {
+            $key = 'phone:'.$phone;
+
+            if (isset($seen[$key])) {
+                $errors[] = "{$phone} is also on row {$seen[$key]} of this file.";
+            } else {
+                $seen[$key] = $line;
+            }
+
+            if (User::query()->where('phone', $phone)->exists()) {
+                $errors[] = "{$phone} already has an account.";
+            }
         }
 
-        if ($email === null) {
-            $errors[] = 'The email is missing.';
-        } elseif (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        // An email is optional now. When the sheet does carry one it still has to be
+        // an address, and it still belongs to one teacher.
+        if ($email !== null && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $errors[] = "“{$email}” is not an email address.";
-        }
 
-        // The email is the login, so it belongs to one teacher and one account:
-        // not twice on this sheet, and not on somebody already on the staff.
-        if ($email !== null && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $key = strtolower($email);
+            $email = null;
+        } elseif ($email !== null) {
+            $key = 'email:'.strtolower($email);
 
             if (isset($seen[$key])) {
                 $errors[] = "{$email} is also on row {$seen[$key]} of this file.";
@@ -354,10 +398,6 @@ class TeacherImportService
 
         if (! isset($map['phone'])) {
             $missing[] = 'Phone';
-        }
-
-        if (! isset($map['email'])) {
-            $missing[] = 'Email';
         }
 
         return $missing;

@@ -106,7 +106,7 @@
                             </td>
 
                             <td class="border-r border-line p-3 align-top">
-                                <span class="block">{{ $teacher->email }}</span>
+                                <span class="block">{{ $teacher->email ?: 'No email address' }}</span>
                                 <span class="mt-0.5 block text-xs text-muted">
                                     {{ $teacher->phone ?: 'No phone number' }}
                                 </span>
@@ -134,6 +134,15 @@
                                        title="Edit {{ $teacher->name }}">
                                         <x-nav-icon name="pencil" class="h-3.5 w-3.5" />
                                     </a>
+
+                                    {{-- Their password was read out once and never written down,
+                                         so a lost one is replaced rather than looked up. --}}
+                                    <button type="submit"
+                                            form="reset-password-{{ $teacher->id }}"
+                                            class="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-soft transition hover:bg-surface-3"
+                                            title="Give {{ $teacher->name }} a new password">
+                                        <x-nav-icon name="key" class="h-3.5 w-3.5" />
+                                    </button>
 
                                     <button type="submit"
                                             form="remove-teacher-{{ $teacher->id }}"
@@ -164,6 +173,13 @@
 
     {{-- One form per row, waiting outside the table: the bin above points at these. --}}
     @foreach ($teachers as $teacher)
+        <form id="reset-password-{{ $teacher->id }}"
+              method="POST"
+              action="{{ route('admin.students-results.teachers.password.reset', $teacher) }}"
+              onsubmit="return confirm('Give {{ addslashes($teacher->name) }} a new password? The one they have now stops working straight away, and the new one is shown once.')">
+            @csrf
+        </form>
+
         <form id="remove-teacher-{{ $teacher->id }}"
               method="POST"
               action="{{ route('admin.students-results.teachers.destroy', $teacher) }}"

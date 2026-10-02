@@ -8,8 +8,8 @@
             <p class="font-display text-base font-semibold text-ink">Add a teacher</p>
             <p class="mt-1 text-sm text-muted">
                 This creates the account they sign in with as well as the record itself. The role is
-                Teacher — that is what being on this page means — and they choose a password of their
-                own the first time they sign in.
+                Teacher — that is what being on this page means. The password you set here is the
+                one they keep until they change it themselves.
             </p>
         </div>
 
@@ -41,16 +41,15 @@
             <x-field name="name" label="Full name" placeholder="Chidera Okafor" required />
 
             <div class="grid gap-5 sm:grid-cols-2">
-                <x-field name="email" type="email" label="Email" placeholder="chidera@example.com" required
+                <x-field name="email" type="email" label="Email (optional)" placeholder="chidera@example.com"
                          autocomplete="off" />
 
-                <x-field name="phone" label="Phone" placeholder="080 1234 5678" required
-                         hint="The school texts teachers, so this is how they are reached." />
+                <x-field name="phone" label="Phone" placeholder="080 1234 5678" required />
             </div>
 
             <div class="grid gap-5 sm:grid-cols-2">
                 <x-field name="password" type="password" label="Password" required
-                         hint="At least 8 characters. Give it to them; they change it on first sign-in."
+                         hint="At least 8 characters. Hand it over; it stays in use until they change it."
                          autocomplete="new-password" />
 
                 <x-field name="password_confirmation" type="password" label="Confirm password" required
