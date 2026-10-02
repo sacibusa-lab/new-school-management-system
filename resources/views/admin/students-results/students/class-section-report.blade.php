@@ -19,13 +19,17 @@
                 description="A class is a year group and a section put together — JSS1 and A are JSS1A. Create the classes the school runs and each one appears here with the number of students in it." />
         @else
             <div class="overflow-x-auto">
-                <table class="w-full border-collapse border border-line text-sm">
+                {{-- `table-fixed` with a width on Sl alone: the three columns that
+                     carry the figures divide what is left of the table equally, so the
+                     section lists have the room they need and none of them is left
+                     holding a third of the page while another is squeezed. --}}
+                <table class="w-full table-fixed border-collapse border border-line text-sm">
                     <thead>
                         <tr class="bg-surface-3 text-left font-semibold text-ink-soft">
                             <th class="w-14 border-b border-r border-line p-3 text-center">Sl</th>
-                            <th class="w-40 border-b border-r border-line p-3">Class</th>
+                            <th class="border-b border-r border-line p-3">Class</th>
                             <th class="border-b border-r border-line p-3">Section</th>
-                            <th class="w-40 border-b border-line p-3 text-right">Total Students</th>
+                            <th class="border-b border-line p-3 text-right">Total Students</th>
                         </tr>
                     </thead>
 
