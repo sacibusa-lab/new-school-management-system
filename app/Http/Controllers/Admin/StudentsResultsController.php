@@ -203,6 +203,22 @@ class StudentsResultsController extends Controller
     }
 
     /**
+     * Multiple import: taking a whole year group's records in at once.
+     *
+     * The second page of Students Details, and still to be built. The register behind
+     * that entry is {@see StudentRegisterController} and the report under it is
+     * {@see ClassSectionReportController}; this one is a placeholder until its turn
+     * comes, which is why it is drawn from here rather than from a controller of its
+     * own. Its own permission, though: importing is a write.
+     */
+    public function multipleImport(): View
+    {
+        $this->authorize('students.import');
+
+        return view('admin.students-results.students.multiple-import');
+    }
+
+    /**
      * Draw one page of the menu.
      *
      * The page is looked up in PAGES rather than trusted from the URL, so the

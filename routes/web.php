@@ -250,11 +250,14 @@ Route::middleware('auth')
             // and section, with the two ways of taking somebody off it.
             Route::get('students', StudentRegisterController::class)->name('students');
 
-            // The second page of Students Details: how full each class is. A literal
-            // path declared before {student}, so that "class-section-report" can never
-            // be read as the id of a student.
+            // The pages that hang off Students Details — both literal paths, declared
+            // before {student} so that neither slug can be read as the id of a student.
+            // The report is built; the multiple import is still to be.
             Route::get('students/class-section-report', ClassSectionReportController::class)
                 ->name('students.class-section-report');
+
+            Route::get('students/multiple-import', [StudentsResultsController::class, 'multipleImport'])
+                ->name('students.multiple-import');
 
             Route::delete('students', [StudentRegisterController::class, 'destroySelected'])->name('students.destroy-selected');
             Route::delete('students/{student}', [StudentRegisterController::class, 'destroy'])->name('students.destroy');

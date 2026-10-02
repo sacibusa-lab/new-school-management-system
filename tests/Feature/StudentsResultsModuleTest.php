@@ -364,6 +364,67 @@ class StudentsResultsModuleTest extends TestCase
         }
     }
 
+    public function test_multiple_import_opens_and_says_it_is_not_built(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.students.multiple-import'))
+            ->assertOk()
+            ->assertSee('Multiple import')
+            ->assertSee('This page has not been built yet');
+    }
+
+    /**
+     * The two pages under Students Details do not share a permission: reading a class
+     * list is not the same as creating a hundred children in one go, so the import
+     * answers to `students.import` and the report to the register's `students.view`.
+     */
+    public function test_multiple_import_is_closed_to_a_role_that_may_only_read_the_roll(): void
+    {
+        $teacher = $this->userWithRole('Teacher');
+
+        $this->assertTrue($teacher->can('students.view'));
+        $this->assertFalse($teacher->can('students.import'));
+
+        $this->actingAs($teacher)
+            ->get(route('admin.students-results.students.multiple-import'))
+            ->assertForbidden();
+
+        // The register itself still opens for them, so this is the import being refused
+        // and not the whole entry.
+        $register = $this->actingAs($teacher)
+            ->get(route('admin.students-results.students'))
+            ->assertOk()
+            ->getContent();
+
+        // ...and it is not in their submenu to be clicked in the first place.
+        $this->assertStringContainsString(
+            route('admin.students-results.students.class-section-report'),
+            $register,
+            'The report has stopped being offered to a role that may read the roll.',
+        );
+
+        $this->assertStringNotContainsString(
+            route('admin.students-results.students.multiple-import'),
+            $register,
+            'The import is offered to a role that may not import.',
+        );
+    }
+
+    public function test_the_submenu_under_students_details_lists_both_pages_in_order(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.students-results.students'))
+            ->assertOk()
+            ->getContent();
+
+        $report = strpos($html, route('admin.students-results.students.class-section-report'));
+        $import = strpos($html, route('admin.students-results.students.multiple-import'));
+
+        $this->assertNotFalse($report, 'Students Details does not offer the Class & Section Report.');
+        $this->assertNotFalse($import, 'Students Details does not offer Multiple import.');
+        $this->assertLessThan($import, $report, 'The submenu is not in the order the office asked for.');
+    }
+
     /* ------------------------------------------------------------------ */
     /* Breadcrumbs */
     /* ------------------------------------------------------------------ */

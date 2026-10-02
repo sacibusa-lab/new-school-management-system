@@ -113,6 +113,16 @@ class AdminMenu
                             'label' => 'Class & Section Report',
                             'icon' => 'columns',
                         ],
+                        [
+                            'route' => 'admin.students-results.students.multiple-import',
+                            'label' => 'Multiple import',
+                            'icon' => 'upload',
+                            // Importing is a write, and this one answers to the permission
+                            // named for it rather than to the register's: a teacher may
+                            // read a class list without being able to create a hundred
+                            // children at once.
+                            'can' => 'students.import',
+                        ],
                     ]],
 
                 // Teachers, and the two pages that hang off it: the register of
