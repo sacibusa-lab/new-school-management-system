@@ -82,8 +82,11 @@ class StudentsDetailsTest extends TestCase
 
     public function test_the_register_lists_a_student_with_their_number_and_guardian(): void
     {
+        // The admission number, not the registration number: the school's SAC/2026/014,
+        // which lives in `student_number` because those two columns are named the wrong
+        // way round.
         $this->student($this->jss1a, 'Ada', 'Okonkwo', [
-            'admission_number' => 'SAC/2026/014',
+            'student_number' => 'SAC/2026/014',
             'guardian_name' => 'Mrs Okonkwo',
             'guardian_phone' => '08031234567',
         ]);

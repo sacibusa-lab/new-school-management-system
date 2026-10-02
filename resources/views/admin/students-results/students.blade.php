@@ -114,8 +114,13 @@
                                 </span>
                             </td>
 
+                            {{-- The admission number, which is the SAC/2026/001 they are given
+                                 when they are admitted. It is held in `student_number`, not in
+                                 `admission_number`: those two columns are named the wrong way
+                                 round, and `admission_number` is the registration number they
+                                 applied with. --}}
                             <td class="border-r border-line p-3 align-middle font-mono text-xs">
-                                {{ $student->admission_number ?? '—' }}
+                                {{ $student->student_number ?? '—' }}
                             </td>
 
                             <td class="border-r border-line p-3 align-middle">
