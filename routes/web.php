@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\ScoreImportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SmsController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\StudentRegisterController;
 use App\Http\Controllers\Admin\StudentsResultsController;
 use App\Http\Controllers\Admin\SubjectAssignmentController;
 use App\Http\Controllers\Admin\SubjectController;
@@ -235,7 +236,12 @@ Route::middleware('auth')
             // The sheet the office cuts up. A literal path, declared with the rest so
             // that nothing can read "sheet" as the id of anything.
             Route::get('pins/sheet', [ResultPinController::class, 'sheet'])->name('pins.sheet');
-            Route::get('students', [StudentsResultsController::class, 'students'])->name('students');
+            // Graduated out of the placeholder controller, as Check Result, Generate
+            // Pin and Promotion did before it: the student register, narrowed by class
+            // and section, with the two ways of taking somebody off it.
+            Route::get('students', StudentRegisterController::class)->name('students');
+            Route::delete('students', [StudentRegisterController::class, 'destroySelected'])->name('students.destroy-selected');
+            Route::delete('students/{student}', [StudentRegisterController::class, 'destroy'])->name('students.destroy');
 
             /*
             | Teachers, and the two pages that hang off it. `teachers` is the

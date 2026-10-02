@@ -13,11 +13,13 @@ use Illuminate\View\View;
  * graduate out of this file into focused controllers, leaving this class as a menu
  * that happens to render rather than a home for unrelated features.
  *
- * Check Result is the first to graduate: it is {@see CheckResultController} now, and
- * Generate Pin is the second: {@see ResultPinController}. Their entries below stay,
- * because the entry is the menu — the sidebar, the label and the permission all come
- * from here — and only the page behind it moved. Promotion did the same: the page is
- * {@see PromotionController} now and the entry below is all that is left of it here.
+ * Check Result is the first to graduate: it is {@see CheckResultController} now,
+ * and Generate Pin is the second: {@see ResultPinController}. Their entries below
+ * stay, because the entry is the menu — the sidebar, the label and the permission
+ * all come from here — and only the page behind it moved. Promotion did the same:
+ * the page is {@see PromotionController} now and the entry below is all that is
+ * left of it here. Students Details is the most recent: the page is
+ * {@see StudentRegisterController} now.
  *
  * The permissions are named for what each page will DO rather than what it is
  * called, because the menu label is the least durable thing about it: "Check
@@ -135,11 +137,6 @@ class StudentsResultsController extends Controller
     public function performance(): View
     {
         return $this->placeholder('performance');
-    }
-
-    public function students(): View
-    {
-        return $this->placeholder('students');
     }
 
     /**
