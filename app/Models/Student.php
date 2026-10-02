@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Gender;
+use App\Enums\InvoiceStatus;
 use App\Enums\StudentStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -31,7 +33,7 @@ class Student extends Model
     {
         return [
             'date_of_birth' => 'date',
-            'gender' => \App\Enums\Gender::class,
+            'gender' => Gender::class,
             'status' => StudentStatus::class,
             'results_portal_enabled' => 'boolean',
             'fees_portal_enabled' => 'boolean',
@@ -80,6 +82,12 @@ class Student extends Model
         return $this->hasMany(TermResult::class);
     }
 
+    /** What was decided about this student at the end of each session. */
+    public function promotions(): HasMany
+    {
+        return $this->hasMany(StudentPromotion::class);
+    }
+
     public function assessmentScores(): HasMany
     {
         return $this->hasMany(AssessmentScore::class);
@@ -97,7 +105,7 @@ class Student extends Model
     public function getInitialsAttribute(): string
     {
         return strtoupper(
-            str($this->first_name)->substr(0, 1)->value() . str($this->last_name)->substr(0, 1)->value()
+            str($this->first_name)->substr(0, 1)->value().str($this->last_name)->substr(0, 1)->value()
         );
     }
 
@@ -112,7 +120,7 @@ class Student extends Model
             return $query;
         }
 
-        $like = '%' . trim($term) . '%';
+        $like = '%'.trim($term).'%';
 
         return $query->where(function (Builder $q) use ($like) {
             $q->where('student_number', 'like', $like)
@@ -124,12 +132,12 @@ class Student extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /* Money helpers                                                       */
+    /* Money helpers */
     /* ------------------------------------------------------------------ */
 
     public function totalBilled(): float
     {
-        return (float) $this->invoices()->where('status', '!=', \App\Enums\InvoiceStatus::Cancelled->value)->sum('total');
+        return (float) $this->invoices()->where('status', '!=', InvoiceStatus::Cancelled->value)->sum('total');
     }
 
     public function totalPaid(): float

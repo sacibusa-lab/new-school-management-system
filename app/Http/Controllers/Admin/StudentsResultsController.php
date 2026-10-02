@@ -8,16 +8,16 @@ use Illuminate\View\View;
 /**
  * The Students & Results module.
  *
- * Scaffolding, deliberately: every page below exists, is reachable from the
- * sidebar and enforces a permission, but draws only a placeholder. The pages are
- * built one at a time, and each one graduates out of this file into a controller
- * of its own as it is designed — so this class is a menu that happens to render,
- * not a home for twelve unrelated features.
+ * The remaining Students & Results pages are scaffolding: each is reachable from
+ * the sidebar and enforces a permission, but draws only a placeholder. Built pages
+ * graduate out of this file into focused controllers, leaving this class as a menu
+ * that happens to render rather than a home for unrelated features.
  *
  * Check Result is the first to graduate: it is {@see CheckResultController} now, and
  * Generate Pin is the second: {@see ResultPinController}. Their entries below stay,
  * because the entry is the menu — the sidebar, the label and the permission all come
- * from here — and only the page behind it moved.
+ * from here — and only the page behind it moved. Promotion did the same: the page is
+ * {@see PromotionController} now and the entry below is all that is left of it here.
  *
  * The permissions are named for what each page will DO rather than what it is
  * called, because the menu label is the least durable thing about it: "Check
@@ -50,10 +50,10 @@ class StudentsResultsController extends Controller
      *
      * Kept beside PAGES rather than inside it because they are a second level: the
      * sidebar draws them underneath Academic, and the Academic page draws them as
-     * the four things it is made of. One list, so the two cannot drift apart — an
+     * the things it is made of. One list, so the two cannot drift apart — an
      * item added here appears in both places.
      *
-     * All four answer to the permission of the page they hang off. They are one
+     * All answer to the permission of the page they hang off. They are one
      * subject — how the school is organised — and splitting that into four
      * permissions would make a menu nobody could be given half of.
      *
@@ -73,6 +73,13 @@ class StudentsResultsController extends Controller
             'label' => 'Subjects',
             'icon' => 'list',
             'note' => 'Every subject the school teaches and the code each one is known by, so a mark entered once can be found again on the report card.',
+        ],
+        [
+            'key' => 'class-assign',
+            'route' => 'admin.students-results.academics.subjects.assignments',
+            'label' => 'Class Assign',
+            'icon' => 'clipboard-check',
+            'note' => 'Assign the active subjects each class takes in the current academic session.',
         ],
         [
             'key' => 'schedule',
@@ -116,7 +123,7 @@ class StudentsResultsController extends Controller
             'route' => 'admin.students-results.teachers.create',
             'label' => 'Add Teachers',
             'icon' => 'user-plus',
-            'note' => 'Take a teacher on: their name, how to reach them, and the login they will use. They change the password the first time they sign in.',
+            'note' => 'Take a teacher on: their name, how to reach them, and the login they will use.',
         ],
     ];
 
@@ -150,9 +157,9 @@ class StudentsResultsController extends Controller
     }
 
     /**
-     * Academic, and the four pages that hang off it.
+     * Academic, and the pages that hang off it.
      *
-     * The page itself is a list of its own four children rather than a placeholder;
+     * The page itself is a list of its own children rather than a placeholder;
      * a page with nothing on it but the word "Academic" tells the office nothing
      * about what Academic holds.
      */
@@ -166,19 +173,9 @@ class StudentsResultsController extends Controller
         return $this->academicPage('classes');
     }
 
-    public function academicSubjects(): View
-    {
-        return $this->academicPage('subjects');
-    }
-
     public function academicSchedule(): View
     {
         return $this->academicPage('schedule');
-    }
-
-    public function academicPromotion(): View
-    {
-        return $this->academicPage('promotion');
     }
 
     public function examMaster(): View

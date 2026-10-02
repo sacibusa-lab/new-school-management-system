@@ -108,7 +108,7 @@ class AdminMenu
                     'matches' => ['admin.students-results.teachers', 'admin.students-results.teachers.*'],
                     'children' => StudentsResultsController::TEACHER_PAGES],
                 ['route' => 'admin.students-results.academics', 'label' => 'Academic', 'icon' => 'book', 'can' => 'academics.manage',
-                    // Academic is a section in its own right: the four pages it holds
+                    // Academic is a section in its own right: the pages it holds
                     // are drawn underneath it, from the list the controller owns.
                     'matches' => ['admin.students-results.academics', 'admin.students-results.academics.*'],
                     'children' => StudentsResultsController::ACADEMIC_PAGES],
@@ -214,7 +214,7 @@ class AdminMenu
                 continue;
             }
 
-            // Deepest namespace wins: the four pages under Academic belong to
+            // Deepest namespace wins: child pages under Academic belong to
             // Academic as well, and it is the page itself we want to end the trail.
             if ($owner === null || strlen($namespace) > strlen(self::namespace($owner['entry']))) {
                 $owner = $candidate;
