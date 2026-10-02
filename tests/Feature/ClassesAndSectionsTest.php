@@ -558,8 +558,6 @@ class ClassesAndSectionsTest extends TestCase
             ->assertSee('name="level_id"', false)
             ->assertSee('name="section_id"', false)
             ->assertSee('name="form_teacher_id"', false)
-            ->assertSee('Branch')
-            ->assertSee(Setting::get('school_name'))
             ->assertSee($teacher->name)
             // JSS1A has one, JSS1B is the row that has not.
             ->assertSee($level->name)

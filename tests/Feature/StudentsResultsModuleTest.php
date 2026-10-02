@@ -11,7 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The Students & Results module, while it is still a menu and nothing else.
+ * The Students & Results menu, permissions, and pages that remain placeholders.
  *
  * What matters at this stage is that no page is a dead end: every item in the
  * sidebar opens something that says plainly it has not been built, rather than
@@ -193,32 +193,48 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Academic, and the four pages under it */
+    /* Academic, and the pages under it */
     /* ------------------------------------------------------------------ */
 
     public function test_every_page_under_academic_opens_and_is_the_page_it_claims(): void
     {
-        // Classes & Sections is built, so it is no longer one of the pages that says
-        // it has not been built; the three that are left still are, each with the
-        // note written for it — which is what proves the right one drew.
-        foreach (['subjects', 'schedule', 'promotion'] as $key) {
-            $child = collect(StudentsResultsController::ACADEMIC_PAGES)->firstWhere('key', $key);
+        // Class schedule is the last placeholder under Academic, and still carries
+        // the note written for it, which proves its route drew correctly.
+        $child = collect(StudentsResultsController::ACADEMIC_PAGES)->firstWhere('key', 'schedule');
 
-            $this->actingAs($this->admin)
-                ->get(route($child['route']))
-                ->assertOk()
-                ->assertSee($child['note'])
-                ->assertSee('This page has not been built yet');
-        }
+        $this->actingAs($this->admin)
+            ->get(route($child['route']))
+            ->assertOk()
+            ->assertSee($child['note'])
+            ->assertSee('This page has not been built yet');
 
         $this->actingAs($this->admin)
             ->get(route('admin.students-results.academics.classes'))
             ->assertOk()
             ->assertSee('Create Class')
             ->assertDontSee('This page has not been built yet');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.subjects'))
+            ->assertOk()
+            ->assertSee('Subject catalogue')
+            ->assertDontSee('This page has not been built yet');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.subjects.assignments'))
+            ->assertOk()
+            ->assertSee('Class Assign')
+            ->assertSee('Assign List')
+            ->assertDontSee('This page has not been built yet');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.academics.promotion'))
+            ->assertOk()
+            ->assertSee('Promotion')
+            ->assertDontSee('This page has not been built yet');
     }
 
-    public function test_the_academic_page_lists_the_four_things_it_holds(): void
+    public function test_the_academic_page_lists_its_children_in_order(): void
     {
         $html = $this->actingAs($this->admin)
             ->get(route('admin.students-results.academics'))
@@ -247,10 +263,10 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /**
-     * The four are a second level, and a second level that is always open is just
+     * The academic pages are a second level, and a second level that is always open is just
      * a longer first level. They appear once Academic is the page you are on.
      */
-    public function test_the_four_pages_are_drawn_under_academic_only_while_it_is_open(): void
+    public function test_academic_pages_are_drawn_under_academic_only_while_it_is_open(): void
     {
         $dashboard = $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk()->getContent();
 
@@ -280,7 +296,7 @@ class StudentsResultsModuleTest extends TestCase
      * up a level. That they render at all on a child route is the proof: the
      * sidebar only draws them for the link it considers active.
      */
-    public function test_the_four_stay_in_the_sidebar_while_you_are_on_one_of_them(): void
+    public function test_academic_pages_stay_in_the_sidebar_while_you_are_on_one_of_them(): void
     {
         $html = $this->actingAs($this->admin)
             ->get(route('admin.students-results.academics.promotion'))

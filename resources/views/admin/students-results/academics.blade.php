@@ -7,7 +7,7 @@
     {{--
         Academic is a section rather than a single screen: classes, the subjects
         they sit, the timetable they run on, and what happens to a class at the end
-        of the year. The four are drawn from the controller's own list — the same
+        of the year. Its pages are drawn from the controller's own list — the same
         one the sidebar uses — so adding a fifth cannot leave one of the two behind.
     --}}
     <div class="card overflow-hidden">

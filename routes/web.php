@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\FeeController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PrintingController;
+use App\Http\Controllers\Admin\PromotionController;
 use App\Http\Controllers\Admin\ResultController;
 use App\Http\Controllers\Admin\ResultPinController;
 use App\Http\Controllers\Admin\ScoreEntryController;
@@ -20,6 +21,8 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SmsController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\StudentsResultsController;
+use App\Http\Controllers\Admin\SubjectAssignmentController;
+use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\TeachersController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -86,7 +89,7 @@ Route::middleware('auth')->group(function () {
 | Admin / staff control panel
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth'])
+Route::middleware('auth')
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -253,9 +256,11 @@ Route::middleware(['auth'])
             Route::get('teachers/import/template', [TeachersController::class, 'downloadTemplate'])->name('teachers.import.template');
             Route::post('teachers/import/preview', [TeachersController::class, 'previewImport'])->name('teachers.import.preview');
             Route::post('teachers/import/commit', [TeachersController::class, 'commitImport'])->name('teachers.import.commit');
+            Route::get('teachers/import/done', [TeachersController::class, 'importDone'])->name('teachers.import.done');
 
             Route::get('teachers/{teacher}/edit', [TeachersController::class, 'edit'])->name('teachers.edit');
             Route::put('teachers/{teacher}', [TeachersController::class, 'update'])->name('teachers.update');
+            Route::post('teachers/{teacher}/password', [TeachersController::class, 'resetPassword'])->name('teachers.password.reset');
 
             /*
             | Removing one teacher, and removing several at once. The collection
@@ -296,9 +301,17 @@ Route::middleware(['auth'])
             Route::post('academics/classes/{level}', [ClassesAndSectionsController::class, 'storeClassSection'])->name('academics.classes.store-class');
             Route::delete('academics/classes/{schoolClass}', [ClassesAndSectionsController::class, 'destroyClassSection'])->name('academics.classes.destroy-class');
 
-            Route::get('academics/subjects', [StudentsResultsController::class, 'academicSubjects'])->name('academics.subjects');
+            Route::get('academics/subjects', [SubjectController::class, 'index'])->name('academics.subjects');
+            Route::post('academics/subjects', [SubjectController::class, 'store'])->name('academics.subjects.store');
+            Route::put('academics/subjects/{subject}', [SubjectController::class, 'update'])->name('academics.subjects.update');
+            Route::patch('academics/subjects/{subject}/status', [SubjectController::class, 'updateStatus'])->name('academics.subjects.status');
+            Route::get('academics/subjects/assignments', [SubjectAssignmentController::class, 'index'])->name('academics.subjects.assignments');
+            Route::post('academics/subjects/assignments', [SubjectAssignmentController::class, 'store'])->name('academics.subjects.assignments.store');
+            Route::put('academics/subjects/assignments/{schoolClass}', [SubjectAssignmentController::class, 'update'])->name('academics.subjects.assignments.update');
+            Route::delete('academics/subjects/assignments/{schoolClass}', [SubjectAssignmentController::class, 'destroy'])->name('academics.subjects.assignments.destroy');
             Route::get('academics/schedule', [StudentsResultsController::class, 'academicSchedule'])->name('academics.schedule');
-            Route::get('academics/promotion', [StudentsResultsController::class, 'academicPromotion'])->name('academics.promotion');
+            Route::get('academics/promotion', [PromotionController::class, 'index'])->name('academics.promotion');
+            Route::post('academics/promotion', [PromotionController::class, 'store'])->name('academics.promotion.store');
 
             Route::get('exam-master', [StudentsResultsController::class, 'examMaster'])->name('exam-master');
             Route::get('attendance', [StudentsResultsController::class, 'attendance'])->name('attendance');

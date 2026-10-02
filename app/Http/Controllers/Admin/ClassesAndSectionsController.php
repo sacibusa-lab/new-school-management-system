@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\Section;
-use App\Models\Setting;
 use App\Models\User;
 use App\Services\Academics\AcademicStructureService;
 use Illuminate\Http\RedirectResponse;
@@ -72,10 +71,6 @@ class ClassesAndSectionsController extends Controller
             'teachers' => User::query()->role('Teacher')->orderBy('name')->get(),
             'editing' => $editing,
             'editingTeacher' => $editingTeacher,
-            // The school the allocation belongs to. There is one branch in this
-            // platform, but the list has always carried the column and the office
-            // reads a row by it, so it is named rather than left blank.
-            'branch' => Setting::get('school_name', config('saci.school_name')),
             'tab' => match (true) {
                 $editing !== null => 'edit',
                 $editingTeacher !== null => 'teacher',

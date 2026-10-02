@@ -349,7 +349,6 @@
                     <thead>
                         <tr class="bg-surface-3 text-left font-semibold text-ink-soft">
                             <th class="w-12 border-b border-r border-line p-3 text-center">#</th>
-                            <th class="w-24 border-b border-r border-line p-3">Branch</th>
                             <th class="border-b border-r border-line p-3">Class Teacher</th>
                             <th class="w-28 border-b border-r border-line p-3">Class</th>
                             <th class="w-20 border-b border-r border-line p-3">Section</th>
@@ -360,8 +359,6 @@
                         @forelse ($allClasses as $class)
                             <tr class="transition-colors hover:bg-surface-3/60">
                                 <td class="border-r border-line p-3 text-center align-middle">{{ $loop->iteration }}</td>
-
-                                <td class="border-r border-line p-3 align-middle">{{ $branch }}</td>
 
                                 <td class="border-r border-line p-3 align-middle">
                                     @if ($class->formTeacher)
@@ -401,7 +398,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="p-8 text-center text-sm text-muted">
+                                <td colspan="5" class="p-8 text-center text-sm text-muted">
                                     No classes yet. Create one on the Class tab and it appears here.
                                 </td>
                             </tr>
