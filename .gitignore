@@ -25,3 +25,9 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Laravel Boost: local tooling state rather than part of the project. The
+# guidelines it writes into AGENTS.md are committed; the skills it installs
+# and the file recording which ones are local to each machine.
+/.agents/
+/boost.json
