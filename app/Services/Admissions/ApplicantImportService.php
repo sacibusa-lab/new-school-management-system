@@ -217,6 +217,12 @@ class ApplicantImportService
      */
     public function commit(array $rows, array $lines, ?User $actor = null): array
     {
+        // A form posts the ticked rows as strings, while the parsed rows carry them as
+        // numbers — and the match below is strict. Left as they arrive, nothing matches,
+        // every row is skipped, and the office is told "Nothing was registered" with no
+        // reason beside it. So the two sides are put in the same shape first.
+        $lines = array_map('intval', $lines);
+
         $imported = 0;
         $numbers = [];
         $failed = [];

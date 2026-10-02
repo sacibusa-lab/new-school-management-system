@@ -10,6 +10,7 @@ use App\Models\Exam;
 use App\Models\ExamSubject;
 use App\Models\SchoolLevel;
 use App\Models\Score;
+use App\Models\SmsLog;
 use App\Models\Subject;
 use App\Models\User;
 use App\Services\Admissions\ApplicantImportService;
@@ -78,7 +79,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Typing one applicant in                                             */
+    /* Typing one applicant in */
     /* ------------------------------------------------------------------ */
 
     public function test_an_officer_can_register_an_applicant_from_the_office(): void
@@ -187,7 +188,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Classes the school does not offer                                   */
+    /* Classes the school does not offer */
     /* ------------------------------------------------------------------ */
 
     public function test_a_class_the_school_does_not_offer_cannot_be_chosen(): void
@@ -226,7 +227,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* The registration slip                                               */
+    /* The registration slip */
     /* ------------------------------------------------------------------ */
 
     /** The flash message after registering promises a slip; this proves it exists. */
@@ -299,7 +300,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Export                                                              */
+    /* Export */
     /* ------------------------------------------------------------------ */
 
     public function test_the_applicant_list_exports_as_csv(): void
@@ -357,7 +358,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Passport and documents                                              */
+    /* Passport and documents */
     /* ------------------------------------------------------------------ */
 
     public function test_a_passport_photograph_taken_at_the_desk_is_stored_and_shown(): void
@@ -376,7 +377,7 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.applicants.show', $applicant))
             ->assertOk()
-            ->assertSee('storage/' . $applicant->photo_path)
+            ->assertSee('storage/'.$applicant->photo_path)
             ->assertDontSee('No photograph');
     }
 
@@ -429,7 +430,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Editing                                                             */
+    /* Editing */
     /* ------------------------------------------------------------------ */
 
     /** The route and the Edit button both existed while this view did not. */
@@ -468,7 +469,7 @@ class AdminApplicantRegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Bulk upload                                                         */
+    /* Bulk upload */
     /* ------------------------------------------------------------------ */
 
     public function test_a_spreadsheet_is_reviewed_before_anything_is_registered(): void
@@ -477,8 +478,8 @@ class AdminApplicantRegistrationTest extends TestCase
             ->post(route('admin.applicants.import.preview'), [
                 'file' => $this->csv(
                     "Surname,First name,Class,Gender,Date of birth,Parent phone,Parent email\n"
-                    . "Okafor,Chidera,JSS1,Female,2013-03-12,08031234567,ngozi@example.com\n"
-                    . "Bello,Aisha,SS1,M,12/03/2013,08031234568,bello@example.com\n",
+                    ."Okafor,Chidera,JSS1,Female,2013-03-12,08031234567,ngozi@example.com\n"
+                    ."Bello,Aisha,SS1,M,12/03/2013,08031234568,bello@example.com\n",
                 ),
             ])
             ->assertRedirect(route('admin.applicants.import'));
@@ -499,9 +500,9 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
-                . "Bello,Aisha,SS1,08031234568,bello@example.com\n"
-                . "Eze,Emeka,SS1,08031234569,eze@example.com\n",
+                ."Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                ."Bello,Aisha,SS1,08031234568,bello@example.com\n"
+                ."Eze,Emeka,SS1,08031234569,eze@example.com\n",
             ),
         ]);
 
@@ -526,13 +527,36 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->assertNull(session('applicant_import'));
     }
 
+    public function test_the_ticked_rows_are_registered_when_the_form_posts_them_as_strings(): void
+    {
+        // A browser posts the ticked rows as strings, but the parser records them as
+        // numbers. Matched strictly, the two shapes never meet, so every row is quietly
+        // skipped and the officer is told "Nothing was registered" with no reason beside
+        // it. Sending the line as the form sends it is the whole point of this test.
+        $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
+            'file' => $this->csv(
+                "Surname,First name,Class,Parent phone,Parent email\n"
+                ."Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n",
+            ),
+        ]);
+
+        $line = (string) session('applicant_import')['rows'][0]['line'];
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.applicants.import.commit'), ['lines' => [$line]])
+            ->assertRedirect(route('admin.applicants.index'))
+            ->assertSessionHas('status');
+
+        $this->assertSame(1, Applicant::query()->count());
+    }
+
     public function test_a_class_that_does_not_exist_is_flagged_rather_than_guessed(): void
     {
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
-                . "Bello,Aisha,JSS9,08031234568,bello@example.com\n",
+                ."Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                ."Bello,Aisha,JSS9,08031234568,bello@example.com\n",
             ),
         ]);
 
@@ -551,8 +575,8 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
-                . ",,JSS1,,\n",
+                ."Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                .",,JSS1,,\n",
             ),
         ]);
 
@@ -571,7 +595,7 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Candidate Surname,Other Names,Class Applied For,Sex,Dob,Parent Phone,Parent Email,Nickname\n"
-                . "Okafor,Chidera Ada,JSS 1,F,12/03/2013,08031234567,ngozi@example.com,Chi\n",
+                ."Okafor,Chidera Ada,JSS 1,F,12/03/2013,08031234567,ngozi@example.com,Chi\n",
             ),
         ]);
 
@@ -593,7 +617,7 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Gender,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,Unknown,08031234567,ngozi@example.com\n",
+                ."Okafor,Chidera,JSS1,Unknown,08031234567,ngozi@example.com\n",
             ),
         ]);
 
@@ -618,9 +642,9 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
-                . ",,,\n"
-                . "Bello,Aisha,SS1,08031234568,bello@example.com\n",
+                ."Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                .",,,\n"
+                ."Bello,Aisha,SS1,08031234568,bello@example.com\n",
             ),
         ]);
 
@@ -661,8 +685,8 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
-                . "Bello,Aisha,SS1,08031234568,bello@example.com\n",
+                ."Okafor,Chidera,JSS1,08031234567,ngozi@example.com\n"
+                ."Bello,Aisha,SS1,08031234568,bello@example.com\n",
             ),
         ]);
 
@@ -671,7 +695,7 @@ class AdminApplicantRegistrationTest extends TestCase
         ]);
 
         $this->assertSame(2, Applicant::query()->count());
-        $this->assertSame(0, \App\Models\SmsLog::query()->count());
+        $this->assertSame(0, SmsLog::query()->count());
     }
 
     public function test_the_imported_guardian_phone_is_kept_for_later_messaging(): void
@@ -679,7 +703,7 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent name,Parent phone,Relationship,Parent email\n"
-                . "Okafor,Chidera,JSS1,Mrs. Ngozi Okafor,08031234567,Mother,ngozi@example.com\n",
+                ."Okafor,Chidera,JSS1,Mrs. Ngozi Okafor,08031234567,Mother,ngozi@example.com\n",
             ),
         ]);
 
@@ -705,8 +729,8 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,,\n"
-                . "Bello,Aisha,SS1,08031234568,not-an-email\n",
+                ."Okafor,Chidera,JSS1,,\n"
+                ."Bello,Aisha,SS1,08031234568,not-an-email\n",
             ),
         ]);
 
@@ -728,7 +752,7 @@ class AdminApplicantRegistrationTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.applicants.import.preview'), [
             'file' => $this->csv(
                 "Surname,First name,Class,Phone,Email,Previous school,Parent phone,Parent email\n"
-                . "Okafor,Chidera,JSS1,08099999999,chidera@example.com,St. Mary,08031234567,ngozi@example.com\n",
+                ."Okafor,Chidera,JSS1,08099999999,chidera@example.com,St. Mary,08031234567,ngozi@example.com\n",
             ),
         ]);
 
