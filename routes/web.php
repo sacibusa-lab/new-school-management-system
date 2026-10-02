@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
 use App\Http\Controllers\Admin\CheckResultController;
 use App\Http\Controllers\Admin\ClassesAndSectionsController;
+use App\Http\Controllers\Admin\ClassSectionReportController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ExamController;
 use App\Http\Controllers\Admin\FeeController;
@@ -248,6 +249,13 @@ Route::middleware('auth')
             // Pin and Promotion did before it: the student register, narrowed by class
             // and section, with the two ways of taking somebody off it.
             Route::get('students', StudentRegisterController::class)->name('students');
+
+            // The second page of Students Details: how full each class is. A literal
+            // path declared before {student}, so that "class-section-report" can never
+            // be read as the id of a student.
+            Route::get('students/class-section-report', ClassSectionReportController::class)
+                ->name('students.class-section-report');
+
             Route::delete('students', [StudentRegisterController::class, 'destroySelected'])->name('students.destroy-selected');
             Route::delete('students/{student}', [StudentRegisterController::class, 'destroy'])->name('students.destroy');
 

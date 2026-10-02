@@ -336,8 +336,61 @@ class StudentsResultsModuleTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* Students Details, and the page under it */
+    /* ------------------------------------------------------------------ */
+
+    public function test_the_class_and_section_report_is_drawn_under_students_details_only_while_it_is_open(): void
+    {
+        $report = route('admin.students-results.students.class-section-report');
+
+        $dashboard = $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString(
+            $report,
+            $dashboard,
+            'Class & Section Report is in the sidebar before Students Details has been opened.',
+        );
+
+        // From the register, and from the report itself: the second level has to be
+        // there whichever of the two you arrived on, or it is a page with no way out.
+        foreach ([route('admin.students-results.students'), $report] as $from) {
+            $html = $this->actingAs($this->admin)->get($from)->assertOk()->getContent();
+
+            $this->assertStringContainsString(
+                $report,
+                $html,
+                "The sidebar does not offer Class & Section Report from {$from}.",
+            );
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Breadcrumbs */
     /* ------------------------------------------------------------------ */
+
+    public function test_the_class_and_section_report_shows_the_trail_back_to_the_register(): void
+    {
+        $report = route('admin.students-results.students.class-section-report');
+
+        $html = $this->actingAs($this->admin)
+            ->get($report)
+            ->assertOk()
+            ->getContent();
+
+        // Read the trail itself, not the page: the register's URL is also in the
+        // sidebar, where finding it would prove nothing.
+        $trail = str($html)->after('aria-label="Breadcrumb"')->before('</nav>')->value();
+
+        $this->assertStringContainsString('Students &amp; Results', $trail, 'The trail does not start at the module.');
+        $this->assertStringContainsString('Students Details', $trail, 'The trail skips the register.');
+        $this->assertStringContainsString('Class &amp; Section Report', $trail, 'The trail does not end at the report.');
+
+        // The register is the way out of here...
+        $this->assertStringContainsString('href="'.route('admin.students-results.students').'"', $trail);
+
+        // ...and the page you are on is not.
+        $this->assertStringNotContainsString('href="'.$report.'"', $trail);
+    }
 
     /**
      * Three levels down there has to be a way back that is not the browser button:

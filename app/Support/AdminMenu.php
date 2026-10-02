@@ -98,7 +98,22 @@ class AdminMenu
                 ['route' => 'admin.students-results.check-result', 'label' => 'Check Result', 'icon' => 'search', 'can' => 'results.check'],
                 ['route' => 'admin.students-results.performance', 'label' => 'Performance Analytics', 'icon' => 'chart', 'can' => 'results.analytics'],
                 ['route' => 'admin.students-results.pins', 'label' => 'Generate Pin', 'icon' => 'key', 'can' => 'results.pins'],
-                ['route' => 'admin.students-results.students', 'label' => 'Students Details', 'icon' => 'academic', 'can' => 'students.view'],
+                ['route' => 'admin.students-results.students', 'label' => 'Students Details', 'icon' => 'academic', 'can' => 'students.view',
+                    // `matches` reaches past the register itself, because the report
+                    // hanging off it has to leave this entry looking open: the sidebar
+                    // only draws a second level for the link it calls active.
+                    'matches' => ['admin.students-results.students', 'admin.students-results.students.*'],
+                    // Spelled out here rather than drawn from a list in the controller,
+                    // the way Academic and Teachers do it: those two have a page of their
+                    // own that lists their children, and this entry does not — the
+                    // register is a register, and a submenu is all it needed.
+                    'children' => [
+                        [
+                            'route' => 'admin.students-results.students.class-section-report',
+                            'label' => 'Class & Section Report',
+                            'icon' => 'columns',
+                        ],
+                    ]],
 
                 // Teachers, and the two pages that hang off it: the register of
                 // the teaching staff, and the form for taking another one on.

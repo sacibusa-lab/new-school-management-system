@@ -19,7 +19,9 @@ use Illuminate\View\View;
  * all come from here — and only the page behind it moved. Promotion did the same:
  * the page is {@see PromotionController} now and the entry below is all that is
  * left of it here. Students Details is the most recent: the page is
- * {@see StudentRegisterController} now.
+ * {@see StudentRegisterController} now, and the Class & Section Report under it is
+ * {@see ClassSectionReportController}. Their entry stays, and the submenu under it
+ * is declared with the entry rather than here — see AdminMenu.
  *
  * The permissions are named for what each page will DO rather than what it is
  * called, because the menu label is the least durable thing about it: "Check
