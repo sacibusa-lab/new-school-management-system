@@ -157,6 +157,9 @@ class AdminMenu
                 ['route' => 'admin.fees.categories.*', 'label' => 'Fee categories', 'icon' => 'tag', 'can' => 'fees.manage'],
                 ['route' => 'admin.fees.structures.*', 'label' => 'Fee structures', 'icon' => 'list', 'can' => 'fees.manage'],
                 ['route' => 'admin.invoices.*', 'label' => 'Invoices', 'icon' => 'receipt', 'can' => 'fees.view'],
+                // What a student is let off. It sits with the bills rather than with the
+                // money coming in, because what it changes is what the bill says.
+                ['route' => 'admin.fees.scholarships.*', 'label' => 'Scholarships', 'icon' => 'rosette', 'can' => 'fees.manage'],
             ],
 
             // The collection side of fees, in the order the school's own fees site
@@ -183,6 +186,11 @@ class AdminMenu
                 ['route' => 'admin.payments.gateway', 'label' => 'Gateway', 'icon' => 'key', 'can' => 'fees.manage',
                     'matches' => ['admin.payments.gateway']],
 
+                // Giving a class their account numbers in one go. Part of this section
+                // because what it opens is the thing the Gateway page watches.
+                ['route' => 'admin.payments.bulk-ops', 'label' => 'Bulk Ops', 'icon' => 'plus', 'can' => 'fees.manage',
+                    'matches' => ['admin.payments.bulk-ops', 'admin.payments.bulk-ops.generate']],
+
                 ['route' => 'admin.payments.settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'can' => 'fees.view',
                     'matches' => ['admin.payments.settlements']],
 
@@ -192,6 +200,12 @@ class AdminMenu
                 ['route' => 'admin.payments.installments', 'label' => 'Installments', 'icon' => 'list', 'can' => 'fees.view',
                     'matches' => ['admin.payments.installments']],
             ],
+            // The school's own money: the accounts fees are paid into. Taken from the
+            // fee site's own section, which is where the office expects to find it.
+            'Business' => [
+                ['route' => 'admin.bank-accounts.*', 'label' => 'Bank Accounts', 'icon' => 'briefcase', 'can' => 'fees.manage'],
+            ],
+
             'Communication' => [
                 ['route' => 'admin.sms.center', 'label' => 'SMS center', 'icon' => 'chat', 'can' => 'sms.view',
                     'matches' => ['admin.sms.center']],

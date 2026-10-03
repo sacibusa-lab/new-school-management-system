@@ -5,6 +5,8 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AddStudentController;
 use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
+use App\Http\Controllers\Admin\BankAccountController;
+use App\Http\Controllers\Admin\BulkOperationController;
 use App\Http\Controllers\Admin\CheckResultController;
 use App\Http\Controllers\Admin\ClassesAndSectionsController;
 use App\Http\Controllers\Admin\ClassSectionReportController;
@@ -17,6 +19,7 @@ use App\Http\Controllers\Admin\PrintingController;
 use App\Http\Controllers\Admin\PromotionController;
 use App\Http\Controllers\Admin\ResultController;
 use App\Http\Controllers\Admin\ResultPinController;
+use App\Http\Controllers\Admin\ScholarshipController;
 use App\Http\Controllers\Admin\ScoreEntryController;
 use App\Http\Controllers\Admin\ScoreImportController;
 use App\Http\Controllers\Admin\SettingController;
@@ -390,6 +393,14 @@ Route::middleware('auth')
         Route::delete('fees/structures/{structure}/items/{item}', [FeeController::class, 'destroyStructureItem'])->name('fees.structures.items.destroy');
         Route::post('fees/structures/{structure}/bill', [FeeController::class, 'billStudents'])->name('fees.structures.bill');
 
+        // What a student is let off. It changes what a bill says, so it is decided
+        // here and written onto the bill, rather than edited on the bill itself and
+        // leaving no record of who agreed to it.
+        Route::get('fees/scholarships', [ScholarshipController::class, 'index'])->name('fees.scholarships.index');
+        Route::post('fees/scholarships', [ScholarshipController::class, 'store'])->name('fees.scholarships.store');
+        Route::post('fees/scholarships/{scholarship}/approve', [ScholarshipController::class, 'approve'])->name('fees.scholarships.approve');
+        Route::post('fees/scholarships/{scholarship}/reject', [ScholarshipController::class, 'reject'])->name('fees.scholarships.reject');
+
         Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
         Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
@@ -409,6 +420,10 @@ Route::middleware('auth')
         Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
         Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
         Route::get('payments/installments', [PaymentController::class, 'installments'])->name('payments.installments');
+
+        // Opening account numbers for a class at a time, rather than one child at a time.
+        Route::get('payments/bulk-ops', [BulkOperationController::class, 'index'])->name('payments.bulk-ops');
+        Route::post('payments/bulk-ops/generate', [BulkOperationController::class, 'generate'])->name('payments.bulk-ops.generate');
 
         // The account number a child's fees are paid into. Paystack issues it; the
         // office presses the button from the student's bill.
@@ -430,6 +445,14 @@ Route::middleware('auth')
         Route::get('sms/templates', [SmsController::class, 'templates'])->name('sms.templates');
         Route::put('sms/templates/{smsTemplate}', [SmsController::class, 'updateTemplate'])->name('sms.templates.update');
         Route::post('sms/templates/{smsTemplate}/reset', [SmsController::class, 'resetTemplate'])->name('sms.templates.reset');
+
+        /* ---------------- Business ---------------- */
+        // The school's own accounts, which are what a letter names — as against the
+        // account number each child is given, which lives under Payments.
+        Route::get('bank-accounts', [BankAccountController::class, 'index'])->name('bank-accounts.index');
+        Route::post('bank-accounts', [BankAccountController::class, 'store'])->name('bank-accounts.store');
+        Route::put('bank-accounts/{account}', [BankAccountController::class, 'update'])->name('bank-accounts.update');
+        Route::delete('bank-accounts/{account}', [BankAccountController::class, 'destroy'])->name('bank-accounts.destroy');
 
         /* ---------------- Administration ---------------- */
         Route::resource('users', UserController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
