@@ -106,8 +106,18 @@ class AdminMenu
                     // Spelled out here rather than drawn from a list in the controller,
                     // the way Academic and Teachers do it: those two have a page of their
                     // own that lists their children, and this entry does not — the
-                    // register is a register, and a submenu is all it needed.
+                    // register is a register, and a submenu is all it needed. The order
+                    // is the office's own, and the module test holds it.
                     'children' => [
+                        [
+                            'route' => 'admin.students-results.students.add',
+                            'label' => 'Add Students',
+                            'icon' => 'user-plus',
+                            // Taking one child on is a write to a child's record, which is
+                            // `students.manage` — the same authority the register asks for
+                            // before it takes one off.
+                            'can' => 'students.manage',
+                        ],
                         [
                             'route' => 'admin.students-results.students.class-section-report',
                             'label' => 'Class & Section Report',

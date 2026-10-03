@@ -401,19 +401,59 @@ class StudentsResultsModuleTest extends TestCase
         );
     }
 
-    public function test_the_submenu_under_students_details_lists_both_pages_in_order(): void
+    public function test_add_students_opens_and_says_it_is_not_built(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.students-results.students.add'))
+            ->assertOk()
+            ->assertSee('Add Students')
+            ->assertSee('This page has not been built yet');
+    }
+
+    /**
+     * Adding a child is a write to a child's record, so it answers to `students.manage`
+     * — the permission the register asks for before it takes one off, not the one it
+     * asks for before it reads the roll.
+     */
+    public function test_add_students_is_closed_to_a_role_that_may_only_read_the_roll(): void
+    {
+        $teacher = $this->userWithRole('Teacher');
+
+        $this->assertTrue($teacher->can('students.view'));
+        $this->assertFalse($teacher->can('students.manage'));
+
+        $this->actingAs($teacher)
+            ->get(route('admin.students-results.students.add'))
+            ->assertForbidden();
+    }
+
+    public function test_the_submenu_under_students_details_lists_its_pages_in_order(): void
     {
         $html = $this->actingAs($this->admin)
             ->get(route('admin.students-results.students'))
             ->assertOk()
             ->getContent();
 
-        $report = strpos($html, route('admin.students-results.students.class-section-report'));
-        $import = strpos($html, route('admin.students-results.students.multiple-import'));
+        // The order the office asked for. Adding a page is a failing test until it is
+        // put in its place, which is the point: the submenu is theirs, not ours.
+        $positions = [];
 
-        $this->assertNotFalse($report, 'Students Details does not offer the Class & Section Report.');
-        $this->assertNotFalse($import, 'Students Details does not offer Multiple import.');
-        $this->assertLessThan($import, $report, 'The submenu is not in the order the office asked for.');
+        foreach ([
+            'admin.students-results.students.add',
+            'admin.students-results.students.class-section-report',
+            'admin.students-results.students.multiple-import',
+        ] as $name) {
+            $at = strpos($html, route($name));
+
+            $this->assertNotFalse($at, "Students Details does not offer {$name}.");
+
+            $positions[] = $at;
+        }
+
+        $sorted = $positions;
+        sort($sorted);
+
+        $this->assertSame($sorted, $positions, 'The submenu is not in the order the office asked for.');
     }
 
     /* ------------------------------------------------------------------ */

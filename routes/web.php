@@ -252,7 +252,11 @@ Route::middleware('auth')
             Route::get('students', StudentRegisterController::class)->name('students');
 
             // The pages that hang off Students Details — all literal paths, declared
-            // before {student} so that none of them can be read as the id of a student.
+            // before {student} so that none of them can be read as the id of a student,
+            // and written in the order the submenu lists them.
+            Route::get('students/add', [StudentsResultsController::class, 'addStudent'])
+                ->name('students.add');
+
             Route::get('students/class-section-report', ClassSectionReportController::class)
                 ->name('students.class-section-report');
 
