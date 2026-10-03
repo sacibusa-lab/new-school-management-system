@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Reports')
-@section('subtitle', 'Payments')
+@section('subtitle', 'Fees & Payments')
 
 @section('content')
     <x-module-placeholder

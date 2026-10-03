@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Scholarships')
-@section('subtitle', 'Fees')
+@section('subtitle', 'Fees & Payments')
 
 @section('content')
 

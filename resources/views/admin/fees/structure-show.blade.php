@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', $structure->name)
-@section('subtitle', 'Fees')
+@section('subtitle', 'Fees & Payments')
 
 @section('actions')
     <a href="{{ route('admin.fees.structures.index') }}" class="btn-secondary btn-sm">

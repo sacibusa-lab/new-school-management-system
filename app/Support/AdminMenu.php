@@ -153,26 +153,26 @@ class AdminMenu
                 ['route' => 'admin.students-results.alumni', 'label' => 'Alumni', 'icon' => 'rosette', 'can' => 'alumni.manage'],
                 ['route' => 'admin.students-results.settings', 'label' => 'Settings', 'icon' => 'sliders', 'can' => 'settings.manage'],
             ],
-            'Fees' => [
+            // Fees and their collection are one banner, because they are one job: what is
+            // billed, then the money coming in against it. Split across two headings the
+            // office had to know which side a screen was on before looking for it — and
+            // nobody should have to work out whether the receipt for what a parent just
+            // paid is a Fees page or a Payments page.
+            //
+            // Two of the fee site's own labels are a little longer here than they are
+            // there: Overview and Reports were clear under a heading that said Payments,
+            // and this heading says more than that.
+            'Fees & Payments' => [
+                // What is billed, and what is taken off it.
                 ['route' => 'admin.fees.categories.*', 'label' => 'Fee categories', 'icon' => 'tag', 'can' => 'fees.manage'],
                 ['route' => 'admin.fees.structures.*', 'label' => 'Fee structures', 'icon' => 'list', 'can' => 'fees.manage'],
                 ['route' => 'admin.invoices.*', 'label' => 'Invoices', 'icon' => 'receipt', 'can' => 'fees.view'],
-                // What a student is let off. It sits with the bills rather than with the
-                // money coming in, because what it changes is what the bill says.
                 ['route' => 'admin.fees.scholarships.*', 'label' => 'Scholarships', 'icon' => 'rosette', 'can' => 'fees.manage'],
-            ],
 
-            // The collection side of fees, in the order the school's own fees site
-            // puts it: what came in, what is due to come in, what the gateway did, and
-            // what the bank paid out. That screen is where the bursar works all day,
-            // and it was asked for here as it stands.
-            //
-            // The register that used to sit under Fees is the first item under this
-            // heading, under the name the fee site gives it — Transactions. It is the
-            // same page; it simply belongs with the money coming in rather than with
-            // the bills going out.
-            'Payments' => [
-                ['route' => 'admin.payments.overview', 'label' => 'Overview', 'icon' => 'chart', 'can' => 'fees.view',
+                // Then the money coming in, in the order the school's own fees site has
+                // it. The register that used to sit under Fees is Transactions — the
+                // same page, under the name the fee site gives it.
+                ['route' => 'admin.payments.overview', 'label' => 'Payments Overview', 'icon' => 'chart', 'can' => 'fees.view',
                     'matches' => ['admin.payments.overview']],
 
                 ['route' => 'admin.payments.schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar', 'can' => 'fees.view',
@@ -186,15 +186,15 @@ class AdminMenu
                 ['route' => 'admin.payments.gateway', 'label' => 'Gateway', 'icon' => 'key', 'can' => 'fees.manage',
                     'matches' => ['admin.payments.gateway']],
 
-                // Giving a class their account numbers in one go. Part of this section
-                // because what it opens is the thing the Gateway page watches.
+                // Giving a class their account numbers in one go — what the Gateway page
+                // watches over.
                 ['route' => 'admin.payments.bulk-ops', 'label' => 'Bulk Ops', 'icon' => 'plus', 'can' => 'fees.manage',
                     'matches' => ['admin.payments.bulk-ops', 'admin.payments.bulk-ops.generate']],
 
                 ['route' => 'admin.payments.settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'can' => 'fees.view',
                     'matches' => ['admin.payments.settlements']],
 
-                ['route' => 'admin.payments.reports', 'label' => 'Reports', 'icon' => 'report', 'can' => 'fees.reports',
+                ['route' => 'admin.payments.reports', 'label' => 'Collection Reports', 'icon' => 'report', 'can' => 'fees.reports',
                     'matches' => ['admin.payments.reports']],
 
                 ['route' => 'admin.payments.installments', 'label' => 'Installments', 'icon' => 'list', 'can' => 'fees.view',

@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', $invoice->invoice_number)
-@section('subtitle', 'Fees')
+@section('subtitle', 'Fees & Payments')
 
 @section('actions')
     <a href="{{ route('admin.invoices.index') }}" class="btn-secondary btn-sm">
