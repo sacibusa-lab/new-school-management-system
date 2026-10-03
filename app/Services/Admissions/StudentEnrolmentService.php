@@ -126,7 +126,8 @@ class StudentEnrolmentService
     }
 
     /**
-     * Take a child onto the roll from a sheet, rather than from an application.
+     * Take a child onto the roll with no application behind them — from a sheet, or from
+     * the Add Student form.
      *
      * The two paths differ in one thing only: where they stop. An applicant is admitted
      * and that is the end of a decision — the school has said yes, so the first invoice
@@ -136,43 +137,48 @@ class StudentEnrolmentService
      * raised from the Fees screen when it falls due.
      *
      * What the two paths do share is the part that cannot be repaired afterwards: the
-     * number, which comes off the same sequence an admission draws from so a child in a
-     * sheet cannot be handed one already in use, and the portal login, so a child who
-     * arrives by spreadsheet can see their results and fees from the day they arrive.
-     * Both are made here, beside the code that already makes them for an admission,
-     * rather than again somewhere else.
+     * number, which comes off the same sequence an admission draws from so a child added
+     * this way cannot be handed one already in use, and the portal login, so a child who
+     * arrives this way can see their results and fees from the day they arrive. Both are
+     * made here, beside the code that already makes them for an admission, rather than
+     * again somewhere else.
      *
-     * @param  array<string,mixed>  $row  Cleaned values, keyed by the students column they belong to.
+     * @param  array<string,mixed>  $details  Cleaned values, keyed by the `students` column they belong to.
+     * @param  string|null  $studentNumber  The number to give them, where the office typed one
+     *                                      themselves rather than letting the series issue it.
      */
-    public function enrolFromSheet(
-        array $row,
+    public function enrolFromDetails(
+        array $details,
         SchoolLevel $level,
         ?SchoolClass $class,
         AcademicSession $session,
+        ?string $studentNumber = null,
     ): Student {
-        return DB::transaction(function () use ($row, $level, $class, $session) {
+        return DB::transaction(function () use ($details, $level, $class, $session, $studentNumber) {
             $student = Student::create([
-                // SAC/2026/001 — restarts each academic year.
-                'student_number' => $this->sequences->nextStudentNumber($session->startYear() ?? now()->year),
+                // SAC/2026/001 — off the shared series each academic year, unless the office
+                // typed one because the number on their paper register is the school's.
+                'student_number' => $studentNumber ?: $this->sequences->nextStudentNumber($session->startYear() ?? now()->year),
                 // No application behind them, so there is no registration number to keep
                 // as the permanent reference. The columns are named the wrong way round:
                 // `student_number` is the admission number, `admission_number` the
                 // registration number, and this one is genuinely empty.
                 'admission_number' => null,
-                'first_name' => $row['first_name'],
-                'middle_name' => $row['middle_name'] ?? null,
-                'last_name' => $row['last_name'],
-                'gender' => $row['gender'] ?? null,
-                'date_of_birth' => $row['date_of_birth'] ?? null,
-                'address' => $row['address'] ?? null,
+                'first_name' => $details['first_name'],
+                'middle_name' => $details['middle_name'] ?? null,
+                'last_name' => $details['last_name'],
+                'gender' => $details['gender'] ?? null,
+                'date_of_birth' => $details['date_of_birth'] ?? null,
+                'photo_path' => $details['photo_path'] ?? null,
+                'address' => $details['address'] ?? null,
                 // The arm chosen on the form, not the least-full one: whichever arm
                 // these children are in, the office is the one who knows it.
                 'level_id' => $level->id,
                 'school_class_id' => $class?->id,
                 'academic_session_id' => $session->id,
-                'guardian_name' => $row['guardian_name'] ?? null,
-                'guardian_phone' => $row['guardian_phone'] ?? null,
-                'guardian_email' => $row['guardian_email'] ?? null,
+                'guardian_name' => $details['guardian_name'] ?? null,
+                'guardian_phone' => $details['guardian_phone'] ?? null,
+                'guardian_email' => $details['guardian_email'] ?? null,
                 'status' => StudentStatus::Active,
                 // Both portals switched on, exactly as an admission does it.
                 'results_portal_enabled' => true,
@@ -183,9 +189,9 @@ class StudentEnrolmentService
             $this->provisionPortalAccount($student);
 
             ActivityLog::record(
-                'student.imported',
+                'student.added',
                 $student,
-                "Imported {$student->first_name} {$student->last_name} as {$student->student_number}",
+                "Added {$student->first_name} {$student->last_name} as {$student->student_number}",
                 ['module' => 'students', 'class' => $class?->name],
             );
 

@@ -387,7 +387,7 @@ class StudentImportService
             }
 
             try {
-                $created[] = $this->enrolment->enrolFromSheet($row['values'], $level, $class, $session);
+                $created[] = $this->enrolment->enrolFromDetails($row['values'], $level, $class, $session);
             } catch (\Throwable $e) {
                 $failed[] = ['line' => $row['line'], 'name' => $row['name'], 'reason' => $e->getMessage()];
             }

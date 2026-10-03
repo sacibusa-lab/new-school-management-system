@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\SequenceType;
 use App\Models\NumberSequence;
+use App\Models\Setting;
 use Closure;
 use Illuminate\Support\Facades\DB;
 
@@ -20,8 +21,8 @@ class NumberSequenceService
 {
     public function nextAdmissionRegistrationNumber(): string
     {
-        $prefix = (string) (\App\Models\Setting::get('admission_number_prefix') ?: config('saci.admission_prefix', 'SAC'));
-        $padding = (int) (\App\Models\Setting::get('admission_number_padding') ?: 5);
+        $prefix = (string) (Setting::get('admission_number_prefix') ?: config('saci.admission_prefix', 'SAC'));
+        $padding = (int) (Setting::get('admission_number_padding') ?: 5);
 
         return $this->allocate(
             SequenceType::AdmissionRegistration,
@@ -34,8 +35,8 @@ class NumberSequenceService
     public function nextStudentNumber(int|string|null $year = null): string
     {
         $year = (string) ($year ?: now()->year);
-        $prefix = (string) (\App\Models\Setting::get('student_number_prefix') ?: config('saci.student_prefix', 'SAC'));
-        $padding = (int) (\App\Models\Setting::get('student_number_padding') ?: 3);
+        $prefix = (string) (Setting::get('student_number_prefix') ?: config('saci.student_prefix', 'SAC'));
+        $padding = (int) (Setting::get('student_number_padding') ?: 3);
 
         return $this->allocate(
             SequenceType::StudentNumber,
@@ -48,7 +49,7 @@ class NumberSequenceService
     public function nextInvoiceNumber(int|string|null $year = null): string
     {
         $year = (string) ($year ?: now()->year);
-        $prefix = (string) (\App\Models\Setting::get('invoice_prefix') ?: 'INV');
+        $prefix = (string) (Setting::get('invoice_prefix') ?: 'INV');
 
         return $this->allocate(
             SequenceType::Invoice,
@@ -61,7 +62,7 @@ class NumberSequenceService
     public function nextReceiptNumber(int|string|null $year = null): string
     {
         $year = (string) ($year ?: now()->year);
-        $prefix = (string) (\App\Models\Setting::get('receipt_prefix') ?: 'RCP');
+        $prefix = (string) (Setting::get('receipt_prefix') ?: 'RCP');
 
         return $this->allocate(
             SequenceType::Receipt,
@@ -86,24 +87,24 @@ class NumberSequenceService
         return match ($type) {
             SequenceType::AdmissionRegistration => sprintf(
                 '%s-%s',
-                (string) (\App\Models\Setting::get('admission_number_prefix') ?: 'SAC'),
+                (string) (Setting::get('admission_number_prefix') ?: 'SAC'),
                 str_pad((string) $next, 5, '0', STR_PAD_LEFT),
             ),
             SequenceType::StudentNumber => sprintf(
                 '%s/%s/%s',
-                (string) (\App\Models\Setting::get('student_number_prefix') ?: 'SAC'),
+                (string) (Setting::get('student_number_prefix') ?: 'SAC'),
                 $scope,
                 str_pad((string) $next, 3, '0', STR_PAD_LEFT),
             ),
             SequenceType::Invoice => sprintf(
                 '%s/%s/%s',
-                (string) (\App\Models\Setting::get('invoice_prefix') ?: 'INV'),
+                (string) (Setting::get('invoice_prefix') ?: 'INV'),
                 $scope,
                 str_pad((string) $next, 5, '0', STR_PAD_LEFT),
             ),
             SequenceType::Receipt => sprintf(
                 '%s/%s/%s',
-                (string) (\App\Models\Setting::get('receipt_prefix') ?: 'RCP'),
+                (string) (Setting::get('receipt_prefix') ?: 'RCP'),
                 $scope,
                 str_pad((string) $next, 5, '0', STR_PAD_LEFT),
             ),
@@ -117,6 +118,44 @@ class NumberSequenceService
             ['type' => $type->value, 'scope' => (string) $scope],
             ['last_number' => $lastNumber],
         );
+    }
+
+    /**
+     * Raise the admission number series above a number the office issued by hand.
+     *
+     * The series is normally handed out from here, but the office can type an admission
+     * number on the Add Student screen: they have a paper register, and the number on it
+     * is the school's rather than ours. That number is then in use, and the counter behind
+     * the series has no idea — left alone it would eventually reach the same number and
+     * offer it to an admission, which the unique index on `students.student_number` would
+     * refuse at the counter, with a parent waiting.
+     *
+     * So the counter is raised to sit above whatever was typed, and only ever raised: a
+     * number already in use must never be issued twice, so this can move the series
+     * forwards and never back. A number not shaped like this series is left alone — a
+     * school that numbers its children its own way keeps its own way, and there is
+     * nothing here to keep in step with it.
+     *
+     * @see setLastNumber() For the unconditional version, which the settings screen uses.
+     */
+    public function raiseStudentNumberTo(string $studentNumber): void
+    {
+        $prefix = (string) (Setting::get('student_number_prefix') ?: config('saci.student_prefix', 'SAC'));
+
+        if (preg_match('#^'.preg_quote($prefix, '#').'/(\d{4})/(\d+)$#', $studentNumber, $matches) !== 1) {
+            return;
+        }
+
+        $year = $matches[1];
+        $number = (int) $matches[2];
+
+        DB::transaction(function () use ($prefix, $year, $number): void {
+            $row = $this->lockRow(SequenceType::StudentNumber, $year, $prefix);
+
+            if ((int) $row->last_number < $number) {
+                $row->forceFill(['last_number' => $number])->save();
+            }
+        }, 3);
     }
 
     /**

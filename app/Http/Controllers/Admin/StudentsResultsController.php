@@ -19,11 +19,10 @@ use Illuminate\View\View;
  * all come from here — and only the page behind it moved. Promotion did the same:
  * the page is {@see PromotionController} now and the entry below is all that is
  * left of it here. Students Details is the most recent: the page is
- * {@see StudentRegisterController} now, and of the three under it the Class & Section
- * Report and the multiple import are {@see ClassSectionReportController} and
- * {@see StudentImportController}, while Add Students is still a placeholder drawn from
- * here. The entry stays, and the submenu under it is declared with the entry rather
- * than here — see AdminMenu.
+ * {@see StudentRegisterController} now, and all three under it have gone the same way —
+ * {@see AddStudentController}, {@see ClassSectionReportController} and
+ * {@see StudentImportController}. The entry stays, and the submenu under it is declared
+ * with the entry rather than here — see AdminMenu.
  *
  * The permissions are named for what each page will DO rather than what it is
  * called, because the menu label is the least durable thing about it: "Check
@@ -202,25 +201,6 @@ class StudentsResultsController extends Controller
     public function settings(): View
     {
         return $this->placeholder('settings');
-    }
-
-    /**
-     * Add Students: taking one child onto the roll by hand.
-     *
-     * The first page under Students Details, and the only one of the three still to be
-     * built. The register behind that entry is {@see StudentRegisterController}, the
-     * report is {@see ClassSectionReportController} and the import is
-     * {@see StudentImportController}; this one is a placeholder until its turn comes,
-     * which is why it is drawn from here rather than from a controller of its own.
-     *
-     * Its own permission, though: adding a child is a write to a child's record, and
-     * `students.manage` is what the module asks for that.
-     */
-    public function addStudent(): View
-    {
-        $this->authorize('students.manage');
-
-        return view('admin.students-results.students.add-student');
     }
 
     /**

@@ -84,7 +84,7 @@ class StudentImportController extends Controller
         $level = SchoolLevel::query()->findOrFail($validated['level_id']);
         $section = Section::query()->findOrFail($validated['section_id']);
 
-        $class = $this->classFor($level, $section);
+        $class = SchoolClass::query()->forArm($level, $section)->first();
 
         if ($class === null) {
             return back()->withInput()->withErrors([
@@ -235,19 +235,5 @@ class StudentImportController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="student-import-sample.csv"',
         ]);
-    }
-
-    /**
-     * The class the two dropdowns name, or nothing if the school has not made it.
-     *
-     * A class is a year group and a section put together, and the office picks the two
-     * the way the school says them. The combination may simply not exist yet.
-     */
-    private function classFor(SchoolLevel $level, Section $section): ?SchoolClass
-    {
-        return SchoolClass::query()
-            ->where('level_id', $level->id)
-            ->where('section_id', $section->id)
-            ->first();
     }
 }

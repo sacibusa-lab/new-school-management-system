@@ -401,15 +401,6 @@ class StudentsResultsModuleTest extends TestCase
         );
     }
 
-    public function test_add_students_opens_and_says_it_is_not_built(): void
-    {
-        $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students.add'))
-            ->assertOk()
-            ->assertSee('Add Students')
-            ->assertSee('This page has not been built yet');
-    }
-
     /**
      * Adding a child is a write to a child's record, so it answers to `students.manage`
      * — the permission the register asks for before it takes one off, not the one it

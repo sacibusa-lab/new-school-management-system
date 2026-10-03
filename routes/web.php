@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AcademicCalendarController;
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\AddStudentController;
 use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
 use App\Http\Controllers\Admin\CheckResultController;
@@ -254,8 +255,10 @@ Route::middleware('auth')
             // The pages that hang off Students Details — all literal paths, declared
             // before {student} so that none of them can be read as the id of a student,
             // and written in the order the submenu lists them.
-            Route::get('students/add', [StudentsResultsController::class, 'addStudent'])
+            Route::get('students/add', [AddStudentController::class, 'create'])
                 ->name('students.add');
+            Route::post('students/add', [AddStudentController::class, 'store'])
+                ->name('students.add.store');
 
             Route::get('students/class-section-report', ClassSectionReportController::class)
                 ->name('students.class-section-report');
