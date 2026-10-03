@@ -399,6 +399,17 @@ Route::middleware('auth')
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
 
+        // The rest of the collection side, in the order the school's own fees site
+        // puts it. Each is a page saying what will be on it until it is built — see
+        // PaymentController::PAGES — so the menu can be complete without a link that
+        // errors.
+        Route::get('payments/overview', [PaymentController::class, 'overview'])->name('payments.overview');
+        Route::get('payments/schedule', [PaymentController::class, 'schedule'])->name('payments.schedule');
+        Route::get('payments/gateway', [PaymentController::class, 'gateway'])->name('payments.gateway');
+        Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
+        Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
+        Route::get('payments/installments', [PaymentController::class, 'installments'])->name('payments.installments');
+
         // The account number a child's fees are paid into. Paystack issues it; the
         // office presses the button from the student's bill.
         Route::post('fees/students/{student}/virtual-account', [VirtualAccountController::class, 'store'])

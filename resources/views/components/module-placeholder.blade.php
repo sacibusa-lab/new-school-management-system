@@ -5,12 +5,16 @@
 ])
 
 {{--
-    A page of the Students & Results menu that has not been built yet.
+    A page of the panel that has not been built yet.
 
     Deliberately not an empty state: an empty state means "there is nothing to
     show", and somebody reading one would go looking for a filter they had got
     wrong. This says the page itself does not exist yet, so the office knows to
     ask rather than to hunt.
+
+    It used to name Students & Results in the sentence below, which was true until
+    the Payments section started using it — and then told the office they were in a
+    module they were not in. Where a page sits is the trail's job to say.
 --}}
 <div {{ $attributes->merge(['class' => 'card flex flex-col items-center justify-center px-6 py-16 text-center']) }}>
     <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-3 text-muted">
@@ -20,8 +24,9 @@
     <p class="mt-4 font-display text-lg font-semibold text-ink">{{ $title }}</p>
 
     <p class="mt-1.5 max-w-md text-sm text-muted">
-        This page has not been built yet — it is one of the Students &amp; Results pages being
-        created one at a time. Nothing is wrong: there is simply nothing here to look at.
+        This page has not been built yet — it is one of the pages of this panel still
+        being created one at a time. Nothing is wrong: there is simply nothing here to
+        look at.
     </p>
 
     @if ($note)

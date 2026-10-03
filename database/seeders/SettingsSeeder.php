@@ -68,6 +68,7 @@ class SettingsSeeder extends Seeder
             // being touched.
             ['key' => 'paystack_public_key', 'value' => '', 'group' => 'api_paystack', 'label' => 'Public key'],
             ['key' => 'paystack_secret_key', 'value' => '', 'group' => 'api_paystack', 'type' => 'secret', 'label' => 'Secret key'],
+            ['key' => 'paystack_dva_bank', 'value' => 'wema-bank', 'group' => 'api_paystack', 'label' => 'Bank that issues account numbers'],
             ['key' => 'termii_api_key', 'value' => '', 'group' => 'api_termii', 'type' => 'secret', 'label' => 'API key'],
             ['key' => 'termii_sender_id', 'value' => 'SACISCH', 'group' => 'api_termii', 'label' => 'Sender ID'],
             ['key' => 'termii_channel', 'value' => 'generic', 'group' => 'api_termii', 'label' => 'Channel'],

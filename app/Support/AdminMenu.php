@@ -157,7 +157,40 @@ class AdminMenu
                 ['route' => 'admin.fees.categories.*', 'label' => 'Fee categories', 'icon' => 'tag', 'can' => 'fees.manage'],
                 ['route' => 'admin.fees.structures.*', 'label' => 'Fee structures', 'icon' => 'list', 'can' => 'fees.manage'],
                 ['route' => 'admin.invoices.*', 'label' => 'Invoices', 'icon' => 'receipt', 'can' => 'fees.view'],
-                ['route' => 'admin.payments.*', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view'],
+            ],
+
+            // The collection side of fees, in the order the school's own fees site
+            // puts it: what came in, what is due to come in, what the gateway did, and
+            // what the bank paid out. That screen is where the bursar works all day,
+            // and it was asked for here as it stands.
+            //
+            // The register that used to sit under Fees is the first item under this
+            // heading, under the name the fee site gives it — Transactions. It is the
+            // same page; it simply belongs with the money coming in rather than with
+            // the bills going out.
+            'Payments' => [
+                ['route' => 'admin.payments.overview', 'label' => 'Overview', 'icon' => 'chart', 'can' => 'fees.view',
+                    'matches' => ['admin.payments.overview']],
+
+                ['route' => 'admin.payments.schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar', 'can' => 'fees.view',
+                    'matches' => ['admin.payments.schedule']],
+
+                // Spelled out rather than left as admin.payments.*, which would light
+                // this up on every other page of the section.
+                ['route' => 'admin.payments.index', 'label' => 'Transactions', 'icon' => 'cash', 'can' => 'fees.view',
+                    'matches' => ['admin.payments.index', 'admin.payments.reverse']],
+
+                ['route' => 'admin.payments.gateway', 'label' => 'Gateway', 'icon' => 'key', 'can' => 'fees.manage',
+                    'matches' => ['admin.payments.gateway']],
+
+                ['route' => 'admin.payments.settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'can' => 'fees.view',
+                    'matches' => ['admin.payments.settlements']],
+
+                ['route' => 'admin.payments.reports', 'label' => 'Reports', 'icon' => 'report', 'can' => 'fees.reports',
+                    'matches' => ['admin.payments.reports']],
+
+                ['route' => 'admin.payments.installments', 'label' => 'Installments', 'icon' => 'list', 'can' => 'fees.view',
+                    'matches' => ['admin.payments.installments']],
             ],
             'Communication' => [
                 ['route' => 'admin.sms.center', 'label' => 'SMS center', 'icon' => 'chat', 'can' => 'sms.view',

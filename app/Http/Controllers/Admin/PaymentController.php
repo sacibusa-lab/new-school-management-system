@@ -152,4 +152,94 @@ class PaymentController extends Controller
 
         return back()->with('status', "Payment {$payment->receipt_number} reversed and the invoice balance restored.");
     }
+
+    /* ------------------------------------------------------------------ */
+    /* The rest of the collection side */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * What came in, and what is owed — the screen the bursar opens first.
+     */
+    public function overview(): View
+    {
+        return $this->placeholder('overview');
+    }
+
+    /**
+     * What each student should have paid by now, and what is still to fall due.
+     */
+    public function schedule(): View
+    {
+        return $this->placeholder('schedule');
+    }
+
+    /**
+     * The school's Paystack account: the keys, the accounts issued, and whether the
+     * webhook is being heard.
+     */
+    public function gateway(): View
+    {
+        return $this->placeholder('gateway');
+    }
+
+    /**
+     * What Paystack has actually paid out to the school's bank, and when.
+     */
+    public function settlements(): View
+    {
+        return $this->placeholder('settlements');
+    }
+
+    /**
+     * The collection reports: by class, by term, by method, and arrears.
+     */
+    public function reports(): View
+    {
+        return $this->placeholder('reports');
+    }
+
+    /**
+     * Students paying in instalments rather than in one go.
+     */
+    public function installments(): View
+    {
+        return $this->placeholder('installments');
+    }
+
+    /**
+     * Draw one of the pages above.
+     *
+     * The page is looked up in PAGES rather than trusted from the URL, so which
+     * permission it needs and what it is called are decided in this file and never by
+     * what the browser asked for.
+     */
+    protected function placeholder(string $key): View
+    {
+        $page = collect(self::PAGES)->firstWhere('key', $key);
+
+        abort_if($page === null, 404);
+
+        $this->authorize($page['permission']);
+
+        return view('admin.payments.'.$key, ['page' => $page]);
+    }
+
+    /**
+     * The Pages section of the menu, less the register that is already built.
+     *
+     * The school's own fees site has every one of these working; here the menu holds
+     * the office's order and each unbuilt page says what will be on it, which is what
+     * keeps a complete menu from being a list of pages that error. Defined next to the
+     * method that reads it.
+     *
+     * @var array<int,array{key:string,label:string,icon:string,permission:string}>
+     */
+    public const PAGES = [
+        ['key' => 'overview', 'label' => 'Overview', 'icon' => 'chart', 'permission' => 'fees.view'],
+        ['key' => 'schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar', 'permission' => 'fees.view'],
+        ['key' => 'gateway', 'label' => 'Gateway', 'icon' => 'key', 'permission' => 'fees.manage'],
+        ['key' => 'settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'permission' => 'fees.view'],
+        ['key' => 'reports', 'label' => 'Reports', 'icon' => 'report', 'permission' => 'fees.reports'],
+        ['key' => 'installments', 'label' => 'Installments', 'icon' => 'list', 'permission' => 'fees.view'],
+    ];
 }

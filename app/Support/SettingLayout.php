@@ -138,6 +138,7 @@ class SettingLayout
         'api_paystack' => [
             'paystack_public_key',
             'paystack_secret_key',
+            'paystack_dva_bank',
         ],
 
         'api_termii' => [

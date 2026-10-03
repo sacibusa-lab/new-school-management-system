@@ -258,7 +258,11 @@ class PaystackProvider implements PaymentGatewayInterface
         try {
             $payload = [
                 'customer' => $customerCode,
-                'preferred_bank' => 'wema-bank', // Common default for DVA
+                // Which bank issues the number depends on how the school's Paystack
+                // account is set up, so it is a setting rather than the one bank this
+                // was first written against — get it wrong and Paystack refuses every
+                // account number the office tries to open.
+                'preferred_bank' => (string) (Setting::get('paystack_dva_bank') ?: 'wema-bank'),
             ];
 
             if ($splitCode) {
