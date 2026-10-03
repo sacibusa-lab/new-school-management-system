@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\SubjectAssignmentController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\TeachersController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VirtualAccountController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Public\HomeController;
@@ -36,6 +37,7 @@ use App\Http\Controllers\Public\LookupController;
 use App\Http\Controllers\Public\RegistrationController;
 use App\Http\Controllers\Public\ResitController;
 use App\Http\Controllers\Public\ResultSlipController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -69,6 +71,16 @@ Route::post('admission/resit', [ResitController::class, 'store'])
 Route::get('check-result', [LookupController::class, 'results'])->middleware('throttle:40,1')->name('public.results');
 Route::get('check-result/{termResult}/slip', ResultSlipController::class)->name('public.result.slip');
 Route::get('fee-status', [LookupController::class, 'fees'])->middleware('throttle:40,1')->name('public.fees');
+
+/*
+ * Where the payment gateway tells us money has arrived. It cannot carry a session
+ * or a CSRF token, and is answered only if the signature over its raw body checks
+ * out against the school's secret key — see WebhookController.
+ *
+ * Deliberately not throttled: term-time payments arrive in bursts, and a 429 here
+ * would make Paystack retry a charge that was real.
+ */
+Route::post('webhooks/paystack', [WebhookController::class, 'paystack'])->name('webhooks.paystack');
 
 /*
 |--------------------------------------------------------------------------
@@ -386,6 +398,11 @@ Route::middleware('auth')
 
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
+
+        // The account number a child's fees are paid into. Paystack issues it; the
+        // office presses the button from the student's bill.
+        Route::post('fees/students/{student}/virtual-account', [VirtualAccountController::class, 'store'])
+            ->name('fees.virtual-account');
 
         /* ---------------- Messaging ---------------- */
         // Declared before the other sms routes so the literal path can never be

@@ -330,6 +330,67 @@
             </div>
         @endcan
 
+        {{--
+            The account number is the one thing on this page that a parent telephoning
+            the office needs: once they have it, every transfer after that finds its
+            own way to the right child.
+        --}}
+        @if ($invoice->student)
+            <div class="card-pad">
+                <h2 class="text-base font-semibold text-ink">Paying into the bank</h2>
+
+                @if ($virtualAccount)
+                    <p class="mt-2 text-sm text-muted">
+                        Money transferred into this account is credited to
+                        {{ $invoice->student->first_name }}'s oldest unpaid bill first.
+                    </p>
+
+                    <dl class="mt-4 space-y-3 text-sm">
+                        <div>
+                            <dt class="eyebrow">Bank</dt>
+                            <dd class="mt-1 font-medium text-ink">{{ $virtualAccount->bank_name }}</dd>
+                        </div>
+
+                        <div x-data="{ copied: false }">
+                            <dt class="eyebrow">Account number</dt>
+                            <dd class="mt-1">
+                                <button type="button"
+                                        class="inline-flex items-center gap-2 font-mono text-lg font-semibold text-ink"
+                                        title="Copy the account number"
+                                        @click="navigator.clipboard.writeText('{{ $virtualAccount->account_number }}'); copied = true; setTimeout(() => copied = false, 1500)">
+                                    {{ $virtualAccount->account_number }}
+                                    <x-nav-icon name="copy" class="h-4 w-4 text-muted" />
+                                </button>
+                                <span x-show="copied" x-cloak class="ml-1 text-xs text-emerald-600 dark:text-emerald-400">Copied</span>
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt class="eyebrow">Account name</dt>
+                            <dd class="mt-1 text-ink">{{ $virtualAccount->account_name }}</dd>
+                        </div>
+                    </dl>
+                @else
+                    <p class="mt-2 text-sm text-muted">
+                        No account number yet. One is opened against the child, and every
+                        transfer into it is matched to them by name — nobody has to quote a
+                        reference, and the office does not have to reconcile a bank statement.
+                    </p>
+
+                    @can('fees.manage')
+                        <form method="POST" action="{{ route('admin.fees.virtual-account', $invoice->student) }}" class="mt-4">
+                            @csrf
+
+                            <button type="submit" class="btn-primary w-full">
+                                <x-nav-icon name="key" class="h-4 w-4" />
+                                Open an account number
+                            </button>
+                        </form>
+                    @endcan
+                @endif
+            </div>
+        @endif
+
         <div class="card-pad">
             <h2 class="text-base font-semibold text-ink">The student's fees</h2>
             <p class="mt-2 text-sm text-muted">

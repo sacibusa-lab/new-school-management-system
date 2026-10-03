@@ -36,6 +36,22 @@ class PaystackProvider implements PaymentGatewayInterface
         return filled($this->secretKey);
     }
 
+    /**
+     * Whether a webhook really came from Paystack.
+     *
+     * The signature is an HMAC of the raw request body under the account's secret
+     * key, so nothing else can produce it. Comparing with hash_equals rather than
+     * `===` is the point: a plain comparison leaks where the strings first differ.
+     */
+    public function signatureIsValid(string $signature, string $body): bool
+    {
+        if ($signature === '' || $this->secretKey === '') {
+            return false;
+        }
+
+        return hash_equals(hash_hmac('sha512', $body, $this->secretKey), $signature);
+    }
+
     public function initiateTransaction(array $data): array
     {
         try {

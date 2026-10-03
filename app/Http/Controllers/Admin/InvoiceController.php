@@ -86,8 +86,9 @@ class InvoiceController extends Controller
         ]);
 
         return view('admin.invoices.show', [
-            'invoice' => $invoice,
-            'currency' => Setting::get('currency_symbol', '₦'),
+            'invoice' => $invoice,            // The account a parent pays into, if one has been opened for this child:
+            // the bill is where the office is standing when they are asked for it.
+            'virtualAccount' => $invoice->student?->virtualAccount,            'currency' => Setting::get('currency_symbol', '₦'),
         ]);
     }
 

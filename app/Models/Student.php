@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -75,6 +76,15 @@ class Student extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * The bank account number their fees are paid into — one per child, opened with
+     * the gateway on demand. See VirtualAccountService.
+     */
+    public function virtualAccount(): HasOne
+    {
+        return $this->hasOne(StudentVirtualAccount::class);
     }
 
     public function termResults(): HasMany
