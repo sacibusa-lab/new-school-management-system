@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\ImportDriver;
 use App\Enums\ScoreImportRowStatus;
+use App\Enums\ScoreImportStatus;
 use App\Exceptions\ScoresheetExtractionException;
 use App\Http\Controllers\Controller;
 use App\Models\Applicant;
@@ -11,6 +12,7 @@ use App\Models\Exam;
 use App\Models\ExamSubject;
 use App\Models\ScoreImport;
 use App\Models\ScoreImportRow;
+use App\Services\Import\AiVisionScoresheetExtractor;
 use App\Services\Import\ScoreImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,8 +26,7 @@ class ScoreImportController extends Controller
 {
     public function __construct(
         private readonly ScoreImportService $imports,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -43,7 +44,7 @@ class ScoreImportController extends Controller
             ->get()
             ->mapWithKeys(fn (ExamSubject $paper) => [
                 $paper->id => trim(
-                    ($selectedExam ? '' : ($paper->exam?->title . ' — ')) . ($paper->subject?->name ?? 'Subject'),
+                    ($selectedExam ? '' : ($paper->exam?->title.' — ')).($paper->subject?->name ?? 'Subject'),
                 ),
             ])
             ->all();
@@ -59,7 +60,7 @@ class ScoreImportController extends Controller
             'exams' => Exam::query()->with('level')->orderByDesc('id')->get(),
             'subjectOptions' => $subjectOptions,
             'drivers' => ImportDriver::options(),
-            'aiConfigured' => app(\App\Services\Import\AiVisionScoresheetExtractor::class)->isConfigured(),
+            'aiConfigured' => app(AiVisionScoresheetExtractor::class)->isConfigured(),
         ]);
     }
 
@@ -88,7 +89,7 @@ class ScoreImportController extends Controller
         if ($import->driver === ImportDriver::ManualGrid) {
             return redirect()
                 ->route('admin.imports.show', $import)
-                ->with('error', 'This file type cannot be read automatically. Configure AI scoring (AI_PROVIDER / AI_API_KEY in .env) to read photographs, or type the scores in by hand.');
+                ->with('error', 'This file type cannot be read automatically. Set up AI scoring in Settings under API to read photographs, or type the scores in by hand.');
         }
 
         return $this->processAndRedirect($import);
@@ -120,7 +121,7 @@ class ScoreImportController extends Controller
 
         $import->refresh();
 
-        if ($import->status === \App\Enums\ScoreImportStatus::Failed) {
+        if ($import->status === ScoreImportStatus::Failed) {
             return redirect()
                 ->route('admin.imports.show', $import)
                 ->with('error', $import->error);
@@ -171,7 +172,7 @@ class ScoreImportController extends Controller
     {
         $this->authorize('scores.import');
 
-        if ($import->status === \App\Enums\ScoreImportStatus::Committed) {
+        if ($import->status === ScoreImportStatus::Committed) {
             return back()->with('error', 'This import has already been committed.');
         }
 
@@ -190,15 +191,15 @@ class ScoreImportController extends Controller
         return redirect()
             ->route('admin.imports.show', $import)
             ->with('status', "{$result['written']} score(s) committed to the examination."
-                . ($result['skipped'] > 0 ? " {$result['skipped']} row(s) were skipped." : '')
-                . $tail);
+                .($result['skipped'] > 0 ? " {$result['skipped']} row(s) were skipped." : '')
+                .$tail);
     }
 
     public function destroy(ScoreImport $import): RedirectResponse
     {
         $this->authorize('scores.import');
 
-        if ($import->status === \App\Enums\ScoreImportStatus::Committed) {
+        if ($import->status === ScoreImportStatus::Committed) {
             return back()->with('error', 'Committed imports are kept for audit. Reverse the scores instead.');
         }
 

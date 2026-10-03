@@ -180,6 +180,14 @@ class AdminMenu
                         'admin.settings.update',
                         'admin.settings.sequences.update',
                         'admin.settings.academic.*',
+                        'admin.settings.api',
+                    ],
+                    'children' => [
+                        // The keys the school signs in elsewhere with. Under Settings
+                        // rather than in a section of its own: the account belongs to
+                        // the school, not to the fees desk or the results desk.
+                        ['route' => 'admin.settings.api', 'label' => 'API', 'icon' => 'key', 'can' => 'settings.manage',
+                            'matches' => ['admin.settings.api']],
                     ]],
 
                 ['route' => 'admin.activity.*', 'label' => 'Activity log', 'icon' => 'clock', 'can' => 'audit.view'],

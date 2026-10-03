@@ -54,11 +54,26 @@ class SettingsSeeder extends Seeder
             ['key' => 'signature_image', 'value' => null, 'group' => 'letters', 'type' => 'image', 'label' => 'Signature image'],
             ['key' => 'admission_letter_note', 'value' => 'This offer is subject to verification of the documents you submitted. Please bring the originals when you report.', 'group' => 'letters', 'type' => 'text', 'label' => 'Note printed at the foot of the letter'],
 
-            // Messaging
+            // Messaging — the switch only. The credentials are on the API page.
             ['key' => 'sms_enabled', 'value' => '1', 'group' => 'messaging', 'type' => 'bool', 'label' => 'Send text messages'],
-            ['key' => 'termii_api_key', 'value' => '', 'group' => 'messaging', 'label' => 'Termii API key'],
-            ['key' => 'termii_sender_id', 'value' => 'SACISCH', 'group' => 'messaging', 'label' => 'Termii sender ID'],
-            ['key' => 'termii_channel', 'value' => 'generic', 'group' => 'messaging', 'label' => 'Termii channel'],
+
+            // The school's accounts with other people, at Settings → API. Each is a
+            // card of its own, so the labels can be short: the heading says whose
+            // key it is.
+            //
+            // The Termii rows used to sit in the messaging group. Only their group
+            // changes here, which is what keeps them on the general page for an
+            // installation that already has them — the metadata below is written
+            // over rows that exist, so the move reaches them without the key itself
+            // being touched.
+            ['key' => 'paystack_public_key', 'value' => '', 'group' => 'api_paystack', 'label' => 'Public key'],
+            ['key' => 'paystack_secret_key', 'value' => '', 'group' => 'api_paystack', 'type' => 'secret', 'label' => 'Secret key'],
+            ['key' => 'termii_api_key', 'value' => '', 'group' => 'api_termii', 'type' => 'secret', 'label' => 'API key'],
+            ['key' => 'termii_sender_id', 'value' => 'SACISCH', 'group' => 'api_termii', 'label' => 'Sender ID'],
+            ['key' => 'termii_channel', 'value' => 'generic', 'group' => 'api_termii', 'label' => 'Channel'],
+            ['key' => 'ai_provider', 'value' => 'null', 'group' => 'api_deepseek', 'label' => 'Provider'],
+            ['key' => 'ai_api_key', 'value' => '', 'group' => 'api_deepseek', 'type' => 'secret', 'label' => 'API key'],
+            ['key' => 'ai_model', 'value' => '', 'group' => 'api_deepseek', 'label' => 'Model'],
 
             // Fees
             ['key' => 'currency', 'value' => 'NGN', 'group' => 'fees', 'label' => 'Currency code'],

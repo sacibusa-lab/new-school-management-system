@@ -43,6 +43,12 @@ class SettingLayout
         'messaging' => 'Text messages (SMS)',
         'fees' => 'Fees',
         'results' => 'Results',
+        // The accounts the school holds with other people. One group per
+        // provider, so each is a card of its own rather than a run of keys with
+        // somebody else's name on them — see PAGES for the page they share.
+        'api_paystack' => 'Paystack — fees collection',
+        'api_termii' => 'Termii — text messages',
+        'api_deepseek' => 'DeepSeek — reading scoresheets',
         'general' => 'General',
     ];
 
@@ -54,11 +60,19 @@ class SettingLayout
      * letter it will send. On one long page that is something to scroll past on the
      * way to the school's logo, which is how the office found it.
      *
+     * The API keys are the other page. They are not a setting the office changes
+     * as it goes about the day — they are set once, when the school opens its
+     * account with a provider, and then not looked at again. Kept on the general
+     * page they were three company names to scroll past to reach the school's own
+     * logo, and the switch that turns text messages ON is not the same idea as the
+     * key that makes them send.
+     *
      * A group not named here — including one this file has never heard of — belongs
      * to the general page, so nothing can be saved into invisibility.
      */
     public const PAGES = [
         'admissions' => ['admissions', 'letters'],
+        'api' => ['api_paystack', 'api_termii', 'api_deepseek'],
     ];
 
     /**
@@ -113,11 +127,29 @@ class SettingLayout
             'admission_letter_note',
         ],
 
+        // Only the switch. Termii's credentials live on the API page now — a
+        // setting has one home, or it sooner or later has two values.
         'messaging' => [
             'sms_enabled',
+        ],
+
+        // Each provider reads the way it is set up: what the school is given to
+        // identify it, then the secret that proves it.
+        'api_paystack' => [
+            'paystack_public_key',
+            'paystack_secret_key',
+        ],
+
+        'api_termii' => [
+            'termii_api_key',
             'termii_sender_id',
             'termii_channel',
-            'termii_api_key',
+        ],
+
+        'api_deepseek' => [
+            'ai_provider',
+            'ai_api_key',
+            'ai_model',
         ],
 
         'fees' => [

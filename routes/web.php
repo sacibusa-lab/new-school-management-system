@@ -411,6 +411,9 @@ Route::middleware('auth')
         // the same route as the rest: a setting is a setting wherever it is drawn.
         Route::get('settings/admissions', [SettingController::class, 'admissions'])->name('settings.admissions');
 
+        // The accounts the school holds elsewhere — Paystack, Termii, DeepSeek.
+        Route::get('settings/api', [SettingController::class, 'api'])->name('settings.api');
+
         Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
         Route::post('settings/sequences', [SettingController::class, 'updateSequence'])->name('settings.sequences.update');
 

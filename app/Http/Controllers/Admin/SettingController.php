@@ -79,6 +79,35 @@ class SettingController extends Controller
         ]);
     }
 
+    /**
+     * The school's accounts with other people, on a page of their own.
+     *
+     * Paystack to collect fees, Termii to send a text message, DeepSeek to read a
+     * scoresheet that has been photographed. Three cards, one page, and the same
+     * form and the same route that saves every other setting: a setting is a
+     * setting, and which page it was drawn on makes no difference to how it is
+     * written. Which groups are drawn here is SettingLayout's to say.
+     */
+    public function api(NumberSequenceService $sequences): View
+    {
+        $this->authorize('settings.manage');
+
+        return view('admin.settings.api', [
+            'groups' => SettingLayout::arrange(
+                Setting::query()->orderBy('key')->get()->groupBy('group'),
+                'api',
+            ),
+            // The numbering fields' hints are drawn by the same shared partial, so
+            // it is handed the previews even though none of these groups has one.
+            'previews' => [
+                'admission' => $sequences->preview(SequenceType::AdmissionRegistration),
+                'student' => $sequences->preview(SequenceType::StudentNumber),
+                'invoice' => $sequences->preview(SequenceType::Invoice),
+                'receipt' => $sequences->preview(SequenceType::Receipt),
+            ],
+        ]);
+    }
+
     public function update(Request $request, BrandingService $branding): RedirectResponse
     {
         $this->authorize('settings.manage');

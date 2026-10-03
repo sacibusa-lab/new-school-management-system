@@ -5,6 +5,7 @@ namespace App\Services\Import;
 use App\Contracts\ScoresheetExtractor;
 use App\Enums\ImportDriver;
 use App\Exceptions\ScoresheetExtractionException;
+use App\Models\Setting;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -41,7 +42,7 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
 
     public function isConfigured(): bool
     {
-        return $this->provider() !== null && filled(config('saci.ai.key'));
+        return $this->provider() !== null && filled($this->apiKey());
     }
 
     public function supports(string $mimeType, string $extension): bool
@@ -69,6 +70,7 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
         $payload = match ($this->provider()) {
             'gemini' => $this->callGemini($base64, $mimeType, $prompt),
             'openai' => $this->callOpenAi($base64, $mimeType, $prompt),
+            'deepseek' => $this->callDeepSeek($base64, $mimeType, $prompt),
             default => throw ScoresheetExtractionException::notConfigured(),
         };
 
@@ -77,13 +79,40 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
 
     protected function provider(): ?string
     {
-        $provider = strtolower(trim((string) config('saci.ai.provider', 'null')));
+        $provider = strtolower(trim((string) $this->setting('ai_provider', 'provider', 'null')));
 
-        return in_array($provider, ['gemini', 'openai'], true) ? $provider : null;
+        return in_array($provider, ['gemini', 'openai', 'deepseek'], true) ? $provider : null;
+    }
+
+    /**
+     * The provider → key → model the school set on Settings → API, falling back
+     * to the environment.
+     *
+     * These lived only in `.env`, which meant the office could see the scoresheet
+     * reader and had no way to switch it on — that took somebody who could edit a
+     * file on the server. The page is what the school sets now; `.env` still works
+     * for an installation that was configured that way, and a field left empty on
+     * the page falls back rather than meaning "use no key".
+     */
+    protected function setting(string $settingKey, string $configKey, mixed $fallback): mixed
+    {
+        $value = Setting::get($settingKey);
+
+        return filled($value) ? $value : config("saci.ai.{$configKey}", $fallback);
+    }
+
+    protected function apiKey(): string
+    {
+        return (string) $this->setting('ai_api_key', 'key', '');
+    }
+
+    protected function model(string $default): string
+    {
+        return (string) $this->setting('ai_model', 'model', '') ?: $default;
     }
 
     /* ------------------------------------------------------------------ */
-    /* Prompting                                                           */
+    /* Prompting */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -100,7 +129,7 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
         if (! empty($registrations)) {
             $list = implode(', ', array_slice($registrations, 0, 200));
             $roster = "\n\nThese are the valid registration numbers for this examination. "
-                . "Use them to correct any misread digits:\n{$list}";
+                ."Use them to correct any misread digits:\n{$list}";
         }
 
         return <<<PROMPT
@@ -135,7 +164,7 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
     }
 
     /* ------------------------------------------------------------------ */
-    /* Providers                                                           */
+    /* Providers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -143,12 +172,12 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
      */
     protected function callGemini(string $base64, string $mimeType, string $prompt): array
     {
-        $model = config('saci.ai.model', 'gemini-2.5-flash');
+        $model = $this->model('gemini-2.5-flash');
         $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
 
         try {
             $response = Http::timeout((int) config('saci.ai.timeout', 120))
-                ->withQueryParameters(['key' => config('saci.ai.key')])
+                ->withQueryParameters(['key' => $this->apiKey()])
                 ->post($endpoint, [
                     'contents' => [[
                         'parts' => [
@@ -184,17 +213,63 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
     }
 
     /**
+     * OpenAI, over its own endpoint.
+     *
      * @return array<string,mixed>
      */
     protected function callOpenAi(string $base64, string $mimeType, string $prompt): array
     {
-        $model = config('saci.ai.model', 'gpt-4.1-mini');
+        return $this->callOpenAiCompatible(
+            'OpenAI',
+            'https://api.openai.com/v1/chat/completions',
+            'gpt-4.1-mini',
+            $base64,
+            $mimeType,
+            $prompt,
+        );
+    }
 
+    /**
+     * DeepSeek, over the same shape of request as OpenAI.
+     *
+     * One thing to know before switching to it: DeepSeek's published chat models
+     * are text-only, so a photographed sheet may be refused outright. Whatever the
+     * provider says about that is what comes back here and what the office is
+     * shown — a refusal is never quietly turned into "no rows found".
+     *
+     * @return array<string,mixed>
+     */
+    protected function callDeepSeek(string $base64, string $mimeType, string $prompt): array
+    {
+        return $this->callOpenAiCompatible(
+            'DeepSeek',
+            'https://api.deepseek.com/chat/completions',
+            'deepseek-chat',
+            $base64,
+            $mimeType,
+            $prompt,
+        );
+    }
+
+    /**
+     * The request both of the above send: a chat completion carrying the picture,
+     * which is the shape OpenAI and DeepSeek both accept.
+     *
+     * @return array<string,mixed>
+     */
+    protected function callOpenAiCompatible(
+        string $provider,
+        string $endpoint,
+        string $defaultModel,
+        string $base64,
+        string $mimeType,
+        string $prompt,
+    ): array {
         try {
-            $response = Http::withToken((string) config('saci.ai.key'))
+            $response = Http::withToken($this->apiKey())
                 ->timeout((int) config('saci.ai.timeout', 120))
-                ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => $model,
+                ->post($endpoint, [
+                    'model' => $this->model($defaultModel),
                     'temperature' => 0,
                     'response_format' => ['type' => 'json_object'],
                     'messages' => [[
@@ -208,14 +283,14 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
                     ]],
                 ]);
         } catch (ConnectionException) {
-            throw ScoresheetExtractionException::providerFailed('OpenAI', 'the request timed out.');
+            throw ScoresheetExtractionException::providerFailed($provider, 'the request timed out.');
         }
 
         if ($response->failed()) {
-            Log::warning('OpenAI scoresheet extraction failed', ['body' => $response->body()]);
+            Log::warning("{$provider} scoresheet extraction failed", ['body' => $response->body()]);
 
             throw ScoresheetExtractionException::providerFailed(
-                'OpenAI',
+                $provider,
                 $response->json('error.message') ?? "HTTP {$response->status()}",
             );
         }
@@ -223,14 +298,14 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
         $text = $response->json('choices.0.message.content');
 
         if (! is_string($text) || trim($text) === '') {
-            throw ScoresheetExtractionException::unreadableResponse('OpenAI');
+            throw ScoresheetExtractionException::unreadableResponse($provider);
         }
 
-        return $this->decodeJson($text, 'OpenAI');
+        return $this->decodeJson($text, $provider);
     }
 
     /* ------------------------------------------------------------------ */
-    /* Parsing                                                             */
+    /* Parsing */
     /* ------------------------------------------------------------------ */
 
     /**

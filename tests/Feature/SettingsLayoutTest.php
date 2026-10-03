@@ -63,7 +63,7 @@ class SettingsLayoutTest extends TestCase
         $drawn = array_column(SettingLayout::arrange($settings), 'key');
 
         $this->assertSame(
-            ['branding', 'numbering', 'admissions', 'letters', 'messaging', 'fees', 'results'],
+            ['branding', 'numbering', 'admissions', 'letters', 'messaging', 'fees', 'results', 'api_paystack', 'api_termii', 'api_deepseek'],
             $drawn,
             'The groups are out of order. A new group has to be placed in SettingLayout::GROUPS.',
         );
@@ -111,6 +111,64 @@ class SettingsLayoutTest extends TestCase
         // And the other way about: the school's own settings stayed where they were.
         $this->assertStringContainsString('settings[school_name]', $general);
         $this->assertStringNotContainsString('settings[school_name]', $admissions);
+    }
+
+    /**
+     * The school's accounts elsewhere are a sitting's work of their own, and they
+     * are not among the school's own settings: whoever changes the school's phone
+     * number has no business scrolling past a secret key to do it.
+     */
+    public function test_the_api_keys_are_on_a_page_of_their_own(): void
+    {
+        $this->assertSame([
+            'Paystack — fees collection',
+            'Termii — text messages',
+            'DeepSeek — reading scoresheets',
+        ], $this->headingsOn('admin.settings.api'));
+
+        $general = $this->headingsOn('admin.settings.index');
+
+        // The switch that turns text messages on is not a credential, so it stayed
+        // behind where the office can reach it without going past a key.
+        $this->assertContains('Text messages (SMS)', $general);
+
+        // And the keys are not drawn on the general page as well: a setting with two
+        // homes is a setting that will sooner or later have two values.
+        $this->assertNotContains('Paystack — fees collection', $general);
+        $this->assertNotContains('Termii — text messages', $general);
+        $this->assertNotContains('DeepSeek — reading scoresheets', $general);
+    }
+
+    public function test_the_general_page_no_longer_carries_the_api_keys(): void
+    {
+        $general = $this->htmlOn('admin.settings.index');
+
+        foreach (['settings[paystack_public_key]', 'settings[paystack_secret_key]', 'settings[termii_api_key]', 'settings[termii_sender_id]', 'settings[ai_provider]', 'settings[ai_api_key]', 'settings[ai_model]'] as $field) {
+            $this->assertSame(
+                0,
+                substr_count($general, $field),
+                "{$field} is still drawn on the general settings page.",
+            );
+        }
+    }
+
+    /**
+     * Counted rather than compared: a page of settings is sixty kilobytes of HTML,
+     * and a failure that prints all of it is a failure nobody reads.
+     */
+    private function htmlOn(string $route): string
+    {
+        return $this->actingAs($this->admin)->get(route($route))->assertOk()->getContent();
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function headingsOn(string $route): array
+    {
+        preg_match_all('/<h2 class="text-base font-semibold[^"]*">\s*([^<]+?)\s*<\/h2>/s', $this->htmlOn($route), $matches);
+
+        return array_values(array_filter(array_map('trim', $matches[1])));
     }
 
     /** The groups keep the order they are declared in, whatever page they are on. */
@@ -239,6 +297,9 @@ class SettingsLayoutTest extends TestCase
         $pages = [
             route('admin.settings.index'),
             route('admin.settings.admissions'),
+            // The school's accounts with other people are set up here, and this test
+            // is what catches a setting saved into a page nobody draws.
+            route('admin.settings.api'),
         ];
 
         $html = '';

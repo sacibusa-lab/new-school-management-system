@@ -102,17 +102,17 @@
 
             <p class="mt-2 text-sm text-ink-soft">
                 @if ($configured)
-                    The key, sender ID and channel live in Settings under <strong>Messaging</strong>.
+                    The key, sender ID and channel live in Settings under <strong>API</strong>.
                     Changing them there takes effect immediately — nothing needs restarting.
                 @else
                     Messages are being simulated, not sent. Add the Termii API key in Settings under
-                    <strong>Messaging</strong> to start sending for real.
+                    <strong>API</strong> to start sending for real.
                 @endif
             </p>
 
             @can('settings.manage')
-                <a href="{{ route('admin.settings.index') }}" class="btn-secondary btn-sm mt-4">
-                    Open Settings
+                <a href="{{ route('admin.settings.api') }}" class="btn-secondary btn-sm mt-4">
+                    Open API settings
                 </a>
             @endcan
         </div>

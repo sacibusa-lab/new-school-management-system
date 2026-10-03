@@ -54,6 +54,8 @@ class BreadcrumbTest extends TestCase
             'admin.settings.index' => ['Administration', 'Settings'],
             // Its own place in the menu, in the section it belongs to.
             'admin.settings.admissions' => ['Admissions', 'Admissions settings'],
+            // A page that hangs off Settings, so Settings is named on the way to it.
+            'admin.settings.api' => ['Administration', 'Settings', 'API'],
             'admin.students-results.academics.classes' => ['Students & Results', 'Academic', 'Classes & Sections'],
             // A section of the module with a page of its own, and two pages under it.
             'admin.students-results.teachers' => ['Students & Results', 'Teachers'],

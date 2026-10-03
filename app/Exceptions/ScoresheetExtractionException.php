@@ -10,8 +10,8 @@ class ScoresheetExtractionException extends RuntimeException
     {
         return new self(
             'AI scoresheet reading is not configured yet. '
-            . 'Set AI_PROVIDER and AI_API_KEY in your .env file, then try again. '
-            . 'Excel and CSV uploads work without any configuration.'
+            .'Set the provider and key in Settings under API, then try again. '
+            .'Excel and CSV uploads work without any configuration.'
         );
     }
 

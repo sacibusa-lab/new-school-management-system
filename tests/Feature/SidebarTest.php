@@ -56,6 +56,8 @@ class SidebarTest extends TestCase
             // Settings is the general page, and the admissions settings hang off it.
             'admin.settings.index' => 'admin.settings.index',
             'admin.settings.admissions' => 'admin.settings.admissions',
+            // The child where the page hangs off one: API is the page, not Settings.
+            'admin.settings.api' => 'admin.settings.api',
             'admin.admissions.printing' => 'admin.admissions.printing',
         ];
 

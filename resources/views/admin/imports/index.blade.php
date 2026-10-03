@@ -107,9 +107,12 @@
                     @else
                         <p class="mt-1.5 text-sm text-ink-soft">
                             Excel and CSV uploads work right now. To read photographs of
-                            hand-marked sheets, set <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-xs ring-1 ring-line">AI_PROVIDER</code>
-                            and <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-xs ring-1 ring-line">AI_API_KEY</code>
-                            in your <code class="font-mono text-xs">.env</code> file.
+                            hand-marked sheets, a key for an AI provider has to be set up
+                            @can('settings.manage')
+                                in <a href="{{ route('admin.settings.api') }}" class="font-medium underline decoration-dotted">Settings → API</a>.
+                            @else
+                                — ask an administrator to set one up in Settings → API.
+                            @endcan
                         </p>
                     @endif
                 </div>
