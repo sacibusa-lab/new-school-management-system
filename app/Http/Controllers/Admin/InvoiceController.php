@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\FeeStructure;
 use App\Models\Invoice;
 use App\Models\SchoolClass;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Services\Fees\InvoiceGenerationService;
 use Illuminate\Http\RedirectResponse;
@@ -18,8 +20,7 @@ class InvoiceController extends Controller
 {
     public function __construct(
         private readonly InvoiceGenerationService $invoices,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -30,7 +31,7 @@ class InvoiceController extends Controller
         $invoices = Invoice::query()
             ->with(['student.level', 'student.schoolClass', 'term'])
             ->when($request->filled('q'), function ($q) use ($request) {
-                $term = '%' . trim($request->string('q')->toString()) . '%';
+                $term = '%'.trim($request->string('q')->toString()).'%';
 
                 $q->where(function ($inner) use ($term) {
                     $inner->where('invoice_number', 'like', $term)
@@ -59,8 +60,17 @@ class InvoiceController extends Controller
             'statuses' => InvoiceStatus::options(),
             'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
             'classes' => SchoolClass::query()->where('is_active', true)->with('level')->orderBy('name')->get(),
-            'currency' => \App\Models\Setting::get('currency_symbol', '₦'),
+            'currency' => Setting::get('currency_symbol', '₦'),
             'session' => $session,
+            // Only for the single-student form at the foot of the page. Billing a whole
+            // year group is done from its fee structure; this is for the exceptions, so
+            // the picker holds the students who are on the roll now.
+            'students' => Student::query()
+                ->when($session, fn ($q) => $q->where('academic_session_id', $session->id))
+                ->where('status', StudentStatus::Active->value)
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->get(),
         ]);
     }
 
@@ -68,14 +78,16 @@ class InvoiceController extends Controller
     {
         $this->authorize('fees.view');
 
+        // No `term.academicSession`: a term is universal and belongs to every session,
+        // so the session is named by the invoice itself, not by the term under it.
         $invoice->load([
-            'student.level', 'student.schoolClass', 'term.academicSession',
+            'student.level', 'student.schoolClass', 'term',
             'items.category', 'payments.recorder', 'feeStructure',
         ]);
 
         return view('admin.invoices.show', [
             'invoice' => $invoice,
-            'currency' => \App\Models\Setting::get('currency_symbol', '₦'),
+            'currency' => Setting::get('currency_symbol', '₦'),
         ]);
     }
 

@@ -19,8 +19,7 @@ class PaymentController extends Controller
     public function __construct(
         private readonly NumberSequenceService $sequences,
         private readonly SmsNotifier $sms,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -30,7 +29,7 @@ class PaymentController extends Controller
             'payments' => Payment::query()
                 ->with(['student.level', 'invoice', 'recorder'])
                 ->when($request->filled('q'), function ($q) use ($request) {
-                    $term = '%' . trim($request->string('q')->toString()) . '%';
+                    $term = '%'.trim($request->string('q')->toString()).'%';
 
                     $q->where(function ($inner) use ($term) {
                         $inner->where('receipt_number', 'like', $term)
@@ -120,7 +119,7 @@ class PaymentController extends Controller
 
         abort_unless($payment->invoice_id === $invoice->id, 404);
 
-        $invoice->load(['student.level', 'student.schoolClass', 'term.academicSession']);
+        $invoice->load(['student.level', 'student.schoolClass', 'term']);
         $payment->load('recorder');
 
         return view('admin.invoices.receipt', [
@@ -145,7 +144,7 @@ class PaymentController extends Controller
         DB::transaction(function () use ($payment, $validated) {
             $payment->update([
                 'status' => PaymentStatus::Reversed,
-                'notes' => trim(($payment->notes ? $payment->notes . ' | ' : '') . 'Reversed: ' . $validated['reason']),
+                'notes' => trim(($payment->notes ? $payment->notes.' | ' : '').'Reversed: '.$validated['reason']),
             ]);
 
             $payment->invoice?->recalculate();
