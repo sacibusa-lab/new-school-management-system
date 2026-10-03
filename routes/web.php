@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\ClassSectionReportController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ExamController;
 use App\Http\Controllers\Admin\FeeController;
+use App\Http\Controllers\Admin\FeesPaymentsController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PrintingController;
@@ -445,6 +446,11 @@ Route::middleware('auth')
         Route::get('sms/templates', [SmsController::class, 'templates'])->name('sms.templates');
         Route::put('sms/templates/{smsTemplate}', [SmsController::class, 'updateTemplate'])->name('sms.templates.update');
         Route::post('sms/templates/{smsTemplate}/reset', [SmsController::class, 'resetTemplate'])->name('sms.templates.reset');
+
+        // The two screens the Fees & Payments banner owns itself: its dashboard, and the
+        // students read by what they owe.
+        Route::get('fees-payments/dashboard', [FeesPaymentsController::class, 'dashboard'])->name('fees-payments.dashboard');
+        Route::get('fees-payments/students-hub', [FeesPaymentsController::class, 'studentsHub'])->name('fees-payments.students-hub');
 
         /* ---------------- Business ---------------- */
         // The school's own accounts, which are what a letter names — as against the

@@ -235,11 +235,11 @@ class PaymentController extends Controller
      * @var array<int,array{key:string,label:string,icon:string,permission:string}>
      */
     public const PAGES = [
-        ['key' => 'overview', 'label' => 'Payments Overview', 'icon' => 'chart', 'permission' => 'fees.view'],
+        ['key' => 'overview', 'label' => 'Overview', 'icon' => 'chart', 'permission' => 'fees.view'],
         ['key' => 'schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar', 'permission' => 'fees.view'],
         ['key' => 'gateway', 'label' => 'Gateway', 'icon' => 'key', 'permission' => 'fees.manage'],
         ['key' => 'settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'permission' => 'fees.view'],
-        ['key' => 'reports', 'label' => 'Collection Reports', 'icon' => 'report', 'permission' => 'fees.reports'],
+        ['key' => 'reports', 'label' => 'Reports', 'icon' => 'report', 'permission' => 'fees.reports'],
         ['key' => 'installments', 'label' => 'Installments', 'icon' => 'list', 'permission' => 'fees.view'],
     ];
 }

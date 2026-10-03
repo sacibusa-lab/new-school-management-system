@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\FeesPaymentsController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Models\Setting;
 use App\Models\User;
@@ -86,6 +87,41 @@ class PaymentScreensTest extends TestCase
             $this->actingAs($student)
                 ->get(route('admin.payments.'.$page['key']))
                 ->assertForbidden();
+        }
+    }
+
+    /**
+     * The banner owns two screens of its own: a dashboard for the money, and a hub for
+     * the students read by what they owe. Neither belongs to the fees desk or the
+     * collection desk, which is why they hang off neither of them.
+     */
+    public function test_the_section_has_its_own_dashboard_and_students_hub(): void
+    {
+        foreach (FeesPaymentsController::PAGES as $page) {
+            $this->actingAs($this->admin)
+                ->get(route('admin.fees-payments.'.$page['key']))
+                ->assertOk()
+                ->assertSee($page['label']);
+        }
+    }
+
+    /**
+     * The five groups the office asked for, all reachable from the sidebar: the two the
+     * section owns, the fees, the collection, and what students are let off.
+     */
+    public function test_the_banner_holds_the_five_groups_the_office_asked_for(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.payments.index'))->assertOk()->getContent();
+
+        foreach ([
+            route('admin.fees-payments.dashboard'),
+            route('admin.fees-payments.students-hub'),
+            route('admin.fees.structures.index'),
+            route('admin.payments.overview'),
+            route('admin.fees.scholarships.index'),
+        ] as $href) {
+            $this->assertStringContainsString($href, $html, "The banner does not offer {$href}.");
         }
     }
 }

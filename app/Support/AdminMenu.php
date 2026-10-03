@@ -159,46 +159,63 @@ class AdminMenu
             // nobody should have to work out whether the receipt for what a parent just
             // paid is a Fees page or a Payments page.
             //
-            // Two of the fee site's own labels are a little longer here than they are
-            // there: Overview and Reports were clear under a heading that said Payments,
-            // and this heading says more than that.
+            // Under it, the five things the office asked for: the section's own dashboard,
+            // the students read by what they owe, the fees themselves, the collection, and
+            // what students are let off. Fees and Payments are headings with their pages
+            // under them, so the sidebar stays five lines rather than twelve.
             'Fees & Payments' => [
-                // What is billed, and what is taken off it.
-                ['route' => 'admin.fees.categories.*', 'label' => 'Fee categories', 'icon' => 'tag', 'can' => 'fees.manage'],
-                ['route' => 'admin.fees.structures.*', 'label' => 'Fee structures', 'icon' => 'list', 'can' => 'fees.manage'],
-                ['route' => 'admin.invoices.*', 'label' => 'Invoices', 'icon' => 'receipt', 'can' => 'fees.view'],
+                ['route' => 'admin.fees-payments.dashboard', 'label' => 'Dashboard', 'icon' => 'grid', 'can' => 'fees.view',
+                    'matches' => ['admin.fees-payments.dashboard']],
+
+                // The fees desk's view of the school: who owes what, by class. Deliberately
+                // not the register under Students & Results, which is the academic one —
+                // reading a class's fees and reading its names are two different jobs.
+                ['route' => 'admin.fees-payments.students-hub', 'label' => 'Students Hub', 'icon' => 'users', 'can' => 'fees.view',
+                    'matches' => ['admin.fees-payments.students-hub']],
+
+                // What is billed, and what it is made of. The entry's own page is the
+                // structures — that is where a bill is priced, and it is the fee site's
+                // own /fees screen — so the two pages beneath it are the other two.
+                //
+                // A child has to be a plain route name: the sidebar links to it with
+                // route(), which a `*` would send looking for a route that does not
+                // exist. Only the parent's `matches` takes a wildcard.
+                ['route' => 'admin.fees.structures.*', 'label' => 'Fees', 'icon' => 'tag', 'can' => 'fees.manage',
+                    'matches' => ['admin.fees.categories.*', 'admin.fees.structures.*', 'admin.invoices.*'],
+                    'children' => [
+                        ['route' => 'admin.fees.categories.index', 'label' => 'Fee categories', 'icon' => 'tag'],
+                        ['route' => 'admin.invoices.index', 'label' => 'Invoices', 'icon' => 'receipt'],
+                    ]],
+
+                // The money coming in, in the fee site's order. The entry's own page is
+                // the register — the day book the bursar works in — and the pages beneath
+                // it are the rest of the collection. `matches` is spelled out because the
+                // sidebar draws a submenu only for the entry it calls active: every one of
+                // these pages has to leave Payments looking open.
+                ['route' => 'admin.payments.index', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view',
+                    'matches' => [
+                        'admin.payments.index',
+                        'admin.payments.reverse',
+                        'admin.payments.overview',
+                        'admin.payments.schedule',
+                        'admin.payments.gateway',
+                        'admin.payments.bulk-ops',
+                        'admin.payments.bulk-ops.generate',
+                        'admin.payments.settlements',
+                        'admin.payments.reports',
+                        'admin.payments.installments',
+                    ],
+                    'children' => [
+                        ['route' => 'admin.payments.overview', 'label' => 'Overview', 'icon' => 'chart'],
+                        ['route' => 'admin.payments.schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar'],
+                        ['route' => 'admin.payments.gateway', 'label' => 'Gateway', 'icon' => 'key'],
+                        ['route' => 'admin.payments.bulk-ops', 'label' => 'Bulk Ops', 'icon' => 'plus'],
+                        ['route' => 'admin.payments.settlements', 'label' => 'Settlement', 'icon' => 'briefcase'],
+                        ['route' => 'admin.payments.reports', 'label' => 'Reports', 'icon' => 'report'],
+                        ['route' => 'admin.payments.installments', 'label' => 'Installments', 'icon' => 'list'],
+                    ]],
+
                 ['route' => 'admin.fees.scholarships.*', 'label' => 'Scholarships', 'icon' => 'rosette', 'can' => 'fees.manage'],
-
-                // Then the money coming in, in the order the school's own fees site has
-                // it. The register that used to sit under Fees is Transactions — the
-                // same page, under the name the fee site gives it.
-                ['route' => 'admin.payments.overview', 'label' => 'Payments Overview', 'icon' => 'chart', 'can' => 'fees.view',
-                    'matches' => ['admin.payments.overview']],
-
-                ['route' => 'admin.payments.schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar', 'can' => 'fees.view',
-                    'matches' => ['admin.payments.schedule']],
-
-                // Spelled out rather than left as admin.payments.*, which would light
-                // this up on every other page of the section.
-                ['route' => 'admin.payments.index', 'label' => 'Transactions', 'icon' => 'cash', 'can' => 'fees.view',
-                    'matches' => ['admin.payments.index', 'admin.payments.reverse']],
-
-                ['route' => 'admin.payments.gateway', 'label' => 'Gateway', 'icon' => 'key', 'can' => 'fees.manage',
-                    'matches' => ['admin.payments.gateway']],
-
-                // Giving a class their account numbers in one go — what the Gateway page
-                // watches over.
-                ['route' => 'admin.payments.bulk-ops', 'label' => 'Bulk Ops', 'icon' => 'plus', 'can' => 'fees.manage',
-                    'matches' => ['admin.payments.bulk-ops', 'admin.payments.bulk-ops.generate']],
-
-                ['route' => 'admin.payments.settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'can' => 'fees.view',
-                    'matches' => ['admin.payments.settlements']],
-
-                ['route' => 'admin.payments.reports', 'label' => 'Collection Reports', 'icon' => 'report', 'can' => 'fees.reports',
-                    'matches' => ['admin.payments.reports']],
-
-                ['route' => 'admin.payments.installments', 'label' => 'Installments', 'icon' => 'list', 'can' => 'fees.view',
-                    'matches' => ['admin.payments.installments']],
             ],
             // The school's own money: the accounts fees are paid into. Taken from the
             // fee site's own section, which is where the office expects to find it.
