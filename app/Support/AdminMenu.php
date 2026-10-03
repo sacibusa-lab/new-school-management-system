@@ -187,32 +187,32 @@ class AdminMenu
                         ['route' => 'admin.invoices.index', 'label' => 'Invoices', 'icon' => 'receipt'],
                     ]],
 
-                // The money coming in, in the fee site's order. The entry's own page is
-                // the register — the day book the bursar works in — and the pages beneath
-                // it are the rest of the collection. `matches` is spelled out because the
-                // sidebar draws a submenu only for the entry it calls active: every one of
-                // these pages has to leave Payments looking open.
+                // The money coming in: the entry's own page is the register — the day book
+                // the bursar works in — and the three beneath it are the rest of the
+                // collection. `matches` is spelled out because the sidebar draws a submenu
+                // only for the entry it calls active: every one of these pages has to leave
+                // Payments looking open.
+                //
+                // Gateway and Installments were here and have gone. Neither had a page:
+                // they were two of the screens saying what would be on them, and the office
+                // did not ask for either. Bulk Ops has gone with them but is not gone — it
+                // is a working page, and it belongs with the students it moves rather than
+                // with the money. It answers at /admin/payments/bulk-ops until it is given
+                // a home under Students & Results.
                 ['route' => 'admin.payments.index', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view',
                     'matches' => [
                         'admin.payments.index',
                         'admin.payments.reverse',
                         'admin.payments.overview',
                         'admin.payments.schedule',
-                        'admin.payments.gateway',
-                        'admin.payments.bulk-ops',
-                        'admin.payments.bulk-ops.generate',
                         'admin.payments.settlements',
                         'admin.payments.reports',
-                        'admin.payments.installments',
                     ],
                     'children' => [
                         ['route' => 'admin.payments.overview', 'label' => 'Overview', 'icon' => 'chart'],
                         ['route' => 'admin.payments.schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar'],
-                        ['route' => 'admin.payments.gateway', 'label' => 'Gateway', 'icon' => 'key'],
-                        ['route' => 'admin.payments.bulk-ops', 'label' => 'Bulk Ops', 'icon' => 'plus'],
                         ['route' => 'admin.payments.settlements', 'label' => 'Settlement', 'icon' => 'briefcase'],
                         ['route' => 'admin.payments.reports', 'label' => 'Reports', 'icon' => 'report'],
-                        ['route' => 'admin.payments.installments', 'label' => 'Installments', 'icon' => 'list'],
                     ]],
 
                 ['route' => 'admin.fees.scholarships.*', 'label' => 'Scholarships', 'icon' => 'rosette', 'can' => 'fees.manage'],

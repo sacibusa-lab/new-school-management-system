@@ -417,10 +417,8 @@ Route::middleware('auth')
         // errors.
         Route::get('payments/overview', [PaymentController::class, 'overview'])->name('payments.overview');
         Route::get('payments/schedule', [PaymentController::class, 'schedule'])->name('payments.schedule');
-        Route::get('payments/gateway', [PaymentController::class, 'gateway'])->name('payments.gateway');
         Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
         Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
-        Route::get('payments/installments', [PaymentController::class, 'installments'])->name('payments.installments');
 
         // Opening account numbers for a class at a time, rather than one child at a time.
         Route::get('payments/bulk-ops', [BulkOperationController::class, 'index'])->name('payments.bulk-ops');

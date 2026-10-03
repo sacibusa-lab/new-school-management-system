@@ -174,15 +174,6 @@ class PaymentController extends Controller
     }
 
     /**
-     * The school's Paystack account: the keys, the accounts issued, and whether the
-     * webhook is being heard.
-     */
-    public function gateway(): View
-    {
-        return $this->placeholder('gateway');
-    }
-
-    /**
      * What Paystack has actually paid out to the school's bank, and when.
      */
     public function settlements(): View
@@ -196,14 +187,6 @@ class PaymentController extends Controller
     public function reports(): View
     {
         return $this->placeholder('reports');
-    }
-
-    /**
-     * Students paying in instalments rather than in one go.
-     */
-    public function installments(): View
-    {
-        return $this->placeholder('installments');
     }
 
     /**
@@ -237,9 +220,7 @@ class PaymentController extends Controller
     public const PAGES = [
         ['key' => 'overview', 'label' => 'Overview', 'icon' => 'chart', 'permission' => 'fees.view'],
         ['key' => 'schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar', 'permission' => 'fees.view'],
-        ['key' => 'gateway', 'label' => 'Gateway', 'icon' => 'key', 'permission' => 'fees.manage'],
         ['key' => 'settlements', 'label' => 'Settlements', 'icon' => 'briefcase', 'permission' => 'fees.view'],
         ['key' => 'reports', 'label' => 'Reports', 'icon' => 'report', 'permission' => 'fees.reports'],
-        ['key' => 'installments', 'label' => 'Installments', 'icon' => 'list', 'permission' => 'fees.view'],
     ];
 }
