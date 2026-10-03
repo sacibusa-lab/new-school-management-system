@@ -193,12 +193,13 @@ class AdminMenu
                 // only for the entry it calls active: every one of these pages has to leave
                 // Payments looking open.
                 //
-                // Gateway and Installments were here and have gone. Neither had a page:
-                // they were two of the screens saying what would be on them, and the office
-                // did not ask for either. Bulk Ops has gone with them but is not gone — it
-                // is a working page, and it belongs with the students it moves rather than
-                // with the money. It answers at /admin/payments/bulk-ops until it is given
-                // a home under Students & Results.
+                // Gateway, Installments and Bulk Ops were all here and have gone. The
+                // first two never had a page — they were screens saying what would be on
+                // them, and the office did not ask for either. Bulk Ops was a working
+                // page, but the school already has its bulk operations under Students &
+                // Results, and fees follow the child: when a student is promoted their
+                // history and their money go with them, so there is nothing for a
+                // fee-side office to do in bulk.
                 ['route' => 'admin.payments.index', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view',
                     'matches' => [
                         'admin.payments.index',

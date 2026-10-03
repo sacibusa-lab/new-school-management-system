@@ -2,13 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Enums\StudentStatus;
 use App\Models\AcademicSession;
 use App\Models\BankAccount;
 use App\Models\SchoolLevel;
 use App\Models\Setting;
-use App\Models\Student;
-use App\Models\StudentVirtualAccount;
 use App\Models\Term;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -18,13 +15,12 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * The school's own bank accounts, and giving a class their account numbers.
+ * The school's own bank accounts.
  *
- * Both are about account numbers, and both are places where a wrong digit is money
- * that never arrives: one holds the numbers the school is paid into, the other opens
- * a number per child. So the tests are about the checks — the number put to the bank
- * before it is saved, one main account rather than two, and a bulk run that skips the
- * children who already have one.
+ * These hold the numbers the school is paid into, and a wrong digit is money that
+ * never arrives. So the tests are about the checks: the number put to the bank before
+ * it is saved, one main account rather than two, and a name that has to be typed in
+ * when there is no key to ask the bank with.
  */
 class CollectionToolsTest extends TestCase
 {
@@ -154,55 +150,6 @@ class CollectionToolsTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
-    /* Giving a class their account numbers */
-    /* ------------------------------------------------------------------ */
-
-    public function test_a_class_is_given_account_numbers_in_one_run(): void
-    {
-        $this->fakePaystack();
-
-        $this->student('SAC/2026/9001');
-        $this->student('SAC/2026/9002');
-        $withAccount = $this->student('SAC/2026/9003');
-
-        // Somebody who already has one must keep the number their parent saved.
-        StudentVirtualAccount::create([
-            'student_id' => $withAccount->id,
-            'customer_code' => 'CUS_existing',
-            'bank_name' => 'Wema Bank',
-            'account_number' => '1111111111',
-            'account_name' => 'SACI SCHOOLS - EXISTING',
-            'provider' => 'paystack',
-            'is_active' => true,
-        ]);
-
-        $this->actingAs($this->admin)
-            ->post(route('admin.payments.bulk-ops.generate'), ['level' => $this->level->id])
-            ->assertSessionHas('status', '2 account number(s) opened.');
-
-        $this->assertSame(3, StudentVirtualAccount::query()->count());
-        $this->assertSame('1111111111', $withAccount->fresh()->virtualAccount->account_number);
-    }
-
-    public function test_a_run_larger_than_one_go_is_refused_before_anything_is_opened(): void
-    {
-        $this->fakePaystack();
-
-        foreach (range(1, 51) as $n) {
-            $this->student(sprintf('SAC/2026/%04d', $n));
-        }
-
-        // Each account is two calls to Paystack: a run this size would time out part
-        // way through, with no way to tell which half had been done.
-        $this->actingAs($this->admin)
-            ->post(route('admin.payments.bulk-ops.generate'), ['level' => $this->level->id])
-            ->assertSessionHas('error');
-
-        $this->assertSame(0, StudentVirtualAccount::query()->count());
-        Http::assertNothingSent();
-    }
-
-    /* ------------------------------------------------------------------ */
     /* Fixtures */
     /* ------------------------------------------------------------------ */
 
@@ -218,36 +165,6 @@ class CollectionToolsTest extends TestCase
                 'status' => true,
                 'data' => [['name' => 'Wema Bank', 'code' => '035']],
             ]),
-            'api.paystack.co/customer' => Http::response([
-                'status' => true,
-                'data' => ['customer_code' => 'CUS_opened', 'email' => 'parent@example.com'],
-            ]),
-            'api.paystack.co/dedicated_account' => Http::response([
-                'status' => true,
-                'data' => [
-                    'account_number' => '2222222222',
-                    'account_name' => 'SACI SCHOOLS - CHILD',
-                    'bank' => ['name' => 'Wema Bank', 'slug' => 'wema-bank'],
-                ],
-            ]),
-        ]);
-    }
-
-    /** @param  array<string,mixed>  $extra */
-    private function student(string $number, array $extra = []): Student
-    {
-        return Student::create($extra + [
-            'student_number' => $number,
-            'admission_number' => 'SAC-'.str_replace(['/', '.'], '', $number),
-            'first_name' => 'Ada',
-            'last_name' => 'Okonkwo',
-            'guardian_name' => 'Mrs Okonkwo',
-            'guardian_phone' => '08031234567',
-            'guardian_email' => 'parent@example.com',
-            'level_id' => $this->level->id,
-            'academic_session_id' => $this->session->id,
-            'status' => StudentStatus::Active->value,
-            'admitted_at' => now(),
         ]);
     }
 }

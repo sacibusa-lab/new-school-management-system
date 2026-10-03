@@ -6,7 +6,6 @@ use App\Http\Controllers\Admin\AddStudentController;
 use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Admin\ApplicantController;
 use App\Http\Controllers\Admin\BankAccountController;
-use App\Http\Controllers\Admin\BulkOperationController;
 use App\Http\Controllers\Admin\CheckResultController;
 use App\Http\Controllers\Admin\ClassesAndSectionsController;
 use App\Http\Controllers\Admin\ClassSectionReportController;
@@ -419,10 +418,6 @@ Route::middleware('auth')
         Route::get('payments/schedule', [PaymentController::class, 'schedule'])->name('payments.schedule');
         Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
         Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
-
-        // Opening account numbers for a class at a time, rather than one child at a time.
-        Route::get('payments/bulk-ops', [BulkOperationController::class, 'index'])->name('payments.bulk-ops');
-        Route::post('payments/bulk-ops/generate', [BulkOperationController::class, 'generate'])->name('payments.bulk-ops.generate');
 
         // The account number a child's fees are paid into. Paystack issues it; the
         // office presses the button from the student's bill.
