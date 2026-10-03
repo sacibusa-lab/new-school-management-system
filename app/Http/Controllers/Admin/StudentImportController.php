@@ -216,7 +216,7 @@ class StudentImportController extends Controller
 
         $rows = [
             $this->imports->templateHeaders(),
-            ['Okafor', 'Chidera', 'Ada', 'F', '12/03/2013', 'Mrs Ngozi Okafor', '08039876543', 'ngozi@example.com', 'chidera@example.com'],
+            ['Okafor', 'Chidera', 'Ada', 'F', '12/03/2013', 'Mrs Ngozi Okafor', '08039876543', 'ngozi@example.com', '12 Ogbeh Street, Ibusa'],
         ];
 
         $handle = fopen('php://temp', 'r+');

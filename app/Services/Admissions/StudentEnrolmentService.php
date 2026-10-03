@@ -164,7 +164,6 @@ class StudentEnrolmentService
                 'last_name' => $row['last_name'],
                 'gender' => $row['gender'] ?? null,
                 'date_of_birth' => $row['date_of_birth'] ?? null,
-                'email' => $row['email'] ?? null,
                 'address' => $row['address'] ?? null,
                 // The arm chosen on the form, not the least-full one: whichever arm
                 // these children are in, the office is the one who knows it.

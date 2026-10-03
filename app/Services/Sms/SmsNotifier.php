@@ -21,8 +21,7 @@ class SmsNotifier
 {
     public function __construct(
         private readonly SmsService $sms,
-    ) {
-    }
+    ) {}
 
     public function applicantRegistered(Applicant $applicant): void
     {
@@ -97,9 +96,11 @@ class SmsNotifier
 
         $this->sms->sendTemplate(
             SmsTemplateKey::PAYMENT_RECEIVED,
-            $student->guardian_phone ?: $student->phone,
+            // The parent's number, and only the parent's: a student has no phone of
+            // their own, so there is nothing to fall back to.
+            $student->guardian_phone,
             $this->forStudent($student) + [
-                'amount' => $currency . number_format((float) $payment->amount, 2),
+                'amount' => $currency.number_format((float) $payment->amount, 2),
                 'receipt_number' => $payment->receipt_number,
             ],
             $payment,
@@ -145,7 +146,7 @@ class SmsNotifier
             'registration_number' => $student->admission_number,
             'class' => $student->schoolClass?->name ?? $student->level?->name,
             'session' => $student->academicSession?->name,
-            'balance' => Setting::get('currency_symbol', '₦') . number_format($student->outstandingBalance(), 2),
+            'balance' => Setting::get('currency_symbol', '₦').number_format($student->outstandingBalance(), 2),
         ] + $this->sharedValues());
     }
 
@@ -196,6 +197,6 @@ class SmsNotifier
 
     protected function formatScore(mixed $value): string
     {
-        return rtrim(rtrim(number_format((float) $value, 2), '0'), '.') . '%';
+        return rtrim(rtrim(number_format((float) $value, 2), '0'), '.').'%';
     }
 }

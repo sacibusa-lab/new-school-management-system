@@ -425,6 +425,9 @@
                 <h2 class="font-display text-base font-semibold text-ink">Student</h2>
             </div>
 
+            {{-- No email and no phone for the child: a pupil of this school has neither.
+                 The parent's are in the block below, and those are what the school writes
+                 to and texts. --}}
             <dl class="grid gap-x-6 gap-y-5 p-5">
                 @foreach ([
                     ['Admission number', $student->student_number],
@@ -438,8 +441,6 @@
                         : '—'],
                     ['Date of birth', $student->date_of_birth?->format('j F Y') ?? '—'],
                     ['Gender', $student->gender?->label() ?? '—'],
-                    ['Email', $student->email ?? '—'],
-                    ['Phone', $student->phone ?? '—'],
                     ['Address', $student->address ?? '—'],
                 ] as [$label, $value])
                     <div>

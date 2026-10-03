@@ -111,7 +111,7 @@ class StudentImportTest extends TestCase
 
         $this->assertSame(
             ['Surname', 'First name', 'Middle name', 'Gender', 'Date of birth', 'Guardian name',
-                'Guardian phone', 'Guardian email', 'Email', 'Address'],
+                'Guardian phone', 'Guardian email', 'Address'],
             $rows[0],
         );
 

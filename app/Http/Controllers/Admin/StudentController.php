@@ -87,8 +87,9 @@ class StudentController extends Controller
             'last_name' => ['required', 'string', 'max:80'],
             'gender' => ['nullable', 'in:male,female'],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
-            'email' => ['nullable', 'email', 'max:150'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            // No `email` and no `phone`: a student does not have either, and the school
+            // writes to and texts the parent. Neither is accepted here, and neither is
+            // overwritten on a record that already carries one from before.
             'address' => ['nullable', 'string', 'max:255'],
             'level_id' => ['nullable', 'exists:school_levels,id'],
             'school_class_id' => ['nullable', 'exists:school_classes,id'],

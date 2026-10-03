@@ -51,9 +51,10 @@ class StudentImportService
      * at a glance. The only one that does not read straight across is `last_name`, which
      * is what the school calls the surname.
      *
-     * The child's own email is deliberately *not* an alias of the guardian's: the reader
-     * matches the longest alias first, so a sheet with both a "Guardian Email" and an
-     * "Email" column lands each one where it belongs rather than on whichever came first.
+     * A bare "Email" or "Phone" is read as the parent's, because a child of this school
+     * has neither: the only address and the only number the school keeps for a student
+     * are the guardian's. Nobody should have to guess which of the two a heading meant,
+     * so a heading that names no one lands on the one the school actually uses.
      */
     private const COLUMN_ALIASES = [
         'last_name' => ['surname', 'last name', 'lastname', 'family name', 'surname of pupil', 'surname of student'],
@@ -62,9 +63,8 @@ class StudentImportService
         'gender' => ['gender'],
         'date_of_birth' => ['date of birth', 'date of birth dd mm yyyy', 'birth date', 'birthday', 'date born', 'dob'],
         'guardian_name' => ['guardian name', 'parent name', 'parents name', 'father name', 'mother name', 'guardian', 'parent'],
-        'guardian_phone' => ['guardian phone', 'guardian phone number', 'guardian number', 'parent phone', 'parent phone number', 'parent number', 'guardians phone', 'phone number of parent'],
-        'guardian_email' => ['guardian email', 'guardian email address', 'parent email', 'parent email address', 'guardians email'],
-        'email' => ['email', 'email address', 'e mail', 'electronic mail'],
+        'guardian_phone' => ['guardian phone', 'guardian phone number', 'guardian number', 'parent phone', 'parent phone number', 'parent number', 'guardians phone', 'phone number of parent', 'phone', 'phone number', 'telephone', 'mobile', 'gsm'],
+        'guardian_email' => ['guardian email', 'guardian email address', 'parent email', 'parent email address', 'guardians email', 'email', 'email address', 'e mail', 'electronic mail'],
         'address' => ['address', 'home address', 'residential address', 'contact address', 'house address'],
     ];
 
@@ -81,8 +81,7 @@ class StudentImportService
         'date_of_birth' => ['Date of birth', 'Optional. Dates are read day first, so 03/12/2013 is 3 December.'],
         'guardian_name' => ['Guardian name', 'Optional. The parent or guardian the school would ring.'],
         'guardian_phone' => ['Guardian phone', 'Optional, and worth having: it is the number the school texts about fees and results.'],
-        'guardian_email' => ['Guardian email', 'Optional.'],
-        'email' => ['Email', 'Optional. The child’s own address. A portal login is made either way.'],
+        'guardian_email' => ['Guardian email', 'Optional. The parent’s address, and the only one the school keeps for a student.'],
         'address' => ['Address', 'Optional.'],
     ];
 
@@ -289,7 +288,6 @@ class StudentImportService
                 'guardian_name' => $values['guardian_name'] ?? null,
                 'guardian_phone' => $values['guardian_phone'] ?? null,
                 'guardian_email' => $values['guardian_email'] ?? null,
-                'email' => $values['email'] ?? null,
                 'address' => $values['address'] ?? null,
             ],
         ];

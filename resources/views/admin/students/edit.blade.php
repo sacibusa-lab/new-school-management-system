@@ -53,9 +53,9 @@
                      :value="$student->status->value"
                      :options="\App\Enums\StudentStatus::options()" />
 
-            <x-field name="email" label="Email" type="email" :value="$student->email" />
-            <x-field name="phone" label="Phone" :value="$student->phone" />
-
+            {{-- No email and no phone for the child: a pupil has neither, and the school
+                 only ever writes to or texts the parent, whose details are in the block
+                 below. Anything posted here is ignored by the controller. --}}
             <x-field name="address" label="Address" :value="$student->address" class="sm:col-span-3" />
         </div>
     </div>
