@@ -126,6 +126,75 @@ class StudentEnrolmentService
     }
 
     /**
+     * Take a child onto the roll from a sheet, rather than from an application.
+     *
+     * The two paths differ in one thing only: where they stop. An applicant is admitted
+     * and that is the end of a decision — the school has said yes, so the first invoice
+     * is raised and the guardian is told. An imported child is a record being caught up
+     * with, often for a class that is already running: the office has the names, not a
+     * decision to announce. So nothing is billed and nobody is texted here; the bill is
+     * raised from the Fees screen when it falls due.
+     *
+     * What the two paths do share is the part that cannot be repaired afterwards: the
+     * number, which comes off the same sequence an admission draws from so a child in a
+     * sheet cannot be handed one already in use, and the portal login, so a child who
+     * arrives by spreadsheet can see their results and fees from the day they arrive.
+     * Both are made here, beside the code that already makes them for an admission,
+     * rather than again somewhere else.
+     *
+     * @param  array<string,mixed>  $row  Cleaned values, keyed by the students column they belong to.
+     */
+    public function enrolFromSheet(
+        array $row,
+        SchoolLevel $level,
+        ?SchoolClass $class,
+        AcademicSession $session,
+    ): Student {
+        return DB::transaction(function () use ($row, $level, $class, $session) {
+            $student = Student::create([
+                // SAC/2026/001 — restarts each academic year.
+                'student_number' => $this->sequences->nextStudentNumber($session->startYear() ?? now()->year),
+                // No application behind them, so there is no registration number to keep
+                // as the permanent reference. The columns are named the wrong way round:
+                // `student_number` is the admission number, `admission_number` the
+                // registration number, and this one is genuinely empty.
+                'admission_number' => null,
+                'first_name' => $row['first_name'],
+                'middle_name' => $row['middle_name'] ?? null,
+                'last_name' => $row['last_name'],
+                'gender' => $row['gender'] ?? null,
+                'date_of_birth' => $row['date_of_birth'] ?? null,
+                'email' => $row['email'] ?? null,
+                'address' => $row['address'] ?? null,
+                // The arm chosen on the form, not the least-full one: whichever arm
+                // these children are in, the office is the one who knows it.
+                'level_id' => $level->id,
+                'school_class_id' => $class?->id,
+                'academic_session_id' => $session->id,
+                'guardian_name' => $row['guardian_name'] ?? null,
+                'guardian_phone' => $row['guardian_phone'] ?? null,
+                'guardian_email' => $row['guardian_email'] ?? null,
+                'status' => StudentStatus::Active,
+                // Both portals switched on, exactly as an admission does it.
+                'results_portal_enabled' => true,
+                'fees_portal_enabled' => true,
+                'admitted_at' => now(),
+            ]);
+
+            $this->provisionPortalAccount($student);
+
+            ActivityLog::record(
+                'student.imported',
+                $student,
+                "Imported {$student->first_name} {$student->last_name} as {$student->student_number}",
+                ['module' => 'students', 'class' => $class?->name],
+            );
+
+            return $student;
+        });
+    }
+
+    /**
      * Give the admitted student a portal login so they can see results and fees.
      * The password is their admission number, and they are forced to change it.
      */

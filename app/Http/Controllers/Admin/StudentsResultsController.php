@@ -19,9 +19,10 @@ use Illuminate\View\View;
  * all come from here — and only the page behind it moved. Promotion did the same:
  * the page is {@see PromotionController} now and the entry below is all that is
  * left of it here. Students Details is the most recent: the page is
- * {@see StudentRegisterController} now, and the Class & Section Report under it is
- * {@see ClassSectionReportController}. Their entry stays, and the submenu under it
- * is declared with the entry rather than here — see AdminMenu.
+ * {@see StudentRegisterController} now, and the two under it — the Class & Section
+ * Report and the multiple import — are {@see ClassSectionReportController} and
+ * {@see StudentImportController}. The entry stays, and the submenu under it is declared
+ * with the entry rather than here — see AdminMenu.
  *
  * The permissions are named for what each page will DO rather than what it is
  * called, because the menu label is the least durable thing about it: "Check
@@ -200,22 +201,6 @@ class StudentsResultsController extends Controller
     public function settings(): View
     {
         return $this->placeholder('settings');
-    }
-
-    /**
-     * Multiple import: taking a whole year group's records in at once.
-     *
-     * The second page of Students Details, and still to be built. The register behind
-     * that entry is {@see StudentRegisterController} and the report under it is
-     * {@see ClassSectionReportController}; this one is a placeholder until its turn
-     * comes, which is why it is drawn from here rather than from a controller of its
-     * own. Its own permission, though: importing is a write.
-     */
-    public function multipleImport(): View
-    {
-        $this->authorize('students.import');
-
-        return view('admin.students-results.students.multiple-import');
     }
 
     /**

@@ -364,15 +364,6 @@ class StudentsResultsModuleTest extends TestCase
         }
     }
 
-    public function test_multiple_import_opens_and_says_it_is_not_built(): void
-    {
-        $this->actingAs($this->admin)
-            ->get(route('admin.students-results.students.multiple-import'))
-            ->assertOk()
-            ->assertSee('Multiple import')
-            ->assertSee('This page has not been built yet');
-    }
-
     /**
      * The two pages under Students Details do not share a permission: reading a class
      * list is not the same as creating a hundred children in one go, so the import

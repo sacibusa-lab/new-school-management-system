@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\ScoreImportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SmsController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\StudentImportController;
 use App\Http\Controllers\Admin\StudentRegisterController;
 use App\Http\Controllers\Admin\StudentsResultsController;
 use App\Http\Controllers\Admin\SubjectAssignmentController;
@@ -250,14 +251,25 @@ Route::middleware('auth')
             // and section, with the two ways of taking somebody off it.
             Route::get('students', StudentRegisterController::class)->name('students');
 
-            // The pages that hang off Students Details — both literal paths, declared
-            // before {student} so that neither slug can be read as the id of a student.
-            // The report is built; the multiple import is still to be.
+            // The pages that hang off Students Details — all literal paths, declared
+            // before {student} so that none of them can be read as the id of a student.
             Route::get('students/class-section-report', ClassSectionReportController::class)
                 ->name('students.class-section-report');
 
-            Route::get('students/multiple-import', [StudentsResultsController::class, 'multipleImport'])
+            /*
+            | Taking a class onto the roll from a spreadsheet. Four addressed paths
+            | rather than one {step}, the same way the teachers import is laid out: the
+            | sample file, the read and the write are different requests, and a wildcard
+            | would have to be pulled apart the first time one needs a child of its own.
+            */
+            Route::get('students/multiple-import', [StudentImportController::class, 'index'])
                 ->name('students.multiple-import');
+            Route::get('students/multiple-import/sample', [StudentImportController::class, 'template'])
+                ->name('students.multiple-import.template');
+            Route::post('students/multiple-import/preview', [StudentImportController::class, 'preview'])
+                ->name('students.multiple-import.preview');
+            Route::post('students/multiple-import/commit', [StudentImportController::class, 'commit'])
+                ->name('students.multiple-import.commit');
 
             Route::delete('students', [StudentRegisterController::class, 'destroySelected'])->name('students.destroy-selected');
             Route::delete('students/{student}', [StudentRegisterController::class, 'destroy'])->name('students.destroy');
