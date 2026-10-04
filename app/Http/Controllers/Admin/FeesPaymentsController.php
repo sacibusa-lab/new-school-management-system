@@ -87,9 +87,16 @@ class FeesPaymentsController extends Controller
                 ->limit(10)
                 ->get(),
 
+            // The term the collection is being measured against, for the card at the top.
+            'term' => $session?->currentTerm(),
+
             // Not a fee figure, but a collection rate means nothing without knowing how
-            // many families are behind it.
-            'roll' => Student::query()->where('status', StudentStatus::Active->value)->count(),
+            // many families are behind it — and active against total says whether the
+            // school is growing underneath the money or shrinking.
+            'roll' => [
+                'active' => Student::query()->where('status', StudentStatus::Active->value)->count(),
+                'total' => Student::query()->count(),
+            ],
         ]);
     }
 

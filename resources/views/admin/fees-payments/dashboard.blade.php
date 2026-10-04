@@ -39,96 +39,140 @@
     </div>
 @endunless
 
-{{-- ================= Today ================= --}}
+{{-- ================= The position ================= --}}
 <div class="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-    <x-stat-card
-        label="Collected today"
-        :value="$school->currency . number_format($today['collected'], 2)"
-        :hint="$today['payments'] . ' ' . Str::plural('payment', $today['payments']) . ' recorded'"
-        icon="cash"
-        tone="emerald"
-        :href="route('admin.payments.index')" />
+
+    {{-- The term, and how far the collection has got through it.
+         The ring is two circles rather than a chart: it is one number, and a chart
+         library bought to draw one number is a dependency the whole application carries
+         for the rest of its life. --}}
+    <div class="card bg-brand-900 p-5 text-white">
+        <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+                <p class="truncate font-display text-lg font-semibold">{{ $term?->name ?? 'No term set' }}</p>
+                <p class="mt-0.5 text-xs text-brand-200">Current term progress</p>
+                <p class="mt-4 text-xs text-brand-200">Today: {{ now()->format('d/m/Y') }}</p>
+            </div>
+
+            @php
+                $radius = 32;
+                $circumference = 2 * M_PI * $radius;
+                $collected = min($totals['rate'], 100);
+            @endphp
+
+            <div class="relative h-24 w-24 shrink-0"
+                 role="img"
+                 aria-label="{{ rtrim(rtrim(number_format($totals['rate'], 1), '0'), '.') }}% of the session's bills collected">
+                <svg viewBox="0 0 80 80" class="h-24 w-24" aria-hidden="true">
+                    <circle cx="40" cy="40" r="{{ $radius }}" fill="none" stroke-width="8"
+                            stroke="currentColor" class="text-white/15" />
+
+                    {{-- Drawn only once there is something to draw: a round line cap on a
+                         zero-length arc leaves a dot, and a dot reads as a small amount
+                         rather than as nothing. --}}
+                    @if ($collected > 0)
+                        <circle cx="40" cy="40" r="{{ $radius }}" fill="none" stroke-width="8"
+                                stroke="currentColor" class="text-gold-300" stroke-linecap="round"
+                                transform="rotate(-90 40 40)"
+                                stroke-dasharray="{{ round($circumference, 2) }}"
+                                stroke-dashoffset="{{ round($circumference * (1 - $collected / 100), 2) }}" />
+                    @endif
+                </svg>
+
+                <span class="absolute inset-0 flex items-center justify-center font-display text-xl font-bold">
+                    {{ rtrim(rtrim(number_format($totals['rate'], 1), '0'), '.') }}%
+                </span>
+            </div>
+        </div>
+    </div>
 
     <x-stat-card
-        label="Bills raised today"
-        :value="$school->currency . number_format($today['raised'], 2)"
-        :hint="$today['bills'] . ' ' . Str::plural('bill', $today['bills']) . ' raised'"
+        label="Expected revenue"
+        :value="$school->currency . number_format($totals['billed'], 2)"
+        :hint="number_format($totals['bills']) . ' ' . Str::plural('bill', $totals['bills']) . ' raised, ' . number_format($totals['unpaid']) . ' unpaid'"
         icon="receipt"
         tone="brand"
         :href="route('admin.invoices.index')" />
 
     <x-stat-card
-        label="This week"
-        :value="$school->currency . number_format($today['week'], 2)"
-        hint="Since Monday"
-        icon="calendar"
-        tone="gold"
+        label="Generated revenue"
+        :value="$school->currency . number_format($totals['collected'], 2)"
+        hint="Received against this session's bills"
+        icon="cash"
+        tone="emerald"
         :href="route('admin.payments.index')" />
 
-    {{-- Not a fee figure, but a collection rate means nothing without knowing how many
-         families are behind it. --}}
     <x-stat-card
-        label="On the roll"
-        :value="number_format($roll)"
-        :hint="'active ' . Str::plural('student', $roll)"
-        icon="users"
-        tone="slate"
-        :href="route('admin.fees-payments.students-hub')" />
+        label="Outstanding payment"
+        :value="$school->currency . number_format($totals['outstanding'], 2)"
+        hint="Still to come in"
+        icon="chart"
+        tone="rose"
+        :href="route('admin.invoices.index', ['status' => 'unpaid'])" />
 </div>
 
-{{-- ================= The session so far ================= --}}
-<div class="card mt-6">
-    <div class="panel-header">
-        <div>
-            <p class="panel-title">The session so far</p>
-            <p class="mt-0.5 text-xs text-muted">
-                {{ $session?->name ?? 'No session open' }}
-                · {{ number_format($totals['bills']) }} {{ Str::plural('bill', $totals['bills']) }} raised
-                · {{ number_format($totals['unpaid']) }} still unpaid
-            </p>
-        </div>
-
-        <span class="badge {{ $totals['rate'] >= 75 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 ring-emerald-600/20 dark:ring-emerald-400/20' : ($totals['rate'] >= 40 ? 'bg-gold-50 dark:bg-gold-950/40 text-gold-700 dark:text-gold-300 ring-gold-600/20 dark:ring-gold-400/20' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 ring-rose-600/20 dark:ring-rose-400/20') }}">
-            {{ rtrim(rtrim(number_format($totals['rate'], 1), '0'), '.') }}% collected
+{{-- ================= Today ================= --}}
+{{-- Rounded to the naira: this strip is read at a glance, and the exact figures are on
+     the cards above it. --}}
+<div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="card flex items-center gap-3 p-4">
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted">
+            <x-nav-icon name="cash" class="h-4 w-4" />
+        </span>
+        <span class="min-w-0">
+            <span class="block truncate font-display text-base font-semibold text-ink">
+                {{ $school->currency }}{{ number_format($today['collected'], 0) }}
+            </span>
+            <span class="block truncate text-xs text-muted">Today ({{ $today['payments'] }} {{ Str::plural('payment', $today['payments']) }})</span>
         </span>
     </div>
 
-    <div class="p-5 sm:p-6">
-        <div class="grid gap-6 sm:grid-cols-3">
-            <div>
-                <p class="eyebrow">Billed</p>
-                <p class="mt-1 font-display text-xl font-semibold text-ink">
-                    {{ $school->currency }}{{ number_format($totals['billed'], 2) }}
-                </p>
-            </div>
+    <div class="card flex items-center gap-3 p-4">
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted">
+            <x-nav-icon name="receipt" class="h-4 w-4" />
+        </span>
+        <span class="min-w-0">
+            <span class="block truncate font-display text-base font-semibold text-ink">
+                {{ $school->currency }}{{ number_format($today['raised'], 0) }}
+            </span>
+            <span class="block truncate text-xs text-muted">Bills raised today ({{ $today['bills'] }})</span>
+        </span>
+    </div>
 
-            <div>
-                <p class="eyebrow">Collected</p>
-                <p class="mt-1 font-display text-xl font-semibold text-emerald-700 dark:text-emerald-300">
-                    {{ $school->currency }}{{ number_format($totals['collected'], 2) }}
-                </p>
-            </div>
+    <div class="card flex items-center gap-3 p-4">
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted">
+            <x-nav-icon name="calendar" class="h-4 w-4" />
+        </span>
+        <span class="min-w-0">
+            <span class="block truncate font-display text-base font-semibold text-ink">
+                {{ $school->currency }}{{ number_format($today['week'], 0) }}
+            </span>
+            <span class="block truncate text-xs text-muted">This week</span>
+        </span>
+    </div>
 
-            <div>
-                <p class="eyebrow">Outstanding</p>
-                <p class="mt-1 font-display text-xl font-semibold {{ $totals['outstanding'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-muted' }}">
-                    {{ $school->currency }}{{ number_format($totals['outstanding'], 2) }}
-                </p>
-            </div>
-        </div>
+    <div class="card flex items-center gap-3 p-4">
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted">
+            <x-nav-icon name="users" class="h-4 w-4" />
+        </span>
+        <span class="min-w-0">
+            <span class="block truncate font-display text-base font-semibold text-ink">
+                {{ number_format($roll['active']) }}
+            </span>
+            <span class="block truncate text-xs text-muted">Active students</span>
+        </span>
+    </div>
 
-        <div class="mt-5 h-3 w-full overflow-hidden rounded-full bg-surface-3">
-            <div class="h-full rounded-full bg-emerald-500 transition-all"
-                 style="width: {{ min($totals['rate'], 100) }}%"></div>
-        </div>
-
-        @if ($totals['billed'] > 0 && $totals['outstanding'] > 0)
-            <p class="mt-3 text-xs text-muted">
-                {{ $school->currency }}{{ number_format($totals['outstanding'], 2) }} is still to come in
-                across {{ number_format($totals['unpaid']) }} {{ Str::plural('bill', $totals['unpaid']) }}.
-                The classes furthest behind are below.
-            </p>
-        @endif
+    <div class="card flex items-center gap-3 p-4">
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted">
+            <x-nav-icon name="academic" class="h-4 w-4" />
+        </span>
+        <span class="min-w-0">
+            <span class="block truncate font-display text-base font-semibold text-ink">
+                {{ number_format($roll['total']) }}
+            </span>
+            <span class="block truncate text-xs text-muted">Total students</span>
+        </span>
     </div>
 </div>
 

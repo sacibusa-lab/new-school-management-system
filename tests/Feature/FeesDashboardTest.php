@@ -80,11 +80,14 @@ class FeesDashboardTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.fees-payments.dashboard'))
             ->assertOk()
-            ->assertSee('The session so far')
+            ->assertSee('Expected revenue')
+            ->assertSee('Generated revenue')
+            ->assertSee('Outstanding payment')
             ->assertSee($this->currency.'100,000.00')
             ->assertSee($this->currency.'60,000.00')
-            // The rate is the figure that says whether this is a good term or a bad one.
-            ->assertSee('40% collected');
+            // The term, and the ring that says how far through it the collection has got.
+            ->assertSee('First Term')
+            ->assertSee('40%');
     }
 
     /**
@@ -106,11 +109,38 @@ class FeesDashboardTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.fees-payments.dashboard'))
             ->assertOk()
-            ->assertSee('1 payment recorded')
-            // Today's own figure, not the week's and not the session's.
-            ->assertSee($this->currency.'40,000.00')
-            // And the week holds both, because both are this week.
-            ->assertSee($this->currency.'50,000.00');
+            // One of the two receipts was taken today, so today counts one and holds
+            // yesterday's money nowhere.
+            ->assertSee('Today (1 payment)')
+            ->assertSee($this->currency.'40,000');
+    }
+
+    /**
+     * The week and the session are two different sums, and the strip near the top is
+     * where they sit side by side. A receipt from three weeks ago belongs to the session
+     * and not to the week, and a page that counts it in both is the page that gets
+     * rung up about.
+     */
+    public function test_the_week_counts_the_week_and_not_the_session(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-07 10:00:00'));
+
+        $student = $this->student();
+        $invoice = $this->bill($student, 100000, 30000);
+
+        // Tuesday of this week, and one from three weeks back.
+        $this->receipt($invoice, 20000, 'cash', Carbon::parse('2026-10-06 09:00:00'));
+        $this->receipt($invoice, 10000, 'cash', Carbon::parse('2026-09-16 09:00:00'));
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.dashboard'))
+            ->assertOk()
+            ->getContent();
+
+        // 20,000 is the week's own figure. The session's is 30,000, which is what the
+        // nine-week-old receipt belongs to.
+        $this->assertStringContainsString($this->currency.'20,000', $html);
+        $this->assertStringContainsString($this->currency.'30,000.00', $html);
     }
 
     public function test_a_cancelled_bill_is_not_money_the_school_is_owed(): void
