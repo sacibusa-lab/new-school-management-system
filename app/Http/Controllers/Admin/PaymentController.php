@@ -2,15 +2,23 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
+use App\Models\Fee;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\SchoolLevel;
 use App\Models\Setting;
+use App\Models\Student;
+use App\Models\Term;
 use App\Services\NumberSequenceService;
 use App\Services\Sms\SmsNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -158,11 +166,99 @@ class PaymentController extends Controller
     /* ------------------------------------------------------------------ */
 
     /**
-     * What came in, and what is owed — the screen the bursar opens first.
+     * What the school should have collected, against what it has.
+     *
+     * Read a year group at a time rather than a child at a time, because the question
+     * asked first is which year is behind. The expectation is worked out from the fee —
+     * what a child in that year group should be paying this term — and not from the
+     * bills raised, which is the whole point of the screen: the register says what has
+     * been billed, and this says what should have been. A year group nobody has billed
+     * still shows its debt rather than showing zero.
+     *
+     * Money is the other way about. What has come in is money that actually arrived
+     * against this term's bills, so a parent clearing last term's balance does not
+     * flatter this term's collection rate.
      */
-    public function overview(): View
+    public function overview(Request $request): View
     {
-        return $this->placeholder('overview');
+        $this->authorize('fees.view');
+
+        // Whatever was asked for, or where the school is standing. `find(0)` is null, so
+        // an unfiltered page lands on the current session and its term without a branch.
+        $session = AcademicSession::query()->find((int) $request->query('session'))
+            ?? AcademicSession::current();
+
+        $term = Term::query()->find((int) $request->query('term'))
+            ?? $session?->currentTerm();
+
+        $levels = SchoolLevel::query()->active()->orderBy('order')->orderBy('name')->get();
+
+        $unitFees = $this->unitFees($levels, $session, $term);
+        $onRoll = $this->studentsPerLevel();
+        $paid = $this->paidPerStudent($session, $term);
+        $discounts = $this->discountsPerLevel($session, $term);
+
+        $rows = $levels->map(function (SchoolLevel $level, int $index) use ($unitFees, $onRoll, $paid, $discounts): array {
+            $unit = (float) ($unitFees[$level->id] ?? 0);
+            $students = (int) ($onRoll[$level->id] ?? 0);
+
+            // One figure per child, so who has settled can be judged against the year
+            // group's own fee — which is not the same number for every year group.
+            $theirPayments = $paid[$level->id] ?? collect();
+
+            $received = round((float) $theirPayments->sum(), 2);
+            $expected = round($unit * $students, 2);
+            $settled = $unit > 0 ? $theirPayments->filter(fn (float $amount): bool => $amount >= $unit)->count() : 0;
+
+            return [
+                'name' => $level->name,
+                'unit' => $unit,
+                'students' => $students,
+                'expected' => $expected,
+                'received' => $received,
+                'payers' => $theirPayments->count(),
+                // A year group charged nothing has nobody owing, whatever the register
+                // says about money that has come in.
+                'owing' => $unit > 0 ? max($students - $settled, 0) : 0,
+                'debt' => round(max($expected - $received, 0), 2),
+                'rate' => $expected > 0 ? round(($received / $expected) * 100, 1) : 0.0,
+                'discount' => (float) ($discounts[$level->id]['discount'] ?? 0),
+                'discounted' => (int) ($discounts[$level->id]['students'] ?? 0),
+                'index' => $index + 1,
+            ];
+        })->values();
+
+        // Added up from the rows rather than counted again, so the cards at the top can
+        // never disagree with the table underneath them.
+        $expected = round($rows->sum('expected'), 2);
+        $received = round($rows->sum('received'), 2);
+
+        return view('admin.payments.overview', [
+            'session' => $session,
+            'term' => $term,
+            'sessions' => AcademicSession::query()->orderByDesc('starts_on')->orderByDesc('id')->get(),
+            'terms' => Term::query()->orderBy('position')->get(),
+            'filters' => ['session' => $session?->id, 'term' => $term?->id],
+
+            'rows' => $rows,
+            'totals' => [
+                'received' => $received,
+                'expected' => $expected,
+                'debt' => round(max($expected - $received, 0), 2),
+                'rate' => $expected > 0 ? round(($received / $expected) * 100, 1) : 0.0,
+
+                'discount' => round($rows->sum('discount'), 2),
+
+                // Each count is of children, and they do not add up to the roll: a family
+                // part-way through is counted as paying and as owing, because both are
+                // true of them.
+                'students' => $rows->sum('students'),
+                'payers' => $rows->sum('payers'),
+                'owing' => $rows->sum('owing'),
+                'discounted' => $rows->sum('discounted'),
+            ],
+            'currency' => Setting::get('currency_symbol', '₦'),
+        ]);
     }
 
     /**
@@ -188,6 +284,152 @@ class PaymentController extends Controller
     {
         return $this->placeholder('reports');
     }
+
+    /* ------------------------------------------------------------------ */
+    /* The figures behind the overview */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * What one child in each year group is charged for this term.
+     *
+     * The fee's own amount, unless the year group has been given one of its own — and an
+     * override replaces the fee's amount rather than adding to it, which is why one that
+     * has been switched off contributes nothing at all instead of falling back. That is
+     * what the Class Amounts tab of a fee is for: JSS1 charged more than JSS2.
+     *
+     * Fees with no academic session are the ones that are not tied to a year, so they are
+     * charged in every one.
+     *
+     * @param  Collection<int,SchoolLevel>  $levels
+     * @return array<int,float> year group => what one child is charged
+     */
+    protected function unitFees(Collection $levels, ?AcademicSession $session, ?Term $term): array
+    {
+        // Null where the school has no term set. `isActiveForTerm` and `amountForTerm`
+        // both take a position and speak about terms 1 to 3, so neither is asked.
+        $position = $term?->position;
+
+        $fees = Fee::query()
+            ->active()
+            ->when($session, fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('academic_session_id', $session->id)
+                ->orWhereNull('academic_session_id')))
+            ->with('overrides')
+            ->get();
+
+        return $levels->mapWithKeys(function (SchoolLevel $level) use ($fees, $position): array {
+            $unit = 0.0;
+
+            foreach ($fees as $fee) {
+                // A term this fee has been unticked for is a term it is not charged in.
+                if ($position !== null && ! $fee->isActiveForTerm($position)) {
+                    continue;
+                }
+
+                $override = $fee->overrides->firstWhere('level_id', $level->id);
+
+                if ($override !== null) {
+                    if ($override->isActive()) {
+                        $unit += (float) $override->amount;
+                    }
+
+                    continue;
+                }
+
+                $unit += (float) ($position === null
+                    ? $fee->amount
+                    : $fee->amountForTerm($position));
+            }
+
+            return [$level->id => round($unit, 2)];
+        })->all();
+    }
+
+    /**
+     * How many children each year group is charged for.
+     *
+     * The active roll. A child who has left is not a child the school is expecting money
+     * from, and counting them would put a debt on the board that nobody can collect.
+     *
+     * @return array<int,int>
+     */
+    protected function studentsPerLevel(): array
+    {
+        return Student::query()
+            ->where('status', StudentStatus::Active->value)
+            ->whereNotNull('level_id')
+            ->groupBy('level_id')
+            ->get([DB::raw('level_id'), DB::raw('count(*) as total')])
+            ->mapWithKeys(fn ($row): array => [(int) $row->level_id => (int) $row->total])
+            ->all();
+    }
+
+    /**
+     * What each child has paid against this term's bills, grouped by year group.
+     *
+     * Per child rather than summed per year, because who has settled is judged against
+     * the year group's own fee and those differ. Grouped in the database, so this is one
+     * read rather than one per year group; the rows it returns are the children who have
+     * paid something, which is a smaller set than the roll.
+     *
+     * A receipt with no bill behind it is left out: it is money the school is holding,
+     * not income against anything, and it belongs to no term.
+     *
+     * @return array<int,Collection<int,float>> year group => child => paid
+     */
+    protected function paidPerStudent(?AcademicSession $session, ?Term $term): array
+    {
+        return Payment::query()
+            ->where('payments.status', PaymentStatus::Successful->value)
+            ->when($session, fn ($query) => $query->whereHas('invoice', fn ($invoice) => $invoice
+                ->where('invoices.academic_session_id', $session->id)
+                ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+                ->when($term, fn ($scoped) => $scoped->where('invoices.term_id', $term->id))))
+            ->join('students', 'students.id', '=', 'payments.student_id')
+            ->groupBy('payments.student_id', 'students.level_id')
+            ->get([
+                DB::raw('payments.student_id as student_id'),
+                DB::raw('students.level_id as level_id'),
+                DB::raw('sum(payments.amount) as paid'),
+            ])
+            ->groupBy('level_id')
+            ->map(fn (Collection $children): Collection => $children
+                ->pluck('paid', 'student_id')
+                ->map(fn ($amount): float => (float) $amount))
+            ->all();
+    }
+
+    /**
+     * What has been taken off, by year group.
+     *
+     * The discount column on the bill, which is what approving a scholarship or a bursary
+     * writes. Nothing else produces one, so an empty school shows nothing here and that
+     * is the truth rather than a missing figure.
+     *
+     * @return array<int,array{discount:float,students:int}>
+     */
+    protected function discountsPerLevel(?AcademicSession $session, ?Term $term): array
+    {
+        return Invoice::query()
+            ->where('invoices.discount', '>', 0)
+            ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+            ->when($session, fn ($query) => $query->where('invoices.academic_session_id', $session->id))
+            ->when($term, fn ($query) => $query->where('invoices.term_id', $term->id))
+            ->join('students', 'students.id', '=', 'invoices.student_id')
+            ->groupBy('students.level_id')
+            ->get([
+                DB::raw('students.level_id as level_id'),
+                DB::raw('sum(invoices.discount) as discount'),
+                DB::raw('count(distinct invoices.student_id) as students'),
+            ])
+            ->mapWithKeys(fn ($row): array => [(int) $row->level_id => [
+                'discount' => (float) $row->discount,
+                'students' => (int) $row->students,
+            ]])
+            ->all();
+    }
+
+    /* ------------------------------------------------------------------ */
 
     /**
      * Draw one of the pages above.
