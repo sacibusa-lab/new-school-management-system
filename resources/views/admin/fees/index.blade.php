@@ -193,12 +193,12 @@
                         <p class="label">Term activation</p>
 
                         <div class="mt-1.5 flex flex-wrap gap-x-6 gap-y-2">
-                            @foreach ($terms as $column => $label)
+                            @foreach ($terms as $term)
                                 <label class="inline-flex items-center gap-2 text-sm text-ink-soft">
-                                    <input type="checkbox" name="{{ $column }}" value="1"
-                                           @checked(old($column, true))
+                                    <input type="checkbox" name="{{ $term['active'] }}" value="1"
+                                           @checked(old($term['active'], true))
                                            class="h-4 w-4 rounded border-line text-brand-700 dark:text-brand-300">
-                                    {{ $label }}
+                                    {{ $term['label'] }}
                                 </label>
                             @endforeach
                         </div>

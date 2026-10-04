@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class BankAccount extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'label', 'bank_name', 'bank_code', 'account_number',
         'account_name', 'sub_account_code', 'is_primary', 'is_active',

@@ -6,6 +6,7 @@ use Database\Factories\FeeFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A fee the school charges.
@@ -26,15 +27,23 @@ class Fee extends Model
         'one-time' => 'One-time',
     ];
 
-    /** The terms a fee can be switched on for, in the order the year runs. */
+    /**
+     * The terms a fee runs in, in the order the year does.
+     *
+     * One description of each term — the column that switches it on, the column that
+     * prices it, and how it is written — so the checkbox, the amount beside it and the
+     * question "is this fee active in the second term" cannot disagree about which
+     * column is which.
+     */
     public const TERMS = [
-        'first_term_active' => 'First term',
-        'second_term_active' => 'Second term',
-        'third_term_active' => 'Third term',
+        1 => ['active' => 'first_term_active', 'amount' => 'first_term_amount', 'label' => 'First term', 'short' => 'First'],
+        2 => ['active' => 'second_term_active', 'amount' => 'second_term_amount', 'label' => 'Second term', 'short' => 'Second'],
+        3 => ['active' => 'third_term_active', 'amount' => 'third_term_amount', 'label' => 'Third term', 'short' => 'Third'],
     ];
 
     protected $fillable = [
-        'title', 'description', 'cycle', 'academic_session_id', 'amount',
+        'title', 'description', 'revenue_code', 'cycle', 'academic_session_id', 'amount',
+        'first_term_amount', 'second_term_amount', 'third_term_amount',
         'first_term_active', 'second_term_active', 'third_term_active', 'is_active',
     ];
 
@@ -42,6 +51,9 @@ class Fee extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'first_term_amount' => 'decimal:2',
+            'second_term_amount' => 'decimal:2',
+            'third_term_amount' => 'decimal:2',
             'first_term_active' => 'boolean',
             'second_term_active' => 'boolean',
             'third_term_active' => 'boolean',
@@ -58,6 +70,21 @@ class Fee extends Model
         return $this->belongsTo(AcademicSession::class);
     }
 
+    /**
+     * Who this fee is divided between. Empty means the whole of it pays into the school's
+     * main account, which is the ordinary case rather than a fee nobody has finished.
+     */
+    public function beneficiaries(): HasMany
+    {
+        return $this->hasMany(FeeBeneficiary::class);
+    }
+
+    /** What a year group is charged instead of the default amount. */
+    public function overrides(): HasMany
+    {
+        return $this->hasMany(FeeClassOverride::class);
+    }
+
     public function cycleLabel(): string
     {
         return self::CYCLES[$this->cycle] ?? ucfirst((string) $this->cycle);
@@ -72,9 +99,9 @@ class Fee extends Model
     {
         $terms = [];
 
-        foreach (self::TERMS as $column => $label) {
-            if ($this->{$column}) {
-                $terms[] = $label;
+        foreach (self::TERMS as $term) {
+            if ($this->{$term['active']}) {
+                $terms[] = $term['label'];
             }
         }
 
@@ -91,6 +118,53 @@ class Fee extends Model
     }
 
     /**
+     * Is this fee charged in the term at that position in the year?
+     *
+     * A term the fee says nothing about is charged: a position outside the three is not
+     * a reason to stop billing.
+     */
+    public function isActiveForTerm(int $position): bool
+    {
+        $column = self::TERMS[$position]['active'] ?? null;
+
+        return $column === null ? true : (bool) $this->{$column};
+    }
+
+    /**
+     * What this fee costs in the term at that position.
+     *
+     * A term with no amount of its own falls back to the default. Empty means "the
+     * default", not zero — a fee with no term amounts set is not a free fee.
+     */
+    public function amountForTerm(int $position): string
+    {
+        $column = self::TERMS[$position]['amount'] ?? null;
+
+        if ($column !== null && $this->{$column} !== null) {
+            return (string) $this->{$column};
+        }
+
+        return (string) $this->amount;
+    }
+
+    /**
+     * How much of this fee has been promised to another account.
+     *
+     * Deliberately able to be less than the fee. The remainder pays into the school's main
+     * account, and a split that adds up to the whole fee is the uncommon case.
+     */
+    public function splitTotal(): float
+    {
+        return round((float) $this->beneficiaries->sum('amount'), 2);
+    }
+
+    /** What is left of the fee after the splits, which pays into the main account. */
+    public function unsplitAmount(): float
+    {
+        return round(max((float) $this->amount - $this->splitTotal(), 0), 2);
+    }
+
+    /**
      * The active terms in one short line, for the row of a list.
      *
      * "All three terms" rather than naming them: a fee that comes round every term is the
@@ -101,9 +175,9 @@ class Fee extends Model
     {
         $active = [];
 
-        foreach (array_keys(self::TERMS) as $column) {
-            if ($this->{$column}) {
-                $active[] = ucfirst(str_replace('_term_active', '', $column));
+        foreach (self::TERMS as $term) {
+            if ($this->{$term['active']}) {
+                $active[] = $term['short'];
             }
         }
 

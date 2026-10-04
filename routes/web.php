@@ -394,6 +394,11 @@ Route::middleware('auth')
         Route::put('fees/{fee}', [FeeController::class, 'update'])->name('fees.update');
         Route::post('fees/{fee}/toggle', [FeeController::class, 'toggle'])->name('fees.toggle');
 
+        // The two tabs that divide a fee up: between the school's own accounts, and
+        // differently for a year group.
+        Route::post('fees/{fee}/beneficiaries', [FeeController::class, 'saveBeneficiaries'])->name('fees.beneficiaries');
+        Route::post('fees/{fee}/overrides', [FeeController::class, 'saveOverrides'])->name('fees.overrides');
+
         Route::get('fees/categories', [FeeController::class, 'categories'])->name('fees.categories.index');
         Route::post('fees/categories', [FeeController::class, 'storeCategory'])->name('fees.categories.store');
         Route::put('fees/categories/{category}', [FeeController::class, 'updateCategory'])->name('fees.categories.update');

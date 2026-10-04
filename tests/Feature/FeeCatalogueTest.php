@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Admin\FeeController;
 use App\Models\AcademicSession;
+use App\Models\BankAccount;
 use App\Models\Fee;
+use App\Models\FeeBeneficiary;
+use App\Models\SchoolLevel;
 use App\Models\Setting;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -296,23 +299,233 @@ class FeeCatalogueTest extends TestCase
     }
 
     /**
-     * The three tabs whose tables do not exist yet have to say so, rather than looking
-     * like a page that loaded wrong.
+     * The one tab whose table does not exist yet has to say so, rather than looking like a
+     * page that loaded wrong.
      */
-    public function test_the_tabs_that_are_not_built_say_so(): void
+    public function test_the_tab_that_is_not_built_says_so(): void
     {
         $fee = Fee::factory()->create();
 
-        foreach ([
-            'splits' => 'Nothing records a split yet',
-            'class-amounts' => 'Nothing records an amount per class yet',
-            'transactions' => 'recorded against a bill and not against the catalogue',
-        ] as $tab => $phrase) {
-            $this->actingAs($this->admin)
-                ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => $tab]))
-                ->assertOk()
-                ->assertSee($phrase);
-        }
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'transactions']))
+            ->assertOk()
+            ->assertSee('Nothing to show yet')
+            ->assertSee('recorded against a bill and not against the catalogue');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Who a fee is divided between */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_fee_can_be_split_between_the_schools_own_accounts(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 100000]);
+
+        $feesAccount = BankAccount::factory()->create(['label' => 'Fees account', 'account_number' => '1111111111']);
+        $ptaAccount = BankAccount::factory()->create(['label' => 'PTA account', 'account_number' => '2222222222']);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.beneficiaries', $fee), [
+                'beneficiaries' => [
+                    ['bank_account_id' => $feesAccount->id, 'amount' => 60000],
+                    ['bank_account_id' => $ptaAccount->id, 'amount' => 25000],
+                ],
+            ])
+            ->assertRedirect(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'splits']))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status');
+
+        $this->assertSame(2, $fee->beneficiaries()->count());
+
+        // 85,000 of 100,000 promised away, so 15,000 still pays into the main account.
+        $split = $fee->load('beneficiaries');
+        $this->assertSame(85000.0, $split->splitTotal());
+        $this->assertSame(15000.0, $split->unsplitAmount());
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'splits']))
+            ->assertOk()
+            ->assertSee('Fees account')
+            ->assertSee('1111111111')
+            ->assertSee($this->currency.'60,000.00')
+            // What is left over is shown rather than left to be worked out.
+            ->assertSee($this->currency.'15,000.00');
+    }
+
+    /**
+     * The whole point of the rule, and the reason it is checked on the server: the form
+     * only warns, and a request does not have to come from the form.
+     */
+    public function test_the_splits_cannot_come_to_more_than_the_fee(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 100000]);
+
+        $first = BankAccount::factory()->create();
+        $second = BankAccount::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.beneficiaries', $fee), [
+                'beneficiaries' => [
+                    ['bank_account_id' => $first->id, 'amount' => 80000],
+                    ['bank_account_id' => $second->id, 'amount' => 40000],
+                ],
+            ])
+            ->assertSessionHasErrors('beneficiaries');
+
+        // Nothing saved: a split that does not add up is not half-saved.
+        $this->assertSame(0, $fee->beneficiaries()->count());
+    }
+
+    /**
+     * Two rows for one account would be two transfers to it, which is never what was meant.
+     * The database refuses it; this is so the office is told, instead of shown a 500.
+     */
+    public function test_a_fee_cannot_be_split_into_the_same_account_twice(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 100000]);
+        $account = BankAccount::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.beneficiaries', $fee), [
+                'beneficiaries' => [
+                    ['bank_account_id' => $account->id, 'amount' => 30000],
+                    ['bank_account_id' => $account->id, 'amount' => 30000],
+                ],
+            ])
+            ->assertSessionHasErrors('beneficiaries.0.bank_account_id');
+
+        $this->assertSame(0, $fee->beneficiaries()->count());
+    }
+
+    /**
+     * Removing every split has to be possible — it means the fee pays wholly into the main
+     * account, which is a real thing to want.
+     */
+    public function test_every_split_can_be_removed(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 100000]);
+        FeeBeneficiary::factory()->create(['fee_id' => $fee->id, 'amount' => 40000]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.beneficiaries', $fee), [])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status');
+
+        $this->assertSame(0, $fee->beneficiaries()->count());
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* What a year group is charged */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_year_group_can_be_charged_other_than_the_default(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 85000]);
+        $senior = SchoolLevel::factory()->create(['name' => 'SS1', 'order' => 4]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.overrides', $fee), [
+                'overrides' => [
+                    ['level_id' => $senior->id, 'amount' => 120000, 'status' => 'active'],
+                ],
+            ])
+            ->assertRedirect(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'class-amounts']))
+            ->assertSessionHasNoErrors();
+
+        $override = $fee->overrides()->sole();
+        $this->assertSame('120000.00', $override->amount);
+        $this->assertTrue($override->isActive());
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'class-amounts']))
+            ->assertOk()
+            ->assertSee('SS1')
+            ->assertSee($this->currency.'120,000.00');
+    }
+
+    public function test_the_same_year_group_cannot_be_listed_twice(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 85000]);
+        $level = SchoolLevel::factory()->create(['name' => 'JSS1']);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.overrides', $fee), [
+                'overrides' => [
+                    ['level_id' => $level->id, 'amount' => 1000, 'status' => 'active'],
+                    ['level_id' => $level->id, 'amount' => 2000, 'status' => 'active'],
+                ],
+            ])
+            ->assertSessionHasErrors('overrides.0.level_id');
+
+        $this->assertSame(0, $fee->overrides()->count());
+    }
+
+    /**
+     * A price set up in advance is not a deleted one: the amount is kept and switched off,
+     * so a fee the school is not charging yet does not have to be typed in twice.
+     */
+    public function test_a_year_group_amount_can_be_switched_off_without_being_removed(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 85000]);
+        $level = SchoolLevel::factory()->create(['name' => 'JSS3']);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.overrides', $fee), [
+                'overrides' => [
+                    ['level_id' => $level->id, 'amount' => 95000, 'status' => 'inactive'],
+                ],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertFalse($fee->overrides()->sole()->isActive());
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* What a term costs */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_term_can_be_priced_apart_from_the_default(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 85000]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.fees.update', $fee), [
+                'title' => 'Tuition Fee',
+                'revenue_code' => 'TUI-01',
+                'cycle' => 'termly',
+                'amount' => 85000,
+                'first_term_amount' => 95000,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $fee->refresh();
+
+        $this->assertSame('TUI-01', $fee->revenue_code);
+
+        // The first term costs more because of resumption; the others fall back.
+        $this->assertSame('95000.00', $fee->amountForTerm(1));
+        $this->assertSame('85000.00', $fee->amountForTerm(2));
+        $this->assertSame('85000.00', $fee->amountForTerm(3));
+    }
+
+    /**
+     * An emptied amount box means "charge the default here", not nought. Stored as null so
+     * a term nobody has priced and a term that costs nothing stay different answers.
+     */
+    public function test_an_empty_term_amount_means_the_default_and_not_nought(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 85000]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.fees.update', $fee), [
+                'title' => $fee->title,
+                'cycle' => 'termly',
+                'amount' => 85000,
+                'second_term_amount' => '',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($fee->refresh()->second_term_amount);
     }
 
     public function test_somebody_outside_the_fee_desk_cannot_change_a_fee(): void

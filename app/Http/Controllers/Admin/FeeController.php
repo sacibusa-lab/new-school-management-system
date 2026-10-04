@@ -5,17 +5,21 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\BankAccount;
 use App\Models\Fee;
 use App\Models\FeeCategory;
+use App\Models\FeeClassOverride;
 use App\Models\FeeStructure;
 use App\Models\FeeStructureItem;
 use App\Models\SchoolLevel;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Term;
 use App\Services\Fees\InvoiceGenerationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class FeeController extends Controller
@@ -99,12 +103,15 @@ class FeeController extends Controller
         $this->authorize('fees.manage');
 
         return view('admin.fees.edit', [
-            'fee' => $fee->load('academicSession'),
+            'fee' => $fee->load(['academicSession', 'beneficiaries.bankAccount', 'overrides.level']),
             'tab' => $this->tabFrom($request),
             'tabs' => self::TABS,
             'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
             'cycles' => Fee::CYCLES,
             'terms' => Fee::TERMS,
+            'statuses' => FeeClassOverride::STATUSES,
+            'bankAccounts' => BankAccount::query()->active()->get(),
+            'levels' => SchoolLevel::query()->active()->orderBy('order')->orderBy('name')->get(),
         ]);
     }
 
@@ -145,6 +152,97 @@ class FeeController extends Controller
     }
 
     /**
+     * The Internal ledger splits tab, saved.
+     *
+     * Replaced whole rather than merged row by row: the form is the entire answer to "who
+     * is this fee divided between", and leaving a row out is how a split is removed.
+     *
+     * A split may add up to less than the fee — the remainder pays into the main account —
+     * but never to more. That is checked here and not only in the form, because it is a rule
+     * about the money, and a rule about the money cannot live somewhere a request can skip.
+     */
+    public function saveBeneficiaries(Request $request, Fee $fee): RedirectResponse
+    {
+        $this->authorize('fees.manage');
+
+        $validated = $request->validate([
+            // Optional rather than required: removing every split is a real thing to want,
+            // and it means the fee pays wholly into the main account.
+            'beneficiaries' => ['nullable', 'array'],
+            // Distinct, because two rows for one account would be two transfers to it.
+            'beneficiaries.*.bank_account_id' => ['required', 'integer', 'distinct', 'exists:bank_accounts,id'],
+            'beneficiaries.*.amount' => ['required', 'numeric', 'min:0'],
+        ], [
+            'beneficiaries.*.bank_account_id.distinct' => 'The same account is listed twice.',
+            'beneficiaries.*.bank_account_id.exists' => 'One of those accounts no longer exists.',
+        ]);
+
+        $rows = $validated['beneficiaries'] ?? [];
+        $total = round(array_sum(array_map(fn (array $row): float => (float) $row['amount'], $rows)), 2);
+
+        if ($total > (float) $fee->amount) {
+            $currency = Setting::get('currency_symbol', '₦');
+
+            throw ValidationException::withMessages([
+                'beneficiaries' => sprintf(
+                    'Those splits add up to %s%s, which is more than the fee of %s%s.',
+                    $currency, number_format($total, 2),
+                    $currency, number_format((float) $fee->amount, 2),
+                ),
+            ]);
+        }
+
+        $fee->beneficiaries()->delete();
+
+        foreach ($rows as $row) {
+            $fee->beneficiaries()->create($row);
+        }
+
+        return redirect()
+            ->route('admin.fees.edit', ['fee' => $fee, 'tab' => 'splits'])
+            ->with('status', $rows === []
+                ? 'Every split removed — '.$fee->title.' pays into the main account.'
+                : 'Splits updated for '.$fee->title.'.');
+    }
+
+    /**
+     * The Class amounts tab, saved.
+     *
+     * Replaced whole, like the splits: leaving a year group out is how an override is
+     * removed, and the form is the entire answer.
+     */
+    public function saveOverrides(Request $request, Fee $fee): RedirectResponse
+    {
+        $this->authorize('fees.manage');
+
+        $validated = $request->validate([
+            'overrides' => ['nullable', 'array'],
+            // Distinct, so a year group named twice is a message rather than a constraint
+            // violation the office cannot read.
+            'overrides.*.level_id' => ['required', 'integer', 'distinct', 'exists:school_levels,id'],
+            'overrides.*.amount' => ['required', 'numeric', 'min:0'],
+            'overrides.*.status' => ['required', Rule::in(array_keys(FeeClassOverride::STATUSES))],
+        ], [
+            'overrides.*.level_id.distinct' => 'The same year group is listed twice.',
+            'overrides.*.level_id.exists' => 'One of those year groups no longer exists.',
+        ]);
+
+        $rows = $validated['overrides'] ?? [];
+
+        $fee->overrides()->delete();
+
+        foreach ($rows as $row) {
+            $fee->overrides()->create($row);
+        }
+
+        return redirect()
+            ->route('admin.fees.edit', ['fee' => $fee, 'tab' => 'class-amounts'])
+            ->with('status', $rows === []
+                ? 'Every class amount removed — every year group pays the default.'
+                : 'Class amounts updated for '.$fee->title.'.');
+    }
+
+    /**
      * The rules a fee is saved under, in the modal and on its own page alike. One list,
      * so the two cannot drift apart.
      *
@@ -155,9 +253,15 @@ class FeeController extends Controller
         return [
             'title' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:500'],
+            'revenue_code' => ['nullable', 'string', 'max:40'],
             'cycle' => ['required', Rule::in(array_keys(Fee::CYCLES))],
             'academic_session_id' => ['nullable', 'integer', 'exists:academic_sessions,id'],
             'amount' => ['required', 'numeric', 'min:0'],
+            // The per-term amounts are exceptions to the default, so empty is allowed and
+            // means "charge the default here".
+            'first_term_amount' => ['nullable', 'numeric', 'min:0'],
+            'second_term_amount' => ['nullable', 'numeric', 'min:0'],
+            'third_term_amount' => ['nullable', 'numeric', 'min:0'],
             // Unchecked boxes are not submitted at all, so these have to be optional.
             'first_term_active' => ['sometimes', 'boolean'],
             'second_term_active' => ['sometimes', 'boolean'],
@@ -179,13 +283,27 @@ class FeeController extends Controller
         return [
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
+            'revenue_code' => $validated['revenue_code'] ?? null,
             'cycle' => $validated['cycle'],
             'academic_session_id' => $validated['academic_session_id'] ?? null,
             'amount' => $validated['amount'],
+            'first_term_amount' => $this->amountOrNull($validated['first_term_amount'] ?? null),
+            'second_term_amount' => $this->amountOrNull($validated['second_term_amount'] ?? null),
+            'third_term_amount' => $this->amountOrNull($validated['third_term_amount'] ?? null),
             'first_term_active' => $request->boolean('first_term_active'),
             'second_term_active' => $request->boolean('second_term_active'),
             'third_term_active' => $request->boolean('third_term_active'),
         ];
+    }
+
+    /**
+     * An emptied amount box means "use the default", not nought. Stored as null so the two
+     * can be told apart later: a term that costs nothing and a term that was never priced
+     * are different answers.
+     */
+    protected function amountOrNull(mixed $value): ?float
+    {
+        return ($value === null || $value === '') ? null : round((float) $value, 2);
     }
 
     /** An unknown tab is not an error to shout about; it is somebody's stale bookmark. */
