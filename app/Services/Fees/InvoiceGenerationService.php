@@ -2,6 +2,7 @@
 
 namespace App\Services\Fees;
 
+use App\Enums\InvoiceStatus;
 use App\Models\AcademicSession;
 use App\Models\FeeStructure;
 use App\Models\Invoice;
@@ -19,8 +20,7 @@ class InvoiceGenerationService
 {
     public function __construct(
         private readonly NumberSequenceService $sequences,
-    ) {
-    }
+    ) {}
 
     /**
      * Raise the term invoice for a student.
@@ -42,14 +42,10 @@ class InvoiceGenerationService
 
         $termId ??= $session->currentTerm()?->id;
 
-        $structure ??= FeeStructure::defaultFor($session->id, $student->level_id, $termId);
-
-        if (! $structure) {
-            // Nothing to bill against yet — the student is still enrolled, they
-            // simply have no invoice until the finance office publishes a structure.
-            return null;
-        }
-
+        // The bill they already have comes first; the structure is only needed to raise a new
+        // one. Asked the other way round this handed back nothing for a child who had a real,
+        // unpaid bill but no published structure — which is the state a school is in the term
+        // after it stops reissuing structures, and exactly when the office is settling up.
         $existing = Invoice::query()
             ->where('student_id', $student->id)
             ->where('academic_session_id', $session->id)
@@ -60,6 +56,14 @@ class InvoiceGenerationService
             return $existing;
         }
 
+        $structure ??= FeeStructure::defaultFor($session->id, $student->level_id, $termId);
+
+        if (! $structure) {
+            // Nothing to bill against yet — the student is still enrolled, they
+            // simply have no invoice until the finance office publishes a structure.
+            return null;
+        }
+
         return DB::transaction(function () use ($student, $structure, $session, $termId, $user) {
             $invoice = Invoice::create([
                 'invoice_number' => $this->sequences->nextInvoiceNumber($session->startYear()),
@@ -68,7 +72,7 @@ class InvoiceGenerationService
                 'term_id' => $termId,
                 'fee_structure_id' => $structure->id,
                 'discount' => 0,
-                'status' => \App\Enums\InvoiceStatus::Unpaid,
+                'status' => InvoiceStatus::Unpaid,
                 'due_date' => now()->addDays((int) ($structure->due_days ?: Setting::get('invoice_due_days', 30))),
                 'issued_at' => now(),
                 'is_auto_generated' => true,

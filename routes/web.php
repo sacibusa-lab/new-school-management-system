@@ -429,7 +429,7 @@ Route::middleware('auth')
         Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])->name('payments.reverse');
 
         // The rest of the collection side, in the order the school's own fees site
-        // puts it. Each is a page saying what will be on it until it is built — see
+        // puts it. What is not built yet is a page saying what will be on it — see
         // PaymentController::PAGES — so the menu can be complete without a link that
         // errors.
         Route::get('payments/overview', [PaymentController::class, 'overview'])->name('payments.overview');
@@ -441,7 +441,18 @@ Route::middleware('auth')
         Route::get('payments/level', [PaymentController::class, 'level'])->name('payments.level');
         Route::get('payments/level/export', [PaymentController::class, 'exportLevel'])->name('payments.level.export');
 
+        // The slips for a term, and the same slips as a file. The filters travel in the
+        // query string rather than in a session, so both downloads are links the office can
+        // send to a colleague or open on another machine.
         Route::get('payments/schedule', [PaymentController::class, 'schedule'])->name('payments.schedule');
+        Route::get('payments/schedule/export', [PaymentController::class, 'exportSchedule'])->name('payments.schedule.export');
+        Route::get('payments/schedule/pdf', [PaymentController::class, 'downloadSchedule'])->name('payments.schedule.pdf');
+
+        // The two things the office does to a sheet of slips: change what is owed, and record
+        // what has been paid. Both act on the children ticked on the page, and both come back
+        // to it with a sentence saying what happened — including who was left alone.
+        Route::post('payments/schedule/adjust', [PaymentController::class, 'adjustSchedule'])->name('payments.schedule.adjust');
+        Route::post('payments/schedule/record', [PaymentController::class, 'recordSchedule'])->name('payments.schedule.record');
         Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
         Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
 

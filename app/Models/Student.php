@@ -79,6 +79,17 @@ class Student extends Model
     }
 
     /**
+     * Money added to or taken off this child's bill, with a reason.
+     *
+     * Scoped by whoever asks to one session and one term: an adjustment is a decision about
+     * a term, so a child collects them over a school life rather than carrying one price.
+     */
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(StudentAdjustment::class);
+    }
+
+    /**
      * The bank account number their fees are paid into — one per child, opened with
      * the gateway on demand. See VirtualAccountService.
      */

@@ -13,12 +13,17 @@ use App\Models\Payment;
 use App\Models\SchoolLevel;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\StudentAdjustment;
 use App\Models\Term;
+use App\Services\Fees\InvoiceGenerationService;
 use App\Services\NumberSequenceService;
 use App\Services\Sms\SmsNotifier;
+use App\Support\ClassOptions;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -433,12 +438,548 @@ class PaymentController extends Controller
         return ['unit' => $unit, 'children' => $rows];
     }
 
+    /* ------------------------------------------------------------------ */
+    /* Payment Schedule */
+    /* ------------------------------------------------------------------ */
+
     /**
-     * What each student should have paid by now, and what is still to fall due.
+     * What each child is charged this term, and what is still owed on it.
+     *
+     * A payment slip to a child, which is what the office hands over the counter: the fees
+     * being charged for, anything taken off, anything brought forward from an earlier
+     * session, the account the money goes into, and what is left to pay.
+     *
+     * Built from the same fees the overview works from rather than from the bills, for the
+     * reason the overview gives — the expectation is what the year group is charged, so a
+     * child nobody has raised a bill for still owes what they owe. A schedule that went
+     * blank until an invoice existed would be blank exactly when the office needed it.
+     *
+     * The filters are a plain GET form rather than a fetch: the sheet is a page of money,
+     * and it should be able to be linked to, bookmarked and printed from a school computer
+     * that has not finished loading the rest of the site.
      */
-    public function schedule(): View
+    public function schedule(Request $request): View
     {
-        return $this->placeholder('schedule');
+        $this->authorize('fees.view');
+
+        $filters = $this->scheduleFilters($request);
+
+        return view('admin.payments.schedule', [
+            'sheet' => $this->scheduleSheet($filters),
+            'filters' => $filters,
+            'statuses' => self::STANDINGS,
+            'sessions' => AcademicSession::query()->orderByDesc('starts_on')->orderByDesc('id')->get(),
+            'terms' => Term::query()->orderBy('position')->get(),
+            'classOptions' => ClassOptions::grouped(),
+            'feeOptions' => $this->feeOptions(),
+            'currency' => Setting::get('currency_symbol', '₦'),
+        ]);
+    }
+
+    /**
+     * The same sheet as a spreadsheet.
+     *
+     * Written by the server rather than assembled in the browser, so the file is whole
+     * whether or not the page has finished loading, and so what is in it can be asserted.
+     * The four subsets are the three standings and the whole sheet, which is what the
+     * office asks for by name.
+     */
+    public function exportSchedule(Request $request): StreamedResponse
+    {
+        $this->authorize('fees.view');
+
+        $filters = $this->scheduleFilters($request);
+        $subset = $this->subset($request);
+        $sheet = $this->scheduleSheet($filters, $subset);
+
+        return response()->streamDownload(function () use ($sheet): void {
+            $file = fopen('php://output', 'w');
+
+            // For Excel: without it the naira sign and the accented names arrive as rubble.
+            fwrite($file, "\xEF\xBB\xBF");
+
+            fputcsv($file, [
+                'Student number', 'Name', 'Class', 'Charged', 'Discount',
+                'Expected', 'Received', 'Outstanding', 'Status',
+            ]);
+
+            foreach ($sheet['slips'] as $slip) {
+                fputcsv($file, [
+                    $slip['number'],
+                    $slip['name'],
+                    $slip['class'],
+                    number_format($slip['charged'], 2, '.', ''),
+                    number_format($slip['discount'], 2, '.', ''),
+                    number_format($slip['expected'], 2, '.', ''),
+                    number_format($slip['paid'], 2, '.', ''),
+                    number_format($slip['due'], 2, '.', ''),
+                    self::STANDINGS[$slip['status']],
+                ]);
+            }
+
+            fclose($file);
+        }, $this->scheduleFilename($filters, $subset, 'csv'), ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * The same slips on paper.
+     *
+     * A PDF rather than a print stylesheet because the slips go home: the office prints a
+     * class at a time and cuts them up, so they have to sit several to a sheet and not be
+     * split across two of them.
+     */
+    public function downloadSchedule(Request $request): Response
+    {
+        $this->authorize('fees.view');
+
+        $filters = $this->scheduleFilters($request);
+        $subset = $this->subset($request);
+
+        // `$school` is not passed: AppServiceProvider shares the branding object with every
+        // view, and a `school` key of our own would be overwritten by it. Its `currency` is
+        // used for the same reason — one place to change the symbol.
+        $pdf = Pdf::loadView('admin.payments.schedule-pdf', [
+            'sheet' => $this->scheduleSheet($filters, $subset),
+            'session' => $filters['session']?->name,
+            'term' => $filters['term']?->name,
+            'standings' => self::STANDINGS,
+            'label' => $subset === 'all' ? 'Every child' : self::STANDINGS[$subset],
+        ])->setPaper('a4');
+
+        return $pdf->download($this->scheduleFilename($filters, $subset, 'pdf'));
+    }
+
+    /**
+     * What the sheet has been asked for.
+     *
+     * @return array{session:?AcademicSession,term:?Term,class:string,fee:int}
+     */
+    protected function scheduleFilters(Request $request): array
+    {
+        $session = AcademicSession::query()->find($request->integer('session'))
+            ?? AcademicSession::current();
+
+        return [
+            'session' => $session,
+            'term' => Term::query()->find($request->integer('term'))
+                ?? $session?->currentTerm()
+                ?? Term::current(),
+            // Kept as it was written rather than taken apart, so the control recognises its
+            // own choice when the page is drawn again. ClassOptions does the reading.
+            'class' => (string) $request->string('class'),
+            'fee' => $request->integer('fee'),
+        ];
+    }
+
+    /**
+     * Which of the three standings a download is narrowed to.
+     *
+     * `all` is not one of them — it is the absence of a choice between them, and anything
+     * that is not one of the four is treated as the whole sheet rather than as an error.
+     */
+    protected function subset(Request $request): string
+    {
+        $subset = (string) $request->string('subset', 'all');
+
+        return array_key_exists($subset, self::STANDINGS) ? $subset : 'all';
+    }
+
+    /**
+     * Every slip on the sheet, and the figures across them.
+     *
+     * @param  array{session:?AcademicSession,term:?Term,class:string,fee:int}  $filters
+     * @return array{slips:Collection<int,array<string,mixed>>,counts:array<string,int>,totals:array<string,float>}
+     */
+    protected function scheduleSheet(array $filters, string $subset = 'all'): array
+    {
+        $chosen = ClassOptions::parse($filters['class']);
+
+        $students = Student::query()
+            ->active()
+            ->with(['schoolClass.section', 'level', 'virtualAccount'])
+            ->when($chosen['level'] !== 0, fn ($query) => $query->where('level_id', $chosen['level']))
+            ->when($chosen['section'] !== 0, fn ($query) => $query->whereHas(
+                'schoolClass',
+                fn ($classes) => $classes->where('section_id', $chosen['section']),
+            ))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        // Fees with no academic session are the ones not tied to a year, so they are charged
+        // in every one — the same rule the overview charges by.
+        $fees = Fee::query()
+            ->active()
+            ->when($filters['session'], fn ($query, $session) => $query->where(fn ($inner) => $inner
+                ->where('academic_session_id', $session->id)
+                ->orWhereNull('academic_session_id')))
+            ->when($filters['fee'] !== 0, fn ($query) => $query->where('id', $filters['fee']))
+            ->with('overrides')
+            ->get();
+
+        $position = $filters['term']?->position;
+
+        $money = $this->childTotals($students->pluck('id'), $filters['session'], $filters['term']);
+        $arrears = $this->arrearsPerChild($students->pluck('id'), $filters['session']);
+        $adjustments = $this->adjustmentsPerChild($students->pluck('id'), $filters['session'], $filters['term']);
+
+        $slips = $students->map(function (Student $child) use ($fees, $position, $money, $arrears, $adjustments): array {
+            $level = $child->level;
+
+            $lines = $level === null ? [] : $this->feeLinesFor($level, $fees, $position);
+            $brought = $arrears[$child->id] ?? [];
+            $changed = $adjustments[$child->id] ?? [];
+
+            // What the slip asks for before anything is taken off: this term's fees, whatever
+            // the office has added or taken off, and whatever earlier sessions still owe.
+            $charged = round(
+                collect($lines)->sum('amount')
+                + collect($changed)->sum('amount')
+                + collect($brought)->sum('amount'),
+                2,
+            );
+            $discount = round($money['discount'][$child->id] ?? 0, 2);
+            $expected = round(max($charged - $discount, 0), 2);
+            $paid = round($money['paid'][$child->id] ?? 0, 2);
+
+            return [
+                'id' => $child->id,
+                'number' => (string) ($child->student_number ?: $child->admission_number),
+                'name' => $child->full_name,
+                'class' => $child->schoolClass?->name,
+                'arm' => $child->schoolClass?->section?->name,
+                'level' => $level?->name,
+                'account' => $child->virtualAccount?->account_number,
+                'bank' => $child->virtualAccount?->bank_name,
+                'lines' => $lines,
+                'adjustments' => $changed,
+                'arrears' => $brought,
+                'charged' => $charged,
+                'discount' => $discount,
+                'expected' => $expected,
+                'paid' => $paid,
+                'due' => round(max($expected - $paid, 0), 2),
+                'status' => $this->standing($expected, $paid),
+            ];
+        })->values();
+
+        // Tallied before the subset narrows anything: the four figures say what the whole
+        // sheet holds, which is the question the buttons beside them are asked.
+        $counts = [
+            'all' => $slips->count(),
+            'completed' => $slips->where('status', 'completed')->count(),
+            'partial' => $slips->where('status', 'partial')->count(),
+            'pending' => $slips->where('status', 'pending')->count(),
+        ];
+
+        if ($subset !== 'all') {
+            $slips = $slips->where('status', $subset)->values();
+        }
+
+        return [
+            'slips' => $slips,
+            'counts' => $counts,
+            'totals' => [
+                'expected' => round($slips->sum('expected'), 2),
+                'paid' => round($slips->sum('paid'), 2),
+                'due' => round($slips->sum('due'), 2),
+            ],
+        ];
+    }
+
+    /**
+     * What each child still owes from sessions that have ended.
+     *
+     * A bill raised in an earlier session and not settled. The outstanding is the bill less
+     * what has been paid against it — the same pair of columns the register reads — and a
+     * cancelled bill is owed by nobody.
+     *
+     * Only earlier sessions count. A bill for a session that has not started is not arrears,
+     * and putting it on this term's slip would ask a family to pay next year's fees now.
+     *
+     * @param  Collection<int,int>  $studentIds
+     * @return array<int,array<int,array{title:string,amount:float}>> child => what is carried
+     */
+    protected function arrearsPerChild(Collection $studentIds, ?AcademicSession $session): array
+    {
+        if ($session === null || $studentIds->isEmpty()) {
+            return [];
+        }
+
+        $rows = Invoice::query()
+            ->whereIn('invoices.student_id', $studentIds)
+            ->where('invoices.academic_session_id', '!=', $session->id)
+            ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+            ->whereColumn('invoices.total', '>', 'invoices.amount_paid')
+            ->join('academic_sessions', 'academic_sessions.id', '=', 'invoices.academic_session_id')
+            ->where('academic_sessions.starts_on', '<', $session->starts_on)
+            ->groupBy(
+                'invoices.student_id',
+                'academic_sessions.id',
+                'academic_sessions.name',
+                'academic_sessions.starts_on',
+            )
+            ->orderBy('academic_sessions.starts_on')
+            ->get([
+                DB::raw('invoices.student_id as student_id'),
+                DB::raw('academic_sessions.name as session_name'),
+                DB::raw('sum(invoices.total - invoices.amount_paid) as outstanding'),
+            ]);
+
+        $arrears = [];
+
+        foreach ($rows as $row) {
+            $arrears[(int) $row->student_id][] = [
+                'title' => 'Brought forward — '.$row->session_name,
+                'amount' => round((float) $row->outstanding, 2),
+            ];
+        }
+
+        return $arrears;
+    }
+
+    /**
+     * What has been added to or taken off each child's bill this term.
+     *
+     * One line to an adjustment rather than a sum: a parent reading the slip is owed the
+     * reason, and two discounts given for two reasons are two decisions. A slip that said
+     * only "less ₦10,000" starts an argument at the counter.
+     *
+     * Scoped to one session, because that is what makes an adjustment belong to a year. The
+     * term is applied when there is one; an adjustment made against the session alone is
+     * money moved for the year and shows on whichever term is being read.
+     *
+     * @param  Collection<int,int>  $studentIds
+     * @return array<int,array<int,array{title:string,amount:float}>> child => what was changed
+     */
+    protected function adjustmentsPerChild(Collection $studentIds, ?AcademicSession $session, ?Term $term): array
+    {
+        if ($session === null || $studentIds->isEmpty()) {
+            return [];
+        }
+
+        $rows = StudentAdjustment::query()
+            ->whereIn('student_id', $studentIds)
+            ->where('academic_session_id', $session->id)
+            ->when($term, fn ($query, $term) => $query->where('term_id', $term->id))
+            ->orderBy('id')
+            ->get();
+
+        $adjustments = [];
+
+        foreach ($rows as $row) {
+            $adjustments[$row->student_id][] = [
+                'title' => $row->label(),
+                'amount' => round((float) $row->amount, 2),
+            ];
+        }
+
+        return $adjustments;
+    }
+
+    /**
+     * Add to, or take off, the bills of a set of children at once.
+     *
+     * One adjustment each rather than one row shared between them, because these are
+     * separate children's bills: a shared row would make "what did we do to Ada's bill" a
+     * join, and undoing it for one child a special case.
+     *
+     * The amount is stored signed. Nothing here edits a fee or a bill — an adjustment sits
+     * beside them and is added up with them, so the reason survives and can be reversed by
+     * making the opposite one.
+     */
+    public function adjustSchedule(Request $request): RedirectResponse
+    {
+        $this->authorize('fees.manage');
+
+        $validated = $request->validate([
+            'students' => ['required', 'array', 'min:1'],
+            'students.*' => ['integer', 'exists:students,id'],
+            'amount' => ['required', 'numeric', 'min:1', 'max:99999999'],
+            'type' => ['required', 'in:add,subtract'],
+            'description' => ['nullable', 'string', 'max:120'],
+        ], [
+            'students.required' => 'Tick at least one child whose amount is being changed.',
+            'amount.min' => 'Enter an amount greater than zero.',
+        ]);
+
+        $filters = $this->scheduleFilters($request);
+
+        $signed = $validated['type'] === 'subtract'
+            ? -1 * (float) $validated['amount']
+            : (float) $validated['amount'];
+
+        $description = trim((string) ($validated['description'] ?? ''));
+
+        if ($description === '') {
+            $description = $signed < 0 ? 'Discount' : 'Additional charge';
+        }
+
+        $changed = DB::transaction(function () use ($validated, $filters, $signed, $description, $request): int {
+            foreach ($validated['students'] as $studentId) {
+                StudentAdjustment::create([
+                    'student_id' => $studentId,
+                    'academic_session_id' => $filters['session']?->id,
+                    'term_id' => $filters['term']?->id,
+                    'amount' => $signed,
+                    'description' => $description,
+                    'created_by' => $request->user()->id,
+                ]);
+            }
+
+            return count($validated['students']);
+        });
+
+        $money = Setting::get('currency_symbol', '₦').number_format(abs($signed), 2);
+        $word = $signed < 0 ? 'taken off' : 'added to';
+
+        return back()->with(
+            'status',
+            $money.' '.$word.' '.$changed.' '.Str::plural('child', $changed).' — '.$description.'.',
+        );
+    }
+
+    /**
+     * Record money received for a set of children at once.
+     *
+     * The money goes against each child's bill for this session and this term, and the bill
+     * is raised from the published fee structure if it does not exist yet — the same service
+     * the rest of the school bills with, so a bill raised here is a bill like any other
+     * rather than a second kind of money.
+     *
+     * Children the office cannot usefully mark are counted and named rather than passed over.
+     * A run that quietly did nothing looks exactly like one that worked, and the place that
+     * shows up is a parent being told they had paid.
+     *
+     * No text message goes out from here. The counter taking one payment sends a receipt;
+     * this is the office catching up on a term, and forty texts is not a favour to anybody.
+     */
+    public function recordSchedule(Request $request, InvoiceGenerationService $billing): RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $validated = $request->validate([
+            'students' => ['required', 'array', 'min:1'],
+            'students.*' => ['integer', 'exists:students,id'],
+            'method' => ['required', 'in:cash,bank_transfer,card,gateway,cheque'],
+            'mode' => ['required', 'in:full,part'],
+            'amount' => ['nullable', 'numeric', 'min:1', 'max:99999999', 'required_if:mode,part'],
+            'paid_at' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'students.required' => 'Tick at least one child who is paying.',
+            'amount.required_if' => 'Enter the amount each of them is paying.',
+        ]);
+
+        $filters = $this->scheduleFilters($request);
+
+        $recorded = 0;
+        $settled = 0;
+        $unbilled = [];
+
+        foreach ($validated['students'] as $studentId) {
+            $student = Student::query()->find($studentId);
+
+            if ($student === null) {
+                continue;
+            }
+
+            $invoice = $billing->generateForStudent($student, null, $filters['term']?->id, $request->user());
+
+            if ($invoice === null) {
+                $unbilled[] = $student->full_name;
+
+                continue;
+            }
+
+            $outstanding = round((float) $invoice->balance, 2);
+
+            if ($outstanding <= 0) {
+                $settled++;
+
+                continue;
+            }
+
+            // "Full" is what the bill says is left, never the slip's figure: the two can
+            // disagree while the fees catalogue and the published structures are out of step,
+            // and money has to be recorded against the thing it settles.
+            $amount = $validated['mode'] === 'full'
+                ? $outstanding
+                : min((float) $validated['amount'], $outstanding);
+
+            DB::transaction(function () use ($invoice, $amount, $validated, $request): void {
+                Payment::create([
+                    'receipt_number' => $this->sequences->nextReceiptNumber(),
+                    'invoice_id' => $invoice->id,
+                    'student_id' => $invoice->student_id,
+                    'amount' => $amount,
+                    'method' => $validated['method'],
+                    'status' => PaymentStatus::Successful,
+                    'paid_at' => $validated['paid_at'] ?? now(),
+                    'notes' => $validated['notes'] ?? null,
+                    'recorded_by' => $request->user()->id,
+                ]);
+
+                $invoice->recalculate();
+            });
+
+            $recorded++;
+        }
+
+        return back()->with('status', $this->recordedMessage($recorded, $settled, $unbilled));
+    }
+
+    /**
+     * What to say once the run is over.
+     *
+     * The children who were left alone are in the sentence on purpose.
+     *
+     * @param  array<int,string>  $unbilled
+     */
+    protected function recordedMessage(int $recorded, int $settled, array $unbilled): string
+    {
+        $sentence = $recorded.' '.Str::plural('payment', $recorded).' recorded.';
+
+        if ($settled > 0) {
+            $sentence .= ' '.$settled.' already settled.';
+        }
+
+        if ($unbilled !== []) {
+            $sentence .= ' Nothing to pay against for '.implode(', ', $unbilled)
+                .' — publish a fee structure for their year group first.';
+        }
+
+        return $sentence;
+    }
+
+    /**
+     * The fees a sheet can be narrowed to.
+     *
+     * By name rather than by id, because the office filters a sheet by what it is for —
+     * "the termly fee" — and an id is not a thing anybody says out loud.
+     *
+     * @return array<int,string>
+     */
+    protected function feeOptions(): array
+    {
+        return Fee::query()->active()->orderBy('title')->pluck('title', 'id')->all();
+    }
+
+    /** What a downloaded sheet is called, so two terms' files cannot be confused. */
+    protected function scheduleFilename(array $filters, string $subset, string $extension): string
+    {
+        $name = implode(' ', array_filter([
+            'Payment schedule',
+            $filters['session']?->name,
+            $filters['term']?->name,
+            $subset === 'all' ? null : self::STANDINGS[$subset],
+        ]));
+
+        // The slashes in "2026/2027" come out of a slug as "20262027", which is a year nobody
+        // recognises. Spaces keep the two halves apart.
+        $name = str_replace(['/', '\\'], ' ', $name);
+
+        return Str::slug($name).'.'.$extension;
     }
 
     /**
@@ -489,32 +1030,68 @@ class PaymentController extends Controller
             ->with('overrides')
             ->get();
 
-        return $levels->mapWithKeys(function (SchoolLevel $level) use ($fees, $position): array {
-            $unit = 0.0;
+        return $levels->mapWithKeys(fn (SchoolLevel $level): array => [
+            $level->id => round(collect($this->feeLinesFor($level, $fees, $position))->sum('amount'), 2),
+        ])->all();
+    }
 
-            foreach ($fees as $fee) {
-                // A term this fee has been unticked for is a term it is not charged in.
-                if ($position !== null && ! $fee->isActiveForTerm($position)) {
-                    continue;
-                }
+    /**
+     * What one child in a year group is charged this term, fee by fee.
+     *
+     * The rule unitFees() adds up, itemised rather than summed, because a payment slip has
+     * to name what it is charging for. One method rather than two: a slip that itemised a
+     * different total from the one the overview says the year group owes would be a page
+     * arguing with itself.
+     *
+     * @param  Collection<int,Fee>  $fees
+     * @return array<int,array{title:string,amount:float}>
+     */
+    protected function feeLinesFor(SchoolLevel $level, Collection $fees, ?int $position): array
+    {
+        $lines = [];
 
-                $override = $fee->overrides->firstWhere('level_id', $level->id);
-
-                if ($override !== null) {
-                    if ($override->isActive()) {
-                        $unit += (float) $override->amount;
-                    }
-
-                    continue;
-                }
-
-                $unit += (float) ($position === null
-                    ? $fee->amount
-                    : $fee->amountForTerm($position));
+        foreach ($fees as $fee) {
+            // A term this fee has been unticked for is a term it is not charged in.
+            if ($position !== null && ! $fee->isActiveForTerm($position)) {
+                continue;
             }
 
-            return [$level->id => round($unit, 2)];
-        })->all();
+            $override = $fee->overrides->firstWhere('level_id', $level->id);
+
+            if ($override !== null) {
+                if ($override->isActive()) {
+                    $lines[] = [
+                        'title' => $this->feeTitle($fee),
+                        'amount' => round((float) $override->amount, 2),
+                    ];
+                }
+
+                continue;
+            }
+
+            $lines[] = [
+                'title' => $this->feeTitle($fee),
+                'amount' => round((float) ($position === null
+                    ? $fee->amount
+                    : $fee->amountForTerm($position)), 2),
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * What a fee is called on a slip.
+     *
+     * The catalogue's own words, falling back to the description and then to something
+     * printable, because a slip is read by a parent rather than by the office and an empty
+     * row with a price beside it explains nothing.
+     */
+    protected function feeTitle(Fee $fee): string
+    {
+        $title = trim((string) ($fee->title ?: $fee->description));
+
+        return $title === '' ? 'School fee' : $title;
     }
 
     /**
