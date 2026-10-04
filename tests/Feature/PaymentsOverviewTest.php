@@ -249,7 +249,6 @@ class PaymentsOverviewTest extends TestCase
 
         $this->assertStringContainsString('1 student paid', $html);
         $this->assertStringContainsString('2 students owing', $html);
-        $this->assertStringContainsString('both are true of them', $html);
     }
 
     /** A receipt with no bill behind it belongs to no term, so it is not this term's money. */

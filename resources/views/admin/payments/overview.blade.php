@@ -24,9 +24,7 @@
     register: the register says what has been billed, and this says what should have been.
 --}}
 <p class="max-w-3xl text-sm text-muted">
-    What each year group should have paid this term, and what has actually come in. The
-    expectation is worked out from the fees — what one child in that year group is charged —
-    so a year group nobody has billed for still shows what it owes.
+    What each year group should have paid this term, and what has actually come in.
 </p>
 
 {{-- ================= Which session, which term ================= --}}
@@ -124,7 +122,7 @@
          search: '',
 
          get arms() {
-             return [...new Set(this.children.map(child => child.class).filter(Boolean))].sort();
+             return [...new Set(this.children.map(child => child.subclass).filter(Boolean))].sort();
          },
 
          get visible() {
@@ -144,7 +142,7 @@
 
              return this.children.filter(child => {
                  if (which !== '' && child.status !== which) { return false; }
-                 if (this.subclass !== '' && child.class !== this.subclass) { return false; }
+                 if (this.subclass !== '' && child.subclass !== this.subclass) { return false; }
                  if (needle === '') { return true; }
 
                  return child.name.toLowerCase().includes(needle)
@@ -201,8 +199,6 @@
             <p class="font-display text-base font-semibold text-ink">By year group</p>
             <p class="mt-0.5 text-xs text-muted">
                 {{ $session?->name ?? 'No session set' }}@if ($term) · {{ $term->name }}@endif.
-                A family part-way through is counted as having paid and as still owing, because
-                both are true of them.
             </p>
         </div>
 

@@ -388,7 +388,11 @@ class PaymentController extends Controller
         $unit = (float) ($this->unitFees(collect([$level]), $session, $term)[$level->id] ?? 0);
 
         $children = Student::query()
-            ->with('schoolClass')
+            // The section comes with the class: the panel filters by the arm, and the arm is
+            // a thing of its own. JSS1A and SS1A share the letter A, so it has to be read
+            // from the section rather than off the end of the class name — which would also
+            // break the moment a school names an arm "Blue" or "JSS 1A".
+            ->with(['schoolClass.section'])
             ->where('level_id', $level->id)
             ->active()
             ->orderBy('last_name')
@@ -410,6 +414,9 @@ class PaymentController extends Controller
                 'number' => (string) ($child->student_number ?: $child->admission_number),
                 'name' => $child->full_name,
                 'class' => $child->schoolClass?->name,
+                // The arm on its own, for the panel's filter. The card and the CSV keep the
+                // whole class name, because a slip that says A does not say which year.
+                'subclass' => $child->schoolClass?->section?->name,
                 'discount' => $discount,
                 'expected' => $owed,
                 'received' => $received,
