@@ -19,7 +19,6 @@ class BankAccountFactory extends Factory
     public function definition(): array
     {
         return [
-            'label' => ucfirst($this->faker->unique()->word()).' account',
             'bank_name' => 'Wema Bank',
             'bank_code' => '035',
             'account_number' => (string) $this->faker->unique()->numerify('##########'),

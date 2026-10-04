@@ -182,14 +182,19 @@
                                 @foreach ($fee->beneficiaries as $split)
                                     <tr>
                                         <td class="p-3">
-                                            <span class="block font-medium text-ink">
-                                                {{ $split->bankAccount?->label ?? 'Account no longer held' }}
-                                            </span>
-
+                                            {{-- The bank's name for the account, because the caption the
+                                                 office used to type ("Fees account") is gone — and the
+                                                 bank's answer is the one thing here nobody typed. --}}
                                             @if ($split->bankAccount)
+                                                <span class="block font-medium text-ink">
+                                                    {{ $split->bankAccount->account_name }}
+                                                </span>
+
                                                 <span class="mt-0.5 block font-mono text-xs text-muted">
                                                     {{ $split->bankAccount->account_number }} · {{ $split->bankAccount->bank_name }}
                                                 </span>
+                                            @else
+                                                <span class="block font-medium text-muted">Account no longer held</span>
                                             @endif
                                         </td>
 
@@ -237,7 +242,7 @@
                               x-data="{
                                   fee: {{ (float) $fee->amount }},
                                   rows: @js($fee->beneficiaries->map(fn ($split) => ['bank_account_id' => (string) $split->bank_account_id, 'amount' => (string) $split->amount])->values()),
-                                  accounts: @js($bankAccounts->map(fn ($account) => ['id' => $account->id, 'label' => $account->label.' — '.$account->account_number])->values()),
+                                  accounts: @js($bankAccounts->map(fn ($account) => ['id' => $account->id, 'label' => $account->bank_name.' — '.$account->account_number])->values()),
                                   add() {
                                       const used = this.rows.map(row => String(row.bank_account_id));
                                       const free = this.accounts.find(account => ! used.includes(String(account.id)));

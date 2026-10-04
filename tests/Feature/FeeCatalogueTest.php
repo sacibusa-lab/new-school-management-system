@@ -321,8 +321,8 @@ class FeeCatalogueTest extends TestCase
     {
         $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 100000]);
 
-        $feesAccount = BankAccount::factory()->create(['label' => 'Fees account', 'account_number' => '1111111111']);
-        $ptaAccount = BankAccount::factory()->create(['label' => 'PTA account', 'account_number' => '2222222222']);
+        $feesAccount = BankAccount::factory()->create(['account_number' => '1111111111']);
+        $ptaAccount = BankAccount::factory()->create(['account_number' => '2222222222']);
 
         $this->actingAs($this->admin)
             ->post(route('admin.fees.beneficiaries', $fee), [
@@ -345,7 +345,7 @@ class FeeCatalogueTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'splits']))
             ->assertOk()
-            ->assertSee('Fees account')
+            ->assertSee('Wema Bank')
             ->assertSee('1111111111')
             ->assertSee($this->currency.'60,000.00')
             // What is left over is shown rather than left to be worked out.

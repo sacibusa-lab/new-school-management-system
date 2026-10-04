@@ -476,6 +476,14 @@ Route::middleware('auth')
         // account number each child is given, which lives under Payments.
         Route::get('bank-accounts', [BankAccountController::class, 'index'])->name('bank-accounts.index');
         Route::post('bank-accounts', [BankAccountController::class, 'store'])->name('bank-accounts.store');
+
+        // Whose account a number is, asked while the form is being filled in. Literal
+        // path, and before the routes that take an id, so "resolve" can never be read
+        // as one. Throttled because each call is a call to Paystack.
+        Route::post('bank-accounts/resolve', [BankAccountController::class, 'resolve'])
+            ->middleware('throttle:30,1')
+            ->name('bank-accounts.resolve');
+
         Route::put('bank-accounts/{account}', [BankAccountController::class, 'update'])->name('bank-accounts.update');
         Route::delete('bank-accounts/{account}', [BankAccountController::class, 'destroy'])->name('bank-accounts.destroy');
 

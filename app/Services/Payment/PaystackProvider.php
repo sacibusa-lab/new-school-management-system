@@ -148,21 +148,36 @@ class PaystackProvider implements PaymentGatewayInterface
         }
     }
 
+    /**
+     * Every bank in the country, which is the list the school picks its OWN account from.
+     *
+     * Not the same question as getVirtualAccountBanks below: only some of these will open
+     * a dedicated account for a child.
+     */
     public function getBanks(): array
     {
         try {
-            // Using cache to avoid frequent API calls for static data
-            return cache()->remember('paystack_banks', 86400, function () { // Cache for 24 hours
-                $response = Http::withToken($this->secretKey)->get("{$this->baseUrl}/bank", [
-                    'currency' => 'NGN',
-                ]);
+            $banks = cache()->get('paystack_banks');
 
-                if ($response->successful()) {
-                    return $response->json()['data'] ?? [];
-                }
+            if (is_array($banks) && $banks !== []) {
+                return $banks;
+            }
 
-                return [];
-            });
+            // Ten seconds, because this is read while a page is being drawn.
+            $response = Http::withToken($this->secretKey)
+                ->timeout(10)
+                ->get("{$this->baseUrl}/bank", ['currency' => 'NGN']);
+
+            $banks = $response->successful() ? ($response->json('data') ?? []) : [];
+
+            // Only a real list is kept. `remember` would have cached the empty answer a
+            // failed call gives, which takes the bank list off the page for a whole day
+            // because Paystack had one bad minute.
+            if ($banks !== []) {
+                cache()->put('paystack_banks', $banks, 86400);
+            }
+
+            return $banks;
         } catch (\Exception $e) {
             Log::error('Paystack Get Banks Exception', ['error' => $e->getMessage()]);
 
@@ -219,27 +234,44 @@ class PaystackProvider implements PaymentGatewayInterface
     public function resolveAccountNumber(string $accountNumber, string $bankCode): array
     {
         try {
-            $response = Http::withToken($this->secretKey)->get("{$this->baseUrl}/bank/resolve", [
-                'account_number' => $accountNumber,
-                'bank_code' => $bankCode,
-            ]);
+            // Ten seconds, not the thirty this would otherwise wait. The answer is wanted
+            // while somebody is looking at the page — either they are typing an account
+            // number and being told whose it is, or they have pressed Save — and half a
+            // minute of nothing is a page the office decides is broken.
+            $response = Http::withToken($this->secretKey)
+                ->timeout(10)
+                ->get("{$this->baseUrl}/bank/resolve", [
+                    'account_number' => $accountNumber,
+                    'bank_code' => $bankCode,
+                ]);
 
-            if ($response->successful()) {
+            $name = $response->json('data.account_name');
+
+            // Paystack answers 200 with `status: false` as well as failing outright, so
+            // what says whether this worked is whether a name came back — not the code.
+            if ($response->successful() && filled($name)) {
                 return [
                     'status' => true,
-                    'account_name' => $response->json()['data']['account_name'],
-                    'account_number' => $response->json()['data']['account_number'],
+                    'account_name' => $name,
+                    'account_number' => $response->json('data.account_number', $accountNumber),
                 ];
             }
 
             return [
                 'status' => false,
-                'message' => 'Could not resolve account details',
+                // The bank's own sentence where it gave one. "Could not resolve account
+                // name" is more use to the office than anything written here, and this
+                // sentence is now read out on the page rather than only logged.
+                'message' => $response->json('message') ?: 'Could not resolve account details',
             ];
         } catch (\Exception $e) {
+            Log::warning('Paystack Account Resolution Unavailable', ['error' => $e->getMessage()]);
+
+            // Said rather than thrown, because an unreachable bank is not the office's
+            // mistake and is certainly not something to put a stack trace in front of.
             return [
                 'status' => false,
-                'message' => 'Service error: '.$e->getMessage(),
+                'message' => 'The bank could not be reached just now. Try again.',
             ];
         }
     }

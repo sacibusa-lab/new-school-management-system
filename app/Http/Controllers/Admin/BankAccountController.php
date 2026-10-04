@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Services\Payment\PaystackProvider;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,6 +18,10 @@ use Illuminate\View\View;
  * on a letter and read out over the telephone, which is why the number is checked
  * against the bank before it is saved — a mistyped account number is money that never
  * arrives, and nobody finds out until a parent produces a teller slip.
+ *
+ * The number is put to the bank twice: once while the form is being filled in, so the
+ * office can see what it is about to save, and again on submit, because the reply that
+ * gets written has to be the bank's and not the browser's.
  */
 class BankAccountController extends Controller
 {
@@ -31,7 +36,7 @@ class BankAccountController extends Controller
         return view('admin.business.bank-accounts', [
             'accounts' => BankAccount::query()
                 ->orderByDesc('is_primary')
-                ->orderBy('label')
+                ->orderBy('bank_name')
                 ->get(),
             'banks' => $this->paystack->isConfigured() ? $this->paystack->getBanks() : [],
             'paystackReady' => $this->paystack->isConfigured(),
@@ -43,19 +48,22 @@ class BankAccountController extends Controller
         $this->authorize('fees.manage');
 
         $validated = $request->validate([
-            'label' => ['required', 'string', 'max:60'],
             'bank_code' => ['nullable', 'string', 'max:20', 'required_without:bank_name'],
             'bank_name' => ['nullable', 'string', 'max:120', 'required_without:bank_code'],
             'account_number' => ['required', 'string', 'digits:10', 'unique:bank_accounts,account_number'],
             'account_name' => ['nullable', 'string', 'max:160'],
             'is_primary' => ['nullable', 'boolean'],
+        ], [
+            'account_number.unique' => 'That account number is already saved.',
         ]);
 
         $bankName = $this->bankName($validated['bank_code'] ?? null, $validated['bank_name'] ?? null);
         $accountName = $validated['account_name'] ?? null;
 
-        // Where the bank can be asked, its answer is the one kept: what the bank calls
-        // the account is the only version of the name that cannot be somebody's typing.
+        // Asked again here, even though the page asked while the form was being filled
+        // in. That is the point of asking twice: what the page showed was a courtesy,
+        // and this is the answer that gets written — a request does not have to come
+        // from that form.
         if ($this->paystack->isConfigured() && filled($validated['bank_code'] ?? null)) {
             $resolved = $this->paystack->resolveAccountNumber($validated['account_number'], $validated['bank_code']);
 
@@ -75,7 +83,6 @@ class BankAccountController extends Controller
         }
 
         $account = BankAccount::create([
-            'label' => $validated['label'],
             'bank_name' => $bankName,
             'bank_code' => $validated['bank_code'] ?? null,
             'account_number' => $validated['account_number'],
@@ -89,18 +96,63 @@ class BankAccountController extends Controller
         return back()->with('status', "{$account->label()} saved.");
     }
 
-    public function update(Request $request, BankAccount $account): RedirectResponse
+    /**
+     * Whose account a number is, asked while the form is being filled in.
+     *
+     * The office sees the name it is about to save rather than finding out on submit. It
+     * is a courtesy and not the check: store() puts the number to the bank again and keeps
+     * that answer, because a request does not have to come from this page.
+     *
+     * Answers as JSON because the page fetches it — that way it can say "checking" while
+     * it waits instead of blanking the form and starting again.
+     */
+    public function resolve(Request $request): JsonResponse
     {
         $this->authorize('fees.manage');
 
         $validated = $request->validate([
-            'label' => ['required', 'string', 'max:60'],
+            'account_number' => ['required', 'string', 'digits:10'],
+            'bank_code' => ['required', 'string', 'max:20'],
+        ]);
+
+        // Caught here as well as on save, because a number that is already on the list is
+        // the one mistake this can spot without asking the bank anything — and being told
+        // while typing beats being told once the whole form is filled in.
+        if (BankAccount::query()->where('account_number', $validated['account_number'])->exists()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'That account number is already saved.',
+            ]);
+        }
+
+        $resolved = $this->paystack->resolveAccountNumber($validated['account_number'], $validated['bank_code']);
+
+        if (empty($resolved['status'])) {
+            return response()->json([
+                'ok' => false,
+                'message' => $resolved['message'] ?? 'That account number could not be checked with the bank.',
+            ]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'account_name' => $resolved['account_name'],
+        ]);
+    }
+
+    public function update(Request $request, BankAccount $account): RedirectResponse
+    {
+        $this->authorize('fees.manage');
+
+        // Only the two switches. The number and the name on it are the bank's, and the
+        // bank is the only authority on either: changing them means adding the account
+        // again, which is what puts them back to the bank.
+        $request->validate([
             'is_primary' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $account->update([
-            'label' => $validated['label'],
             'is_primary' => $request->boolean('is_primary'),
             'is_active' => $request->boolean('is_active'),
         ]);

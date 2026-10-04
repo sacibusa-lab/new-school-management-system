@@ -17,7 +17,7 @@ class BankAccount extends Model
     use HasFactory;
 
     protected $fillable = [
-        'label', 'bank_name', 'bank_code', 'account_number',
+        'bank_name', 'bank_code', 'account_number',
         'account_name', 'sub_account_code', 'is_primary', 'is_active',
     ];
 
@@ -40,7 +40,12 @@ class BankAccount extends Model
         return static::query()->active()->orderByDesc('is_primary')->orderBy('id')->first();
     }
 
-    /** How it reads on a letter. */
+    /**
+     * How it reads on a letter.
+     *
+     * Bank and number, not the caption the office used to type in: this is what a
+     * parent has to copy out, and "PTA account" is not something they can pay into.
+     */
     public function label(): string
     {
         return "{$this->bank_name} {$this->account_number}";
