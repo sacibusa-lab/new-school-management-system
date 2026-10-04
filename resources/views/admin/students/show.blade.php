@@ -53,6 +53,32 @@
             </p>
         </div>
 
+        {{-- The number their fees are paid into. It is the one thing a parent rings up
+             to confirm, and the office should be able to read it back from the child's
+             own page rather than going off to the fee section to find it. Left of the
+             standing pill so the pill keeps the corner it has always had. --}}
+        <div class="shrink-0 text-right sm:border-l sm:border-line sm:pl-5">
+            <p class="eyebrow">Pays into</p>
+
+            @if ($student->virtualAccount)
+                <div class="mt-1" x-data="{ copied: false }">
+                    <button type="button"
+                            class="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-ink"
+                            title="Copy the account number"
+                            @click="navigator.clipboard.writeText('{{ $student->virtualAccount->account_number }}'); copied = true; setTimeout(() => copied = false, 1500)">
+                        {{ $student->virtualAccount->account_number }}
+                        <x-nav-icon name="copy" class="h-3.5 w-3.5 text-muted" />
+                    </button>
+
+                    <span x-show="copied" x-cloak class="ml-1 text-xs text-emerald-600 dark:text-emerald-400">Copied</span>
+
+                    <p class="mt-0.5 text-xs text-muted">{{ $student->virtualAccount->bank_name }}</p>
+                </div>
+            @else
+                <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">Not generated</p>
+            @endif
+        </div>
+
         <x-status-pill :status="$student->status" />
     </div>
 </div>

@@ -16,6 +16,7 @@ use App\Models\Section;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\StudentPromotion;
+use App\Models\StudentVirtualAccount;
 use App\Models\Subject;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -104,6 +105,40 @@ class StudentRecordTest extends TestCase
             ->assertSee('SAC/2026/014')
             ->assertSee('JSS1A')
             ->assertSee('Mrs Okonkwo');
+    }
+
+    /**
+     * The number their fees go into is read back from their own record, not only from
+     * the fee section: it is what a parent rings up to confirm, and whoever answers the
+     * telephone is looking at this page.
+     */
+    public function test_the_record_reads_back_the_account_number_their_fees_go_into(): void
+    {
+        $withAccount = $this->student();
+        $without = $this->student(['student_number' => 'SAC/2026/015', 'first_name' => 'Ngozi']);
+
+        StudentVirtualAccount::create([
+            'student_id' => $withAccount->id,
+            'customer_code' => 'CUS_ada',
+            'bank_name' => 'Wema Bank',
+            'account_number' => '1111111111',
+            'account_name' => 'SACI SCHOOLS - ADA',
+            'provider' => 'paystack',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.students.show', $withAccount))
+            ->assertOk()
+            ->assertSee('1111111111')
+            ->assertSee('Wema Bank');
+
+        // A child with nowhere to pay says so rather than leaving a blank where a
+        // number should be. That is the line somebody acts on.
+        $this->actingAs($this->admin)
+            ->get(route('admin.students.show', $without))
+            ->assertOk()
+            ->assertSee('Not generated');
     }
 
     /**

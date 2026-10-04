@@ -48,6 +48,9 @@ class StudentController extends Controller
 
         $student->load([
             'level', 'schoolClass', 'academicSession', 'applicant', 'user',
+            // The number their fees are paid into, read back on this page so the
+            // office does not have to open the fee section to answer for it.
+            'virtualAccount',
             'termResults.term', 'termResults.academicSession',
             // How they got here, and the examination they came in on.
             'promotions.fromSession', 'promotions.toSession',
