@@ -171,11 +171,21 @@
                             </td>
 
                             {{-- The child, with the guardian beside them: the payer and
-                                 the name on the account are rarely the same person. --}}
+                                 the name on the account are rarely the same person.
+                                 The photograph matters more here than on most screens:
+                                 this page is read across a counter, and a face is what
+                                 tells the office they have the right child. The initials
+                                 stand in only for a child nobody has photographed yet. --}}
                             <td class="border-r border-line p-3 align-middle">
                                 <div class="flex items-center gap-3">
-                                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-900 text-[11px] font-semibold text-gold-300"
-                                          aria-hidden="true">{{ $child->initials }}</span>
+                                    @if ($child->photo_path)
+                                        <img src="{{ asset('storage/'.$child->photo_path) }}"
+                                             alt="Photograph of {{ $child->full_name }}"
+                                             class="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line">
+                                    @else
+                                        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-900 text-[11px] font-semibold text-gold-300"
+                                              aria-hidden="true">{{ $child->initials }}</span>
+                                    @endif
 
                                     <span class="min-w-0">
                                         <a href="{{ route('admin.students.show', $child) }}"

@@ -255,6 +255,29 @@ class FeeStudentsHubTest extends TestCase
             ->assertForbidden();
     }
 
+    /**
+     * The hub is read across a counter, and a face is what tells the office they have the
+     * right child in front of them. The initials are a fallback for a child nobody has
+     * photographed yet, not a replacement for the photograph.
+     */
+    public function test_the_photograph_is_shown_where_there_is_one(): void
+    {
+        $photographed = $this->student($this->classA, 'SAC/2026/1001');
+        $photographed->update(['photo_path' => 'photos/students/ada.jpg']);
+
+        $unphotographed = $this->student($this->classB, 'SAC/2026/1002', 'Zubairu');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub'))
+            ->assertOk()
+            // asset('storage/…') rather than Storage::url(), which builds the host from
+            // APP_URL and 404s on the host the office actually browses.
+            ->assertSee('storage/photos/students/ada.jpg', false)
+            ->assertSee('Photograph of '.$photographed->full_name)
+            // Still something rather than a gap for the one with no photograph.
+            ->assertSee($unphotographed->initials);
+    }
+
     /* ------------------------------------------------------------------ */
     /* Fixtures */
     /* ------------------------------------------------------------------ */
