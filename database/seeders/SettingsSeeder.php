@@ -54,9 +54,6 @@ class SettingsSeeder extends Seeder
             ['key' => 'signature_image', 'value' => null, 'group' => 'letters', 'type' => 'image', 'label' => 'Signature image'],
             ['key' => 'admission_letter_note', 'value' => 'This offer is subject to verification of the documents you submitted. Please bring the originals when you report.', 'group' => 'letters', 'type' => 'text', 'label' => 'Note printed at the foot of the letter'],
 
-            // Messaging — the switch only. The credentials are on the API page.
-            ['key' => 'sms_enabled', 'value' => '1', 'group' => 'messaging', 'type' => 'bool', 'label' => 'Send text messages'],
-
             // The school's accounts with other people, at Settings → API. Each is a
             // card of its own, so the labels can be short: the heading says whose
             // key it is.
@@ -69,6 +66,13 @@ class SettingsSeeder extends Seeder
             ['key' => 'paystack_public_key', 'value' => '', 'group' => 'api_paystack', 'label' => 'Public key'],
             ['key' => 'paystack_secret_key', 'value' => '', 'group' => 'api_paystack', 'type' => 'secret', 'label' => 'Secret key'],
             ['key' => 'paystack_dva_bank', 'value' => 'wema-bank', 'group' => 'api_paystack', 'label' => 'Bank for virtual account numbers'],
+            // The switch that turns text messages on, on the card that sends them. It
+            // used to be a group of its own on the general page, one page away from the
+            // key it depends on: the office could read that text messages were on
+            // without seeing whether there was a key, and paste a key in without
+            // noticing the switch was off. Migration 2026_10_04_230000 carries the move
+            // to an installation that never runs this seeder again.
+            ['key' => 'sms_enabled', 'value' => '1', 'group' => 'api_termii', 'type' => 'bool', 'label' => 'Send text messages'],
             ['key' => 'termii_api_key', 'value' => '', 'group' => 'api_termii', 'type' => 'secret', 'label' => 'API key'],
             ['key' => 'termii_sender_id', 'value' => 'SACISCH', 'group' => 'api_termii', 'label' => 'Sender ID'],
             ['key' => 'termii_channel', 'value' => 'generic', 'group' => 'api_termii', 'label' => 'Channel'],

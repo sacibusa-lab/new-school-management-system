@@ -58,6 +58,8 @@
                             <span class="mt-0.5 block text-xs text-muted">
                                 @if ($setting->key === 'registration_open')
                                     Turn off to close the public application form.
+                                @elseif ($setting->key === 'sms_enabled')
+                                    Off means no message leaves the school, whatever the key below says.
                                 @else
                                     Tick to enable.
                                 @endif

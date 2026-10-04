@@ -40,7 +40,6 @@ class SettingLayout
         'numbering' => 'Numbering',
         'admissions' => 'Admissions',
         'letters' => 'Admission letters',
-        'messaging' => 'Text messages (SMS)',
         'fees' => 'Fees',
         'results' => 'Results',
         // The accounts the school holds with other people. One group per
@@ -67,8 +66,14 @@ class SettingLayout
      * as it goes about the day — they are set once, when the school opens its
      * account with a provider, and then not looked at again. Kept on the general
      * page they were three company names to scroll past to reach the school's own
-     * logo, and the switch that turns text messages ON is not the same idea as the
-     * key that makes them send.
+     * logo.
+     *
+     * Each provider's whole arrangement then lives together on that page. The switch
+     * that turns text messages on used to sit on the general page while the key that
+     * sends them sat here, a page apart: the office could read that text messages were
+     * on without seeing whether there was a key to send them with, and could paste a
+     * key in without noticing the switch was off. Turning text messages off is a
+     * decision about Termii, so it is a field on Termii's card.
      *
      * A group not named here — including one this file has never heard of — belongs
      * to the general page, so nothing can be saved into invisibility.
@@ -130,12 +135,6 @@ class SettingLayout
             'admission_letter_note',
         ],
 
-        // Only the switch. Termii's credentials live on the API page now — a
-        // setting has one home, or it sooner or later has two values.
-        'messaging' => [
-            'sms_enabled',
-        ],
-
         // Each provider reads the way it is set up: what the school is given to
         // identify it, then the secret that proves it.
         'api_paystack' => [
@@ -144,7 +143,11 @@ class SettingLayout
             'paystack_dva_bank',
         ],
 
+        // The switch first, then the credentials it turns on. Read top to bottom
+        // the card answers “do text messages leave this school?” before it shows
+        // the office the key that would send them.
         'api_termii' => [
+            'sms_enabled',
             'termii_api_key',
             'termii_sender_id',
             'termii_channel',

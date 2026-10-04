@@ -63,7 +63,7 @@ class SettingsLayoutTest extends TestCase
         $drawn = array_column(SettingLayout::arrange($settings), 'key');
 
         $this->assertSame(
-            ['branding', 'numbering', 'admissions', 'letters', 'messaging', 'fees', 'results', 'api_paystack', 'api_termii', 'api_deepseek'],
+            ['branding', 'numbering', 'admissions', 'letters', 'fees', 'results', 'api_paystack', 'api_termii', 'api_deepseek'],
             $drawn,
             'The groups are out of order. A new group has to be placed in SettingLayout::GROUPS.',
         );
@@ -128,9 +128,24 @@ class SettingsLayoutTest extends TestCase
 
         $general = $this->headingsOn('admin.settings.index');
 
-        // The switch that turns text messages on is not a credential, so it stayed
-        // behind where the office can reach it without going past a key.
-        $this->assertContains('Text messages (SMS)', $general);
+        // The switch that turns text messages on went across with the keys. It used to be
+        // a group of its own on the general page, a page away from the Termii key it
+        // depends on: the office could read that text messages were on without seeing
+        // whether there was a key to send them with, and could paste a key in without
+        // noticing the switch was off.
+        $api = $this->htmlOn('admin.settings.api');
+
+        $switch = strpos($api, 'settings[sms_enabled]');
+        $key = strpos($api, 'settings[termii_api_key]');
+
+        $this->assertNotFalse($switch, 'The switch that turns text messages on is not on the API page.');
+        $this->assertNotFalse($key);
+        $this->assertLessThan($key, $switch, 'The switch is drawn below the Termii key it belongs with.');
+        $this->assertSame(
+            0,
+            substr_count($this->htmlOn('admin.settings.index'), 'settings[sms_enabled]'),
+            'The SMS switch is still drawn on the general settings page as well.',
+        );
 
         // And the keys are not drawn on the general page as well: a setting with two
         // homes is a setting that will sooner or later have two values.
