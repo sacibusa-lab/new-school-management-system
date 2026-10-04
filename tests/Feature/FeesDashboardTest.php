@@ -6,9 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\StudentStatus;
 use App\Models\AcademicSession;
-use App\Models\FeeCategory;
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\Payment;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
@@ -119,7 +117,7 @@ class FeesDashboardTest extends TestCase
     {
         $student = $this->student();
         $this->bill($student, 100000, 0);
-        $this->bill($student, 90000, 0, null, null, InvoiceStatus::Cancelled);
+        $this->bill($student, 90000, 0, null, InvoiceStatus::Cancelled);
 
         $this->actingAs($this->admin)
             ->get(route('admin.fees-payments.dashboard'))
@@ -216,40 +214,6 @@ class FeesDashboardTest extends TestCase
         $this->assertStringContainsString('The best month was Jul', $html);
     }
 
-    public function test_the_fee_breakdown_totals_each_category(): void
-    {
-        $tuition = FeeCategory::create(['name' => 'Tuition', 'code' => 'TUI', 'is_active' => true]);
-        $books = FeeCategory::create(['name' => 'Books', 'code' => 'BOK', 'is_active' => true]);
-
-        $student = $this->student();
-
-        $this->bill($student, 80000, 80000, $tuition);
-        $this->bill($student, 20000, 0, $books);
-
-        $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.dashboard'))
-            ->assertOk()
-            ->assertSee('What is being paid for')
-            ->assertSee('Tuition')
-            ->assertSee('Books')
-            ->assertSee($this->currency.'20,000.00 still to come in on this one.');
-    }
-
-    /**
-     * A line with no category is not an error — a bursar can add an ad-hoc charge — and
-     * it must not vanish from the breakdown just because nobody filed it.
-     */
-    public function test_a_charge_with_no_category_is_still_counted(): void
-    {
-        $student = $this->student();
-        $this->bill($student, 15000, 0);
-
-        $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.dashboard'))
-            ->assertOk()
-            ->assertSee('Uncategorised');
-    }
-
     public function test_the_day_book_shows_the_newest_receipt_first(): void
     {
         $this->travelTo(Carbon::parse('2026-10-07 10:00:00'));
@@ -330,21 +294,19 @@ class FeesDashboardTest extends TestCase
     }
 
     /**
-     * A bill with one line on it. The invoice and its line are kept in step by hand
-     * because the dashboard reads the invoice for the totals and the lines for the
-     * breakdown, and a fixture that disagrees with itself would test nothing.
+     * A bill. Its money columns are set by hand rather than derived from its lines,
+     * because the columns are what every figure on the dashboard reads.
      */
     private function bill(
         Student $student,
         float $amount,
         float $paid = 0,
-        ?FeeCategory $category = null,
         ?Carbon $issuedAt = null,
         ?InvoiceStatus $status = null,
     ): Invoice {
         $this->invoices++;
 
-        $invoice = Invoice::create([
+        return Invoice::create([
             'invoice_number' => sprintf('INV/2026/%05d', $this->invoices),
             'student_id' => $student->id,
             'academic_session_id' => $this->session->id,
@@ -359,16 +321,6 @@ class FeesDashboardTest extends TestCase
                 : ($paid >= $amount ? InvoiceStatus::Paid : InvoiceStatus::Partial)),
             'issued_at' => $issuedAt ?? now(),
         ]);
-
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'fee_category_id' => $category?->id,
-            'description' => $category?->name ?? 'Ad-hoc charge',
-            'amount' => $amount,
-            'amount_paid' => $paid,
-        ]);
-
-        return $invoice;
     }
 
     private function receipt(

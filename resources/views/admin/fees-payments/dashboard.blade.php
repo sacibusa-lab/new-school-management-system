@@ -232,17 +232,16 @@
 </div>
 
 {{-- ================= The shape of the year ================= --}}
-<div class="mt-6 grid gap-6 lg:grid-cols-2">
 
-    {{-- Twelve months, not one session: money arrives in the shape of the school year,
-         and a September spike is only visible against the quiet months either side. --}}
-    <div class="card">
-        <div class="panel-header">
-            <div>
-                <p class="panel-title">Money received, month by month</p>
-                <p class="mt-0.5 text-xs text-muted">The last twelve months, across sessions</p>
-            </div>
+{{-- Twelve months, not one session: money arrives in the shape of the school year,
+     and a September spike is only visible against the quiet months either side. --}}
+<div class="card mt-6">
+    <div class="panel-header">
+        <div>
+            <p class="panel-title">Money received, month by month</p>
+            <p class="mt-0.5 text-xs text-muted">The last twelve months, across sessions</p>
         </div>
+    </div>
 
         <div class="p-5 sm:p-6">
             @php
@@ -276,52 +275,6 @@
                     description="No payment has been recorded in the last twelve months. Once the bursary starts receiving money, the shape of the year appears here." />
             @endif
         </div>
-    </div>
-
-    {{-- What the fees were actually for. --}}
-    <div class="card">
-        <div class="panel-header">
-            <div>
-                <p class="panel-title">What is being paid for</p>
-                <p class="mt-0.5 text-xs text-muted">This session, by fee category</p>
-            </div>
-        </div>
-
-        <div class="divide-y divide-line-soft">
-            @forelse ($categories as $category)
-                <div class="px-5 py-4">
-                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                        <span class="text-sm font-medium text-ink">{{ $category['name'] }}</span>
-
-                        <span class="text-right">
-                            <span class="block font-mono text-sm font-semibold text-ink">
-                                {{ $school->currency }}{{ number_format($category['collected'], 0) }}
-                                <span class="font-sans text-xs font-normal text-muted">
-                                    of {{ $school->currency }}{{ number_format($category['billed'], 0) }}
-                                </span>
-                            </span>
-                        </span>
-                    </div>
-
-                    <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
-                        <div class="h-full rounded-full {{ $category['rate'] >= 75 ? 'bg-emerald-500' : ($category['rate'] >= 40 ? 'bg-gold-500' : 'bg-rose-500') }}"
-                             style="width: {{ min($category['rate'], 100) }}%"></div>
-                    </div>
-
-                    @if ($category['outstanding'] > 0)
-                        <p class="mt-1.5 text-xs text-muted">
-                            {{ $school->currency }}{{ number_format($category['outstanding'], 2) }} still to come in on this one.
-                        </p>
-                    @endif
-                </div>
-            @empty
-                <p class="px-5 py-8 text-center text-sm text-muted">
-                    No bill lines to break down yet. Once invoices carry their fee categories, each one
-                    is totalled here.
-                </p>
-            @endforelse
-        </div>
-    </div>
 </div>
 
 {{-- ================= The day book ================= --}}

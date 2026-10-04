@@ -8,7 +8,6 @@ use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\Payment;
 use App\Models\SchoolLevel;
 use App\Models\Section;
@@ -80,7 +79,6 @@ class FeesPaymentsController extends Controller
             'perClass' => $this->perClassTotals($session),
             'methods' => $this->methodTotals($session),
             'monthly' => $this->monthlyTotals(),
-            'categories' => $this->categoryTotals($session),
 
             'recent' => Payment::query()
                 ->with(['student', 'invoice'])
@@ -350,42 +348,8 @@ class FeesPaymentsController extends Controller
     }
 
     /**
-     * What the fees were actually for, billed and collected per category.
-     *
-     * This is what tells the office whether the shortfall sits in tuition, which is
-     * serious, or in a levy half the school has not been asked for yet, which is not.
-     *
-     * @return Collection<int,array<string,mixed>>
-     */
-    protected function categoryTotals(?AcademicSession $session): Collection
-    {
-        $rows = InvoiceItem::query()
-            ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
-            ->leftJoin('fee_categories', 'fee_categories.id', '=', 'invoice_items.fee_category_id')
-            ->when($session, fn (Builder $q) => $q->where('invoices.academic_session_id', $session->id))
-            ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
-            ->groupBy('fee_categories.id', 'fee_categories.name')
-            ->get([
-                DB::raw('fee_categories.name as category'),
-                DB::raw('coalesce(sum(invoice_items.amount), 0) as billed'),
-                DB::raw('coalesce(sum(invoice_items.amount_paid), 0) as collected'),
-            ]);
-
-        return $rows
-            ->map(fn ($row): array => $this->withOutstanding([
-                // A line item with no category is not an error — a bursar can add an
-                // ad-hoc charge — so it gets a name rather than a blank.
-                'name' => $row->category ?? 'Uncategorised',
-                'billed' => (float) $row->billed,
-                'collected' => (float) $row->collected,
-            ]))
-            ->sortByDesc('billed')
-            ->values();
-    }
-
-    /**
      * Fill in what is still owed on a row, and how far along it is. Kept in one place so
-     * a class, a fee category and anything added later are read the same way.
+     * a class, and anything added later, is read the same way.
      *
      * @param  array<string,mixed>  $row
      * @return array<string,mixed>
