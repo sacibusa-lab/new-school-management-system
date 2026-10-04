@@ -14,6 +14,11 @@ class FeeFactory extends Factory
     /**
      * A termly fee against the current session, which is what the office creates most of.
      *
+     * The session has to be the current one. A bare `value('id')` was here first and took
+     * whichever row the database happened to offer — the lowest id — so a school with a past
+     * year on file had its new fee filed under the year that had ended, and every screen that
+     * filters fees by session then quietly showed nothing.
+     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -22,7 +27,7 @@ class FeeFactory extends Factory
             'title' => ucfirst($this->faker->unique()->words(2, true)).' Fee',
             'description' => null,
             'cycle' => 'termly',
-            'academic_session_id' => AcademicSession::query()->value('id'),
+            'academic_session_id' => AcademicSession::current()?->id,
             'amount' => $this->faker->numberBetween(5, 200) * 1000,
             'first_term_active' => true,
             'second_term_active' => true,
