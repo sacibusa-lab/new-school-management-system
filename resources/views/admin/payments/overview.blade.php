@@ -92,7 +92,110 @@
 @endif
 
 {{-- ================= Year group by year group ================= --}}
-<div class="card mt-6 overflow-hidden">
+{{--
+    The card carries the Alpine component because the chevron that opens a year group is
+    a row of the table inside it. The panel itself is included at the bottom of the card,
+    which looks odd for something that covers the screen — it is `position: fixed`, so it
+    is not laid out here at all, and keeping it inside the component it belongs to is the
+    whole reason it is there.
+
+    Nothing written by hand inside `x-data` may contain a double quote, comments
+    included: it is one HTML attribute, and a stray one ends it early — Alpine is then
+    handed half an object, every method in it disappears, and the page still looks
+    perfectly normal. Values from the server go through @js(), which encodes it.
+--}}
+<div class="card mt-6 overflow-hidden"
+     x-data="{
+         url: @js(route('admin.payments.level')),
+         exportUrl: @js(route('admin.payments.level.export')),
+         sessionId: @js($filters['session']),
+         termId: @js($filters['term']),
+         sessionName: @js($session?->name),
+         termName: @js($term?->name),
+         currency: @js($currency),
+
+         open: false,
+         loading: false,
+         failed: false,
+         level: { id: null, name: '' },
+         unit: 0,
+         children: [],
+         subclass: '',
+         search: '',
+
+         get arms() {
+             return [...new Set(this.children.map(child => child.class).filter(Boolean))].sort();
+         },
+
+         get visible() {
+             return this.matching('');
+         },
+
+         get tally() {
+             return {
+                 completed: this.children.filter(child => child.status === 'completed').length,
+                 partial: this.children.filter(child => child.status === 'partial').length,
+                 pending: this.children.filter(child => child.status === 'pending').length,
+             };
+         },
+
+         matching(which) {
+             const needle = this.search.trim().toLowerCase();
+
+             return this.children.filter(child => {
+                 if (which !== '' && child.status !== which) { return false; }
+                 if (this.subclass !== '' && child.class !== this.subclass) { return false; }
+                 if (needle === '') { return true; }
+
+                 return child.name.toLowerCase().includes(needle)
+                     || child.number.toLowerCase().includes(needle);
+             });
+         },
+
+         query(extra) {
+             const params = new URLSearchParams(extra);
+
+             if (this.sessionId) { params.set('session', this.sessionId); }
+             if (this.termId) { params.set('term', this.termId); }
+
+             return params.toString();
+         },
+
+         spreadsheet(which) {
+             return this.exportUrl + '?' + this.query({ level: this.level.id, subset: which });
+         },
+
+         async show(id, name) {
+             this.level = { id: id, name: name };
+             this.children = [];
+             this.subclass = '';
+             this.search = '';
+             this.failed = false;
+             this.loading = true;
+             this.open = true;
+
+             try {
+                 const response = await fetch(this.url + '?' + this.query({ level: id }), {
+                     headers: { 'Accept': 'application/json' },
+                 });
+
+                 if (! response.ok) { throw new Error(response.status); }
+
+                 const payload = await response.json();
+
+                 this.unit = payload.unit;
+                 this.children = payload.children;
+             } catch (problem) {
+                 this.failed = true;
+             } finally {
+                 this.loading = false;
+             }
+         },
+
+         close() {
+             this.open = false;
+         },
+     }">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-2 px-5 py-4">
         <div>
             <p class="font-display text-base font-semibold text-ink">By year group</p>
@@ -119,7 +222,8 @@
                     <th class="w-40 border-b border-r border-line p-3 text-right">Received</th>
                     <th class="w-40 border-b border-r border-line p-3 text-right">Debt</th>
                     <th class="w-52 border-b border-r border-line p-3">Collection progress</th>
-                    <th class="w-28 border-b border-line p-3 text-right">Discount</th>
+                    <th class="w-28 border-b border-r border-line p-3 text-right">Discount</th>
+                    <th class="w-12 border-b border-line p-3"></th>
                 </tr>
             </thead>
 
@@ -178,7 +282,7 @@
                             </div>
                         </td>
 
-                        <td class="p-3 text-right align-middle font-mono text-xs">
+                        <td class="border-r border-line p-3 text-right align-middle font-mono text-xs">
                             @if ($row['discount'] > 0)
                                 <span class="text-gold-700 dark:text-gold-300">
                                     −{{ $currency }}{{ number_format($row['discount']) }}
@@ -187,10 +291,26 @@
                                 <span class="text-muted">—</span>
                             @endif
                         </td>
+
+                        {{-- The way into the year group: every child on it, one card each,
+                             coloured by how far they have got.
+
+                             `.stop` matters. The panel closes when you click outside it, and
+                             that listener is on the document — so without stopping this click
+                             here, it carries on up, the panel notices the click was outside
+                             itself and shuts, and the row appears not to open at all. --}}
+                        <td class="p-3 text-center align-middle">
+                            <button type="button"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-ink-soft transition hover:bg-surface-3 hover:text-ink"
+                                    title="Who is in {{ $row['name'] }}"
+                                    @click.stop="show({{ $row['id'] }}, @js($row['name']))">
+                                <x-nav-icon name="chevron-right" class="h-4 w-4" />
+                            </button>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="p-5">
+                        <td colspan="9" class="p-5">
                             <x-empty-state
                                 icon="academic"
                                 title="No year groups yet"
@@ -218,18 +338,21 @@
                                 <span class="shrink-0 text-xs font-medium text-muted">{{ $rate($totals['rate']) }}%</span>
                             </div>
                         </td>
-                        <td class="border-t border-line p-3 text-right font-mono text-xs">
+                        <td class="border-t border-r border-line p-3 text-right font-mono text-xs">
                             @if ($totals['discount'] > 0)
                                 <span class="text-gold-700 dark:text-gold-300">−{{ $currency }}{{ number_format($totals['discount']) }}</span>
                             @else
                                 <span class="text-muted">—</span>
                             @endif
                         </td>
+                        <td class="border-t border-line p-3"></td>
                     </tr>
                 </tfoot>
             @endif
         </table>
     </div>
+
+    @include('admin.payments.partials.level-detail')
 </div>
 
 @endsection

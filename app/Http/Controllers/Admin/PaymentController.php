@@ -16,11 +16,14 @@ use App\Models\Student;
 use App\Models\Term;
 use App\Services\NumberSequenceService;
 use App\Services\Sms\SmsNotifier;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentController extends Controller
 {
@@ -211,6 +214,7 @@ class PaymentController extends Controller
             $settled = $unit > 0 ? $theirPayments->filter(fn (float $amount): bool => $amount >= $unit)->count() : 0;
 
             return [
+                'id' => $level->id,
                 'name' => $level->name,
                 'unit' => $unit,
                 'students' => $students,
@@ -259,6 +263,167 @@ class PaymentController extends Controller
             ],
             'currency' => Setting::get('currency_symbol', '₦'),
         ]);
+    }
+
+    /**
+     * One year group's children, with what each of them has paid.
+     *
+     * The detail behind one row of the overview, fetched when that row is opened rather
+     * than drawn with the page: a school with a thousand children would otherwise send
+     * every one of them to answer a question about one year group.
+     *
+     * Each child gets one of three standings, and the three are a partition — every child
+     * on the roll is exactly one of them. That is deliberately not the same pair of
+     * counts the row above shows, where "paid" and "owing" overlap for a family part-way
+     * through; here the colours have to account for everybody between them.
+     */
+    public function level(Request $request): JsonResponse
+    {
+        $this->authorize('fees.view');
+
+        [$level, $session, $term] = $this->levelFor($request);
+
+        $roll = $this->levelRoll($level, $session, $term);
+
+        return response()->json([
+            'level' => ['id' => $level->id, 'name' => $level->name],
+            'session' => $session?->name,
+            'term' => $term?->name,
+            'unit' => $roll['unit'],
+            'currency' => Setting::get('currency_symbol', '₦'),
+            'children' => $roll['children'],
+        ]);
+    }
+
+    /**
+     * The same list, as a spreadsheet.
+     *
+     * Written here rather than in the browser: `fputcsv` gets the quoting right without
+     * anybody thinking about it, and a file the office can open is worth more than a
+     * blob assembled in JavaScript — it works with the page's scripts half-loaded, and
+     * it can be tested.
+     *
+     * `subset` is the four things the office asked to be able to take away: everybody, or
+     * one of the three standings.
+     */
+    public function exportLevel(Request $request): StreamedResponse
+    {
+        $this->authorize('fees.view');
+
+        [$level, $session, $term] = $this->levelFor($request);
+
+        $subset = (string) $request->query('subset', 'all');
+
+        // `all` is not one of the three standings — it is the absence of a choice between
+        // them — so it is allowed by name rather than looked up in them. Anything else
+        // has to be a standing the roll can actually be filtered to.
+        abort_unless($subset === 'all' || array_key_exists($subset, self::STANDINGS), 404);
+
+        $roll = $this->levelRoll($level, $session, $term, $subset);
+
+        $filename = Str::slug($level->name).'-'.$subset.'.csv';
+
+        return response()->streamDownload(function () use ($roll): void {
+            $out = fopen('php://output', 'w');
+
+            // A byte-order mark, because Excel on Windows reads a CSV as the machine's own
+            // codepage unless it is told otherwise — and the naira sign is not in it.
+            fwrite($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, ['Student number', 'Name', 'Class', 'Discount', 'Expected', 'Received', 'Outstanding', 'Status']);
+
+            foreach ($roll['children'] as $child) {
+                fputcsv($out, [
+                    $child['number'],
+                    $child['name'],
+                    $child['class'] ?? '',
+                    number_format($child['discount'], 2, '.', ''),
+                    number_format($child['expected'], 2, '.', ''),
+                    number_format($child['received'], 2, '.', ''),
+                    number_format($child['outstanding'], 2, '.', ''),
+                    $child['status_label'],
+                ]);
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * The year group, session and term a request is about.
+     *
+     * Shared by the page's detail and its spreadsheet so the two can never disagree about
+     * which term they are showing — the export carries the filters as query parameters
+     * precisely because it is a fresh request.
+     *
+     * @return array{0:SchoolLevel,1:?AcademicSession,2:?Term}
+     */
+    protected function levelFor(Request $request): array
+    {
+        $validated = $request->validate([
+            'level' => ['required', 'integer', 'exists:school_levels,id'],
+        ]);
+
+        // The session and the term the page was filtered to, so the detail and the
+        // spreadsheet cannot disagree with the row they were opened from.
+        $session = AcademicSession::query()->find((int) $request->query('session'))
+            ?? AcademicSession::current();
+
+        $term = Term::query()->find((int) $request->query('term'))
+            ?? $session?->currentTerm();
+
+        return [SchoolLevel::query()->findOrFail($validated['level']), $session, $term];
+    }
+
+    /**
+     * One year group's roll, read child by child.
+     *
+     * The active roll, like the expectation on the page above it: a child who has left is
+     * not a child this year group is waiting on money from.
+     *
+     * @return array{unit:float,children:Collection<int,array<string,mixed>>}
+     */
+    protected function levelRoll(SchoolLevel $level, ?AcademicSession $session, ?Term $term, ?string $subset = null): array
+    {
+        $unit = (float) ($this->unitFees(collect([$level]), $session, $term)[$level->id] ?? 0);
+
+        $children = Student::query()
+            ->with('schoolClass')
+            ->where('level_id', $level->id)
+            ->active()
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        $totals = $this->childTotals($children->pluck('id'), $session, $term);
+
+        $rows = $children->map(function (Student $child) use ($unit, $totals): array {
+            $received = round($totals['paid'][$child->id] ?? 0, 2);
+            $discount = round($totals['discount'][$child->id] ?? 0, 2);
+
+            // What this child is expected to find, after anything taken off.
+            $owed = round(max($unit - $discount, 0), 2);
+            $standing = $this->standing($owed, $received);
+
+            return [
+                'id' => $child->id,
+                'number' => (string) ($child->student_number ?: $child->admission_number),
+                'name' => $child->full_name,
+                'class' => $child->schoolClass?->name,
+                'discount' => $discount,
+                'expected' => $owed,
+                'received' => $received,
+                'outstanding' => round(max($owed - $received, 0), 2),
+                'status' => $standing,
+                'status_label' => self::STANDINGS[$standing],
+            ];
+        })->values();
+
+        if ($subset !== null && $subset !== 'all') {
+            $rows = $rows->where('status', $subset)->values();
+        }
+
+        return ['unit' => $unit, 'children' => $rows];
     }
 
     /**
@@ -427,6 +592,84 @@ class PaymentController extends Controller
                 'students' => (int) $row->students,
             ]])
             ->all();
+    }
+
+    /**
+     * What each of a set of children has paid, and what has been taken off their bill.
+     *
+     * Asked for a year group's roll rather than the whole school, which is the difference
+     * between opening one row and reading every payment in the session to answer it.
+     *
+     * @param  Collection<int,int>  $studentIds
+     * @return array{paid:array<int,float>,discount:array<int,float>}
+     */
+    protected function childTotals(Collection $studentIds, ?AcademicSession $session, ?Term $term): array
+    {
+        if ($studentIds->isEmpty()) {
+            return ['paid' => [], 'discount' => []];
+        }
+
+        $paid = Payment::query()
+            ->where('payments.status', PaymentStatus::Successful->value)
+            ->whereIn('payments.student_id', $studentIds)
+            ->when($session, fn ($query) => $query->whereHas('invoice', fn ($invoice) => $invoice
+                ->where('invoices.academic_session_id', $session->id)
+                ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+                ->when($term, fn ($scoped) => $scoped->where('invoices.term_id', $term->id))))
+            ->groupBy('payments.student_id')
+            ->get([
+                DB::raw('payments.student_id as student_id'),
+                DB::raw('sum(payments.amount) as total'),
+            ])
+            ->pluck('total', 'student_id')
+            ->map(fn ($amount): float => (float) $amount)
+            ->all();
+
+        $discount = Invoice::query()
+            ->whereIn('invoices.student_id', $studentIds)
+            ->where('invoices.discount', '>', 0)
+            ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+            ->when($session, fn ($query) => $query->where('invoices.academic_session_id', $session->id))
+            ->when($term, fn ($query) => $query->where('invoices.term_id', $term->id))
+            ->groupBy('invoices.student_id')
+            ->get([
+                DB::raw('invoices.student_id as student_id'),
+                DB::raw('sum(invoices.discount) as total'),
+            ])
+            ->pluck('total', 'student_id')
+            ->map(fn ($amount): float => (float) $amount)
+            ->all();
+
+        return ['paid' => $paid, 'discount' => $discount];
+    }
+
+    /**
+     * How far a child has got with the term, and what that is called.
+     *
+     * A constant rather than a match in two places: the words are shown on the card and
+     * written into the spreadsheet, and the two have to agree.
+     */
+    public const STANDINGS = [
+        'completed' => 'Paid in full',
+        'partial' => 'Part payment',
+        'pending' => 'Not paid',
+    ];
+
+    /**
+     * Green, yellow or red.
+     *
+     * Owing nothing counts as settled, and that covers two cases worth naming. A child
+     * whose family was let off the whole fee owes nothing, and neither does anybody in a
+     * year group whose fee is switched off for the term. Neither is money outstanding, so
+     * neither is red — a page that said so would send somebody chasing it.
+     */
+    protected function standing(float $owed, float $received): string
+    {
+        if ($owed <= 0 || $received >= $owed) {
+            return 'completed';
+        }
+
+        return $received > 0 ? 'partial' : 'pending';
     }
 
     /* ------------------------------------------------------------------ */

@@ -312,6 +312,181 @@ class PaymentsOverviewTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* The year group behind a row */
+    /* ------------------------------------------------------------------ */
+
+    public function test_a_year_group_opens_as_the_children_on_it(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $one = $this->student($this->junior, first: 'Ada');
+        $two = $this->student($this->junior, first: 'Ngozi');
+
+        $this->payment($this->invoice($one, 62000), 62000);
+
+        $children = collect($this->detail($this->junior)['children']);
+
+        $this->assertCount(2, $children);
+
+        $first = $children->firstWhere('id', $one->id);
+
+        $this->assertSame(62000.0, (float) $first['received']);
+        $this->assertSame('completed', $first['status']);
+        $this->assertSame('Paid in full', $first['status_label']);
+        $this->assertSame($one->student_number, $first['number']);
+
+        $second = $children->firstWhere('id', $two->id);
+
+        $this->assertSame(0.0, (float) $second['received']);
+        $this->assertSame('pending', $second['status']);
+        $this->assertSame('Not paid', $second['status_label']);
+    }
+
+    /**
+     * Green, yellow and red account for everybody between them.
+     *
+     * Deliberately not the same pair of counts the row above shows: there, a family
+     * part-way through is counted as having paid and as still owing, because both are true
+     * of them. Here the colours have to partition the roll or the grid looks wrong.
+     */
+    public function test_the_three_colours_account_for_everybody(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $settled = $this->student($this->junior, first: 'Ada');
+        $partWay = $this->student($this->junior, first: 'Ngozi');
+        $this->student($this->junior, first: 'Chidi');
+
+        $this->payment($this->invoice($settled, 62000), 62000);
+        $this->payment($this->invoice($partWay, 62000), 20000);
+
+        $children = collect($this->detail($this->junior)['children']);
+
+        $this->assertSame(3, $children->count());
+        $this->assertSame(1, $children->where('status', 'completed')->count());
+        $this->assertSame(1, $children->where('status', 'partial')->count());
+        $this->assertSame(1, $children->where('status', 'pending')->count());
+    }
+
+    /**
+     * A child owing nothing has settled, however little they have paid.
+     *
+     * A family let off the whole fee, or a year group whose fee is switched off for the
+     * term, is not money outstanding — and painting them red would send somebody chasing
+     * a debt that does not exist.
+     */
+    public function test_a_child_owing_nothing_has_settled_however_little_they_paid(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $one = $this->student($this->junior);
+
+        $this->invoice($one, 62000, 0, 62000);
+
+        $child = collect($this->detail($this->junior)['children'])->firstWhere('id', $one->id);
+
+        $this->assertSame(0.0, (float) $child['expected']);
+        $this->assertSame(0.0, (float) $child['received']);
+        $this->assertSame('completed', $child['status']);
+    }
+
+    public function test_the_detail_lists_the_active_roll(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $this->student($this->junior);
+        $left = $this->student($this->junior, StudentStatus::Withdrawn, 'Ngozi');
+
+        $children = collect($this->detail($this->junior)['children']);
+
+        $this->assertCount(1, $children);
+        $this->assertNotContains($left->id, $children->pluck('id')->all());
+    }
+
+    public function test_the_detail_needs_a_year_group_to_be_about(): void
+    {
+        $this->actingAs($this->admin)
+            ->getJson(route('admin.payments.level'))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('level');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* The spreadsheet */
+    /* ------------------------------------------------------------------ */
+
+    public function test_the_spreadsheet_carries_the_subset_it_was_asked_for(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $settled = $this->student($this->junior, first: 'Ada');
+        $nothing = $this->student($this->junior, first: 'Ngozi');
+
+        $this->payment($this->invoice($settled, 62000), 62000);
+
+        $all = $this->spreadsheet('all');
+
+        $this->assertStringContainsString($settled->full_name, $all);
+        $this->assertStringContainsString($nothing->full_name, $all);
+
+        // The four things the office asked to be able to take away.
+        $paid = $this->spreadsheet('completed');
+
+        $this->assertStringContainsString($settled->full_name, $paid);
+        $this->assertStringNotContainsString($nothing->full_name, $paid);
+
+        $pending = $this->spreadsheet('pending');
+
+        $this->assertStringContainsString($nothing->full_name, $pending);
+        $this->assertStringNotContainsString($settled->full_name, $pending);
+
+        // Nobody is part-way through, so that file is its headings and nothing else.
+        $this->assertCount(1, $this->spreadsheetRows('partial'));
+    }
+
+    public function test_the_spreadsheet_says_what_each_column_is(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $one = $this->student($this->junior);
+
+        $this->payment($this->invoice($one, 62000), 20000);
+
+        $rows = $this->spreadsheetRows('all');
+
+        $this->assertSame(
+            ['Student number', 'Name', 'Class', 'Discount', 'Expected', 'Received', 'Outstanding', 'Status'],
+            $rows[0],
+        );
+
+        $this->assertSame($one->student_number, $rows[1][0]);
+        $this->assertSame($one->full_name, $rows[1][1]);
+        $this->assertSame('20000.00', $rows[1][5]);
+        $this->assertSame('Part payment', $rows[1][7]);
+    }
+
+    public function test_a_subset_nobody_has_heard_of_is_not_a_subset(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.payments.level.export', ['level' => $this->junior->id, 'subset' => 'nonsense']))
+            ->assertNotFound();
+    }
+
+    public function test_somebody_outside_the_fee_desk_cannot_read_a_year_group(): void
+    {
+        $outsider = User::factory()->create();
+        $outsider->assignRole('Student');
+
+        $this->actingAs($outsider)
+            ->getJson(route('admin.payments.level', ['level' => $this->junior->id]))
+            ->assertForbidden();
+
+        $this->actingAs($outsider)
+            ->get(route('admin.payments.level.export', ['level' => $this->junior->id]))
+            ->assertForbidden();
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Fixtures */
     /* ------------------------------------------------------------------ */
 
@@ -326,14 +501,59 @@ class PaymentsOverviewTest extends TestCase
             ->getContent();
     }
 
-    private function student(SchoolLevel $level, StudentStatus $status = StudentStatus::Active): Student
+    /**
+     * @return array<string,mixed>
+     */
+    private function detail(SchoolLevel $level): array
     {
+        return $this->actingAs($this->admin)
+            ->getJson(route('admin.payments.level', ['level' => $level->id]))
+            ->assertOk()
+            ->json();
+    }
+
+    /**
+     * The spreadsheet, as rows.
+     *
+     * Read back with `str_getcsv` rather than searched as text, because that is what the
+     * office will open it with — a comma inside a name is the bug this catches.
+     *
+     * @return array<int,array<int,string>>
+     */
+    private function spreadsheetRows(string $subset): array
+    {
+        $csv = $this->actingAs($this->admin)
+            ->get(route('admin.payments.level.export', ['level' => $this->junior->id, 'subset' => $subset]))
+            ->assertOk()
+            ->streamedContent();
+
+        $lines = array_filter(explode("\n", trim(str_replace("\xEF\xBB\xBF", '', $csv))));
+
+        return array_values(array_map(
+            fn (string $line): array => str_getcsv(trim($line)),
+            $lines,
+        ));
+    }
+
+    private function spreadsheet(string $subset): string
+    {
+        return $this->actingAs($this->admin)
+            ->get(route('admin.payments.level.export', ['level' => $this->junior->id, 'subset' => $subset]))
+            ->assertOk()
+            ->streamedContent();
+    }
+
+    private function student(
+        SchoolLevel $level,
+        StudentStatus $status = StudentStatus::Active,
+        string $first = 'Ada',
+    ): Student {
         $number = 'SAC/2026/'.str_pad((string) (Student::query()->count() + 1), 4, '0', STR_PAD_LEFT);
 
         return Student::create([
             'student_number' => $number,
             'admission_number' => str_replace(['/', '.'], '', $number),
-            'first_name' => 'Ada',
+            'first_name' => $first,
             'last_name' => 'Okonkwo',
             'guardian_name' => 'Mrs Okonkwo',
             'guardian_phone' => '08031234567',

@@ -433,6 +433,14 @@ Route::middleware('auth')
         // PaymentController::PAGES — so the menu can be complete without a link that
         // errors.
         Route::get('payments/overview', [PaymentController::class, 'overview'])->name('payments.overview');
+
+        // The detail behind one row of the overview, fetched when that row is opened. The
+        // first answers JSON rather than drawing a page, which is why neither is in the
+        // controller's PAGES list — that list is the screens, and these are one screen's
+        // figures.
+        Route::get('payments/level', [PaymentController::class, 'level'])->name('payments.level');
+        Route::get('payments/level/export', [PaymentController::class, 'exportLevel'])->name('payments.level.export');
+
         Route::get('payments/schedule', [PaymentController::class, 'schedule'])->name('payments.schedule');
         Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
         Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
