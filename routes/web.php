@@ -421,6 +421,14 @@ Route::middleware('auth')
 
         // The account number a child's fees are paid into. Paystack issues it; the
         // office presses the button from the student's bill.
+        //
+        // The plural is listed first so the literal path can never be read as the id
+        // of a student. It takes the names ticked in the students hub, and is the one
+        // place a September intake is opened without pressing anything two hundred
+        // times.
+        Route::post('fees/students/virtual-accounts', [VirtualAccountController::class, 'storeMany'])
+            ->name('fees.virtual-accounts');
+
         Route::post('fees/students/{student}/virtual-account', [VirtualAccountController::class, 'store'])
             ->name('fees.virtual-account');
 

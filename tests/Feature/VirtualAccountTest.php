@@ -132,6 +132,95 @@ class VirtualAccountTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* A September intake, one press */
+    /* ------------------------------------------------------------------ */
+
+    public function test_account_numbers_can_be_opened_for_a_run_of_ticked_names(): void
+    {
+        $this->fakePaystack();
+
+        $first = $this->student(['student_number' => 'SAC/2026/9001', 'admission_number' => 'SAC-09001']);
+        $second = $this->student(['student_number' => 'SAC/2026/9002', 'admission_number' => 'SAC-09002']);
+        $alreadyHasOne = $this->student(['student_number' => 'SAC/2026/9003', 'admission_number' => 'SAC-09003']);
+        $notTicked = $this->student(['student_number' => 'SAC/2026/9004', 'admission_number' => 'SAC-09004']);
+
+        // Somebody who already has one must keep the number their parent saved.
+        $existing = StudentVirtualAccount::create([
+            'student_id' => $alreadyHasOne->id,
+            'customer_code' => 'CUS_existing',
+            'bank_name' => 'Wema Bank',
+            'account_number' => '1111111111',
+            'account_name' => 'SACI SCHOOLS - EXISTING',
+            'provider' => 'paystack',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.virtual-accounts'), [
+                'students' => [$first->id, $second->id, $alreadyHasOne->id],
+            ])
+            ->assertSessionHas('status', '2 account number(s) opened.');
+
+        $this->assertSame(3, StudentVirtualAccount::query()->count());
+        $this->assertSame('1111111111', $existing->fresh()->account_number);
+
+        // Only the names that were ticked: the run is what the office asked for, not
+        // everything the page happens to know about.
+        $this->assertNull($notTicked->fresh()->virtualAccount);
+    }
+
+    public function test_a_run_where_nobody_is_waiting_says_so_rather_than_opening_anything(): void
+    {
+        $this->fakePaystack();
+
+        $student = $this->student();
+        $this->accountFor($student);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.virtual-accounts'), ['students' => [$student->id]])
+            ->assertSessionHas('status', 'Everyone you ticked already has an account number.');
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * Each account is two calls to the gateway: a run this size would time out part
+     * way through, with no way to tell which half had been done. So it is refused
+     * before the first one is opened, not halfway.
+     */
+    public function test_a_run_larger_than_one_go_is_refused_before_anything_is_opened(): void
+    {
+        $this->fakePaystack();
+
+        $ids = [];
+
+        foreach (range(1, 51) as $n) {
+            $ids[] = $this->student([
+                'student_number' => sprintf('SAC/2026/%04d', $n),
+                'admission_number' => sprintf('SAC-9%04d', $n),
+            ])->id;
+        }
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.virtual-accounts'), ['students' => $ids])
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, StudentVirtualAccount::query()->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_a_run_with_nothing_ticked_is_refused(): void
+    {
+        $this->fakePaystack();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.virtual-accounts'), ['students' => []])
+            ->assertSessionHasErrors('students');
+
+        Http::assertNothingSent();
+    }
+
+    /* ------------------------------------------------------------------ */
     /* The transfer landing */
     /* ------------------------------------------------------------------ */
 

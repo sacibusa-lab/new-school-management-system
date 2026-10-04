@@ -7,14 +7,14 @@ use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Invoice;
-use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
+use App\Models\Section;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Services\Payment\VirtualAccountService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 
 /**
@@ -23,30 +23,32 @@ use Illuminate\View\View;
  * Every other page in that section belongs to the fees desk or the collection desk —
  * it is about fee structures, or bills, or money coming in. These two are about the
  * section as a whole: a dashboard that answers "how is the money doing", and the
- * students hub, where the school is read by what it owes.
+ * students hub, where the roll is read one child at a time.
  */
 class FeesPaymentsController extends Controller
 {
+    /** Lines to a page. A form class or two at a time, as the register does it. */
+    private const PER_PAGE = 25;
+
     public function dashboard(): View
     {
         return $this->placeholder('dashboard');
     }
 
     /**
-     * The school read by what it owes, and by whom.
+     * The roll, read one child at a time.
      *
-     * Two questions, answered in that order. First: how far has each class got with
-     * its bills? That is a question about thirty rows, so it is answered without
-     * anything being chosen — the office should not have to guess which class to look
-     * at before they can see which class is behind.
+     * Every child gets a line, and each line carries the two things a parent rings up
+     * about: the account number their money goes into, and how far the fees have got.
+     * The register under Students & Results holds the same children from the other
+     * end — guardian, photograph, class teacher. The two share a table and nothing
+     * else; this one is about the money.
      *
-     * Then: who, inside one class? That is a question about names, and it is only
-     * worth asking about one class at a time.
-     *
-     * Deliberately not the register under Students & Results, which reads the roll:
-     * guardian, photograph, class teacher, and the same children in a different order.
-     * The two share a table and nothing else — one is about the children, this is
-     * about the money.
+     * The filter is the child's standing on the roll, not their payment history.
+     * "Everyone who has paid" is a list whose shape the office already knows;
+     * "the active roll, and how each one is doing" is the question actually asked
+     * across the counter. How far the fees have got is answered per child, by the
+     * pill in the row.
      */
     public function studentsHub(Request $request): View
     {
@@ -54,96 +56,70 @@ class FeesPaymentsController extends Controller
 
         $session = AcademicSession::current();
 
-        $level = $request->filled('level') ? SchoolLevel::find($request->integer('level')) : null;
-        $class = $request->filled('class') ? SchoolClass::find($request->integer('class')) : null;
-
-        $perClass = $this->perClass($session, $level);
+        $filters = [
+            'class' => $request->integer('class'),
+            'section' => $request->integer('section'),
+            // The roll opens on the children who are on it. An empty value is the
+            // office asking for everybody, which is a thing they are allowed to want.
+            'status' => $request->has('status')
+                ? (string) $request->string('status')
+                : StudentStatus::Active->value,
+            'q' => trim((string) $request->string('q')),
+        ];
 
         return view('admin.fees-payments.students-hub', [
-            'levels' => SchoolLevel::query()->active()->orderBy('order')->get(),
-            'classes' => SchoolClass::query()
-                ->where('is_active', true)
-                ->with('level')
-                ->when($level, fn ($q) => $q->where('level_id', $level->id))
-                ->orderBy('name')
-                ->get(),
-            'level' => $level,
-            'class' => $class,
-            // Only read once a class or a year group has been named: a list of every
-            // child's bills is a list nobody reads, and the question the office asks is
-            // "who in JSS2A", not "who".
-            'students' => ($class !== null || $level !== null)
-                ? $this->students($class, $level, $session)
-                : collect(),
-            'perClass' => $perClass,
-            'totals' => [
-                'students' => (int) $perClass->sum('students_count'),
-                'unbilled' => (int) $perClass->sum('unbilled_count'),
-                'billed' => (float) $perClass->sum('billed'),
-                'collected' => (float) $perClass->sum('collected'),
-                'outstanding' => (float) $perClass->sum('outstanding'),
-            ],
+            'students' => $this->register($filters, $session),
+            'levels' => SchoolLevel::query()->active()->orderBy('order')->orderBy('name')->get(),
+            'sections' => Section::query()->orderBy('order')->orderBy('name')->get(),
+            'statuses' => StudentStatus::options(),
+            'filters' => $filters,
             'currency' => Setting::get('currency_symbol', '₦'),
             'session' => $session,
+            'paystackReady' => app(VirtualAccountService::class)->isConfigured(),
         ]);
     }
 
     /**
-     * What each class has been billed and has paid, for one session.
+     * One page of the roll, with each child's bills summed on the way out.
      *
-     * A left join, not an inner one: a class whose children have not been billed
-     * belongs on this page — that is exactly the class the office is looking for.
-     * `unbilled_count` is therefore the children with no invoice at all, which is a
-     * different thing from a child who owes the lot.
+     * Billed and paid are summed by the database rather than counted a row at a time,
+     * so a page of twenty-five costs two reads rather than fifty, and the payment
+     * standing beside each name is worked out from those two figures.
      *
-     * @return Collection<int,object>
+     * The search reaches into both numbers a child can be known by: the admission
+     * number they are given here, and the registration number they applied with. The
+     * office has a parent on the telephone holding one or the other.
+     *
+     * @param  array{class:int,section:int,status:string,q:string}  $filters
+     * @return LengthAwarePaginator<int,Student>
      */
-    protected function perClass(?AcademicSession $session, ?SchoolLevel $level): Collection
+    protected function register(array $filters, ?AcademicSession $session): LengthAwarePaginator
     {
-        return DB::table('students')
-            ->leftJoin('invoices', function ($join) use ($session): void {
-                $join->on('invoices.student_id', '=', 'students.id')
-                    ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value);
+        $search = $filters['q'];
 
-                if ($session !== null) {
-                    $join->where('invoices.academic_session_id', '=', $session->id);
-                }
-            })
-            ->where('students.status', StudentStatus::Active->value)
-            ->when($level, fn ($q) => $q->where('students.level_id', $level->id))
-            ->groupBy('students.school_class_id')
-            ->selectRaw('students.school_class_id as class_id')
-            ->selectRaw('COUNT(DISTINCT students.id) as students_count')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN invoices.id IS NULL THEN students.id END) as unbilled_count')
-            ->selectRaw('COALESCE(SUM(invoices.total), 0) as billed')
-            ->selectRaw('COALESCE(SUM(invoices.amount_paid), 0) as collected')
-            ->selectRaw('COALESCE(SUM(invoices.balance), 0) as outstanding')
-            ->get()
-            ->keyBy('class_id');
-    }
-
-    /**
-     * One class's children, or one year group's, with their bills summed.
-     *
-     * Summed in the query rather than counted a row at a time: a class of forty is
-     * forty invoices and three sums, and reading them child by child is what makes a
-     * page like this slow enough that nobody opens it.
-     *
-     * @return Collection<int,Student>
-     */
-    protected function students(?SchoolClass $class, ?SchoolLevel $level, ?AcademicSession $session): Collection
-    {
         return Student::query()
-            ->where('status', StudentStatus::Active->value)
-            ->when($class, fn (Builder $q) => $q->where('school_class_id', $class->id))
-            ->when($class === null && $level, fn (Builder $q) => $q->where('level_id', $level->id))
-            ->with(['schoolClass', 'virtualAccount'])
+            ->with(['schoolClass.section', 'level', 'virtualAccount'])
             ->withSum(['invoices as billed_total' => fn ($q) => $this->billsFor($q, $session)], 'total')
             ->withSum(['invoices as paid_total' => fn ($q) => $this->billsFor($q, $session)], 'amount_paid')
-            ->withSum(['invoices as balance_total' => fn ($q) => $this->billsFor($q, $session)], 'balance')
+            ->when($filters['status'] !== '', fn ($q) => $q->where('status', $filters['status']))
+            ->when($filters['class'] !== 0, fn ($q) => $q->where('level_id', $filters['class']))
+            // The section lives on the class rather than on the child, so this asks the
+            // class they are in rather than the student row itself.
+            ->when($filters['section'] !== 0, fn ($q) => $q->whereHas(
+                'schoolClass',
+                fn ($classes) => $classes->where('section_id', $filters['section']),
+            ))
+            ->when($search !== '', fn ($q) => $q->where(
+                fn ($inner) => $inner
+                    ->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('student_number', 'like', "%{$search}%")
+                    ->orWhere('admission_number', 'like', "%{$search}%")
+            ))
             ->orderBy('last_name')
             ->orderBy('first_name')
-            ->get();
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
     }
 
     /**

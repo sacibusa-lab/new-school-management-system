@@ -11,6 +11,7 @@ use App\Models\SchoolLevel;
 use App\Models\Section;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\StudentVirtualAccount;
 use App\Models\Term;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -19,13 +20,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The students hub: the school read by what it owes.
+ * The students hub: the roll read one child at a time.
  *
- * Three things it has to get right. It answers "which class is behind" before
- * anything is chosen, because that is the question the office arrives with. It reads
- * a class's children only when a class is named, because a list of every bill in the
- * school is a list nobody reads. And a child who has not been billed at all is shown
- * rather than left out — that child is the reason somebody opened the page.
+ * Four things it has to get right. It carries the two things the office is asked about
+ * across a counter — the account number a child's fees go into, and how far those fees
+ * have got. It opens on the active roll, because that is who is meant by "the
+ * students", and widening it is a click. It can be found from either number a child is
+ * known by, because the parent on the telephone is holding one of them. And a child
+ * nobody has billed is shown as such rather than as owing everything — those are two
+ * different telephone calls, and only one of them is the school's fault.
  */
 class FeeStudentsHubTest extends TestCase
 {
@@ -42,6 +45,8 @@ class FeeStudentsHubTest extends TestCase
     private SchoolClass $classA;
 
     private SchoolClass $classB;
+
+    private SchoolClass $seniorClass;
 
     protected function setUp(): void
     {
@@ -70,109 +75,174 @@ class FeeStudentsHubTest extends TestCase
 
         $this->classA = SchoolClass::create(['level_id' => $this->level->id, 'section_id' => $sectionA->id, 'name' => 'JSS1A', 'is_active' => true]);
         $this->classB = SchoolClass::create(['level_id' => $this->level->id, 'section_id' => $sectionB->id, 'name' => 'JSS1B', 'is_active' => true]);
+
+        // A second year group, sharing section A with the first: that is what makes the
+        // section filter worth testing on its own rather than as a pair with a class.
+        $senior = SchoolLevel::create(['name' => 'SS1', 'order' => 2, 'is_active' => true]);
+
+        $this->seniorClass = SchoolClass::create(['level_id' => $senior->id, 'section_id' => $sectionA->id, 'name' => 'SS1A', 'is_active' => true]);
     }
 
-    public function test_it_reads_the_school_class_by_class_before_anything_is_chosen(): void
+    public function test_it_reads_the_whole_active_roll_whichever_class_they_are_in(): void
     {
         $junior = $this->student($this->classA, 'SAC/2026/1001');
-        $this->student($this->classB, 'SAC/2026/1002', 'Ngozi');
-
-        $this->invoice($junior, 100000, 40000);
-
-        $html = $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub'))->assertOk()->getContent();
-
-        $this->assertStringContainsString('JSS1A', $html);
-        $this->assertStringContainsString('JSS1B', $html);
-
-        // What was billed, what came in, and what is left, for the class it belongs to.
-        $this->assertStringContainsString('100,000.00', $html);
-        $this->assertStringContainsString('40,000.00', $html);
-        $this->assertStringContainsString('60,000.00', $html);
-
-        // JSS1B's child has no bill, so the class shows a child and no money.
-        $this->assertStringContainsString('1 with no bill at all', $html);
-    }
-
-    /** Names come out only once a class is named. */
-    public function test_it_does_not_list_children_until_a_class_is_chosen(): void
-    {
-        $child = $this->student($this->classA, 'SAC/2026/1001');
-        $this->invoice($child, 100000, 0);
+        $second = $this->student($this->classB, 'SAC/2026/1002', 'Ngozi');
+        $senior = $this->student($this->seniorClass, 'SAC/2026/1003', 'Chidi');
 
         $this->actingAs($this->admin)
             ->get(route('admin.fees-payments.students-hub'))
             ->assertOk()
-            ->assertDontSee($child->full_name);
-
-        $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub', ['class' => $this->classA->id]))
-            ->assertOk()
-            ->assertSee($child->full_name)
-            ->assertSee($child->student_number);
+            ->assertSee($junior->full_name)
+            ->assertSee($second->full_name)
+            ->assertSee($senior->full_name)
+            // The count in the heading is the count of what is on the page.
+            ->assertSee('3 children match');
     }
 
-    public function test_a_class_reads_its_children_by_what_they_owe(): void
+    public function test_a_year_group_narrows_the_roll(): void
     {
-        $owing = $this->student($this->classA, 'SAC/2026/1001');
-        $settled = $this->student($this->classA, 'SAC/2026/1002', 'Ngozi');
+        $junior = $this->student($this->classA, 'SAC/2026/1001');
+        $senior = $this->student($this->seniorClass, 'SAC/2026/1002', 'Chidi');
 
-        $this->invoice($owing, 100000, 40000);
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub', ['class' => $this->level->id]))
+            ->assertOk()
+            ->assertSee($junior->full_name)
+            ->assertDontSee($senior->full_name)
+            ->getContent();
+
+        // "SS1A" sits inside "JSS1A", so the year group is asserted on the counts
+        // rather than on a class name that would match the one that was asked for.
+        $this->assertStringContainsString('1 child match', $html);
+    }
+
+    /** A section on its own is that arm of every year, not of one. */
+    public function test_a_section_narrows_the_roll_across_year_groups(): void
+    {
+        $sectionA = Section::query()->where('name', 'A')->sole();
+
+        $junior = $this->student($this->classA, 'SAC/2026/1001');
+        $other = $this->student($this->classB, 'SAC/2026/1002', 'Ngozi');
+        $senior = $this->student($this->seniorClass, 'SAC/2026/1003', 'Chidi');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub', ['section' => $sectionA->id]))
+            ->assertOk()
+            ->assertSee($junior->full_name)
+            ->assertSee($senior->full_name)
+            ->assertDontSee($other->full_name);
+    }
+
+    public function test_a_child_can_be_found_by_name_or_by_admission_number(): void
+    {
+        $wanted = $this->student($this->classA, 'SAC/2026/1001', 'Ngozi');
+        $other = $this->student($this->classB, 'SAC/2026/1002');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub', ['q' => 'Ngozi']))
+            ->assertOk()
+            ->assertSee($wanted->full_name)
+            ->assertDontSee($other->full_name);
+
+        // The office has a parent on the telephone holding the number they were given
+        // when the child was admitted.
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub', ['q' => 'SAC/2026/1002']))
+            ->assertOk()
+            ->assertSee($other->full_name)
+            ->assertDontSee($wanted->full_name);
+    }
+
+    public function test_each_child_shows_what_they_still_owe_and_how_far_they_have_got(): void
+    {
+        $partly = $this->student($this->classA, 'SAC/2026/1001');
+        $settled = $this->student($this->classB, 'SAC/2026/1002', 'Ngozi');
+
+        $this->invoice($partly, 100000, 40000);
         $this->invoice($settled, 50000, 50000);
 
         $html = $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub', ['class' => $this->classA->id]))
+            ->get(route('admin.fees-payments.students-hub'))
             ->assertOk()
+            ->assertSee($partly->full_name)
+            ->assertSee($settled->full_name)
             ->getContent();
 
-        $this->assertStringContainsString($owing->full_name, $html);
-        $this->assertStringContainsString($settled->full_name, $html);
-
-        // The one who still owes is on the page with their balance; the one who has
-        // settled shows a zero rather than being dropped.
+        // What is left, and what it is left of.
         $this->assertStringContainsString('60,000.00', $html);
-        $this->assertStringContainsString('0.00', $html);
+        $this->assertStringContainsString('100,000', $html);
+
+        // Three states, not two: the one who has part-paid is told apart from the one
+        // who has never paid, and both from the one who has settled.
+        $this->assertStringContainsString('Part paid', $html);
+        $this->assertStringContainsString('Settled', $html);
     }
 
     /**
-     * A child nobody has billed is the reason somebody opened this page — so the page
-     * says so rather than leaving them off it.
+     * A child nobody has billed is not a child who owes everything. A red pill on them
+     * would be the page's mistake, and would send somebody to the wrong parent.
      */
-    public function test_a_child_with_no_bill_is_shown_rather_than_left_out(): void
+    public function test_a_child_nobody_has_billed_says_so_rather_than_owing_everything(): void
     {
         $unbilled = $this->student($this->classA, 'SAC/2026/1001');
 
         $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub', ['class' => $this->classA->id]))
+            ->get(route('admin.fees-payments.students-hub'))
             ->assertOk()
             ->assertSee($unbilled->full_name)
-            ->assertSee('No bill raised');
+            ->assertSee('No bill')
+            ->assertSee('Nothing billed');
     }
 
-    public function test_the_year_group_narrows_the_classes_and_lists_its_children(): void
+    public function test_the_account_number_a_child_pays_into_is_shown(): void
     {
-        $other = SchoolLevel::create(['name' => 'SS1', 'order' => 2, 'is_active' => true]);
-        $section = Section::firstOrCreate(['name' => 'A'], ['order' => 1]);
-        $otherClass = SchoolClass::create(['level_id' => $other->id, 'section_id' => $section->id, 'name' => 'SS1A', 'is_active' => true]);
+        $withAccount = $this->student($this->classA, 'SAC/2026/1001');
+        $without = $this->student($this->classB, 'SAC/2026/1002', 'Ngozi');
 
-        $junior = $this->student($this->classA, 'SAC/2026/1001');
-        $senior = $this->student($otherClass, 'SAC/2026/1002', 'Chidi');
+        StudentVirtualAccount::create([
+            'student_id' => $withAccount->id,
+            'customer_code' => 'CUS_existing',
+            'bank_name' => 'Wema Bank',
+            'account_number' => '1111111111',
+            'account_name' => 'SACI SCHOOLS - ADA',
+            'provider' => 'paystack',
+            'is_active' => true,
+        ]);
 
-        $this->invoice($junior, 100000, 0);
-        $this->invoice($senior, 100000, 0);
-
-        $html = $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub', ['level' => $this->level->id]))
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub'))
             ->assertOk()
-            ->getContent();
+            ->assertSee('1111111111')
+            ->assertSee('Wema Bank')
+            // A child with nowhere to pay is marked rather than left blank, because
+            // that is the line somebody acts on.
+            ->assertSee('Not generated')
+            ->assertSee($without->full_name);
+    }
 
-        $this->assertStringContainsString($junior->full_name, $html);
+    /**
+     * The page opens on the children who are on the roll. A child who has graduated is
+     * off it, and has to be asked for — but asking for them has to work, because the
+     * office still gets calls about them.
+     */
+    public function test_the_roll_opens_on_active_students_and_widens_when_asked(): void
+    {
+        $graduated = $this->student($this->classA, 'SAC/2026/1001', 'Ada', StudentStatus::Graduated);
 
-        // The senior is in another year group, so neither the child nor their class is
-        // read. Asserted on the name rather than on the class's, because "SS1A" sits
-        // inside "JSS1A" and would match the year group that was asked for.
-        $this->assertStringNotContainsString($senior->full_name, $html);
-        $this->assertStringNotContainsString('>SS1A<', $html);
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub'))
+            ->assertOk()
+            ->assertDontSee($graduated->full_name);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub', ['status' => StudentStatus::Graduated->value]))
+            ->assertOk()
+            ->assertSee($graduated->full_name);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub', ['status' => '']))
+            ->assertOk()
+            ->assertSee($graduated->full_name);
     }
 
     public function test_somebody_outside_the_fee_desk_cannot_read_it(): void
@@ -189,8 +259,12 @@ class FeeStudentsHubTest extends TestCase
     /* Fixtures */
     /* ------------------------------------------------------------------ */
 
-    private function student(SchoolClass $class, string $number, string $first = 'Ada'): Student
-    {
+    private function student(
+        SchoolClass $class,
+        string $number,
+        string $first = 'Ada',
+        StudentStatus $status = StudentStatus::Active,
+    ): Student {
         return Student::create([
             'student_number' => $number,
             'admission_number' => 'SAC-'.str_replace(['/', '.'], '', $number),
@@ -201,7 +275,7 @@ class FeeStudentsHubTest extends TestCase
             'level_id' => $class->level_id,
             'school_class_id' => $class->id,
             'academic_session_id' => $this->session->id,
-            'status' => StudentStatus::Active->value,
+            'status' => $status->value,
             'admitted_at' => now(),
         ]);
     }
