@@ -64,7 +64,7 @@ class PaymentScreensTest extends TestCase
 
         $positions = [];
 
-        foreach (PaymentController::PAGES as $page) {
+        foreach ($this->pagesUnderPayments() as $page) {
             $at = strpos($html, route('admin.payments.'.$page['key']));
 
             $this->assertNotFalse($at, "The sidebar does not offer {$page['label']}.");
@@ -76,6 +76,60 @@ class PaymentScreensTest extends TestCase
         sort($sorted);
 
         $this->assertSame($sorted, $positions, 'The Payments menu is not in the order the office asked for.');
+    }
+
+    /**
+     * Settlement answers a different question from the rest of the collection — those
+     * screens are about money the school is owed, this one is about money that has
+     * arrived — so it stands in the sidebar in its own right rather than under Payments.
+     */
+    public function test_settlement_stands_on_its_own_rather_than_under_payments(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.payments.settlements'))->assertOk()->getContent();
+
+        // Still offered, and still at the address it always had.
+        $this->assertStringContainsString('href="'.route('admin.payments.settlements').'"', $html);
+
+        // The trail is Fees & Payments › Settlement. "Payments" was the crumb that being
+        // a child of Payments added, and it is gone.
+        preg_match('/<nav aria-label="Breadcrumb".*?<\/nav>/s', $html, $crumbs);
+
+        $this->assertNotEmpty($crumbs, 'The Settlement page draws no breadcrumb at all.');
+        $this->assertStringContainsString('Settlement', $crumbs[0]);
+        $this->assertStringNotContainsString(
+            '>Payments</a>',
+            $crumbs[0],
+            'The trail still goes through Payments.',
+        );
+
+        // And the collection submenu is shut. A submenu is drawn only while the entry it
+        // hangs off is the section being looked at, so this is what says Settlement is no
+        // longer one of its children rather than only moved down the list.
+        foreach ($this->pagesUnderPayments() as $page) {
+            $this->assertStringNotContainsString(
+                'href="'.route('admin.payments.'.$page['key']).'"',
+                $html,
+                "The Payments submenu is still open on the Settlement page ({$page['label']}).",
+            );
+        }
+    }
+
+    /**
+     * The pages still under Payments on the sidebar.
+     *
+     * Derived from the controller rather than listed here, so a page added to the
+     * collection is covered by the two tests above the moment it exists — and so this
+     * file cannot quietly disagree with the menu about which pages there are.
+     *
+     * @return array<int,array{key:string,label:string,icon:string,permission:string}>
+     */
+    private function pagesUnderPayments(): array
+    {
+        return array_values(array_filter(
+            PaymentController::PAGES,
+            fn (array $page): bool => $page['key'] !== 'settlements',
+        ));
     }
 
     public function test_somebody_outside_the_fee_desk_cannot_open_them(): void

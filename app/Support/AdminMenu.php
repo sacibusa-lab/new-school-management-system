@@ -204,7 +204,7 @@ class AdminMenu
                     'owns' => ['admin.invoices.*']],
 
                 // The money coming in: the entry's own page is the register — the day book
-                // the bursar works in — and the three beneath it are the rest of the
+                // the bursar works in — and the pages beneath it are the rest of the
                 // collection. `matches` is spelled out because the sidebar draws a submenu
                 // only for the entry it calls active: every one of these pages has to leave
                 // Payments looking open.
@@ -216,21 +216,34 @@ class AdminMenu
                 // Results, and fees follow the child: when a student is promoted their
                 // history and their money go with them, so there is nothing for a
                 // fee-side office to do in bulk.
+                //
+                // Settlement was the fourth page here and is now an entry of its own,
+                // below. It answers a different question from the rest of the collection:
+                // these screens are about money the school is owed, and that one is about
+                // money that has actually arrived.
                 ['route' => 'admin.payments.index', 'label' => 'Payments', 'icon' => 'cash', 'can' => 'fees.view',
                     'matches' => [
                         'admin.payments.index',
                         'admin.payments.reverse',
                         'admin.payments.overview',
                         'admin.payments.schedule',
-                        'admin.payments.settlements',
                         'admin.payments.reports',
                     ],
                     'children' => [
                         ['route' => 'admin.payments.overview', 'label' => 'Overview', 'icon' => 'chart'],
                         ['route' => 'admin.payments.schedule', 'label' => 'Payment Schedule', 'icon' => 'calendar'],
-                        ['route' => 'admin.payments.settlements', 'label' => 'Settlement', 'icon' => 'briefcase'],
                         ['route' => 'admin.payments.reports', 'label' => 'Reports', 'icon' => 'report'],
                     ]],
+
+                // What Paystack has actually paid out to the school's bank, and when.
+                //
+                // Its own entry rather than a page under Payments, and `matches` names it
+                // alone: nothing here may leave Payments looking open, or the sidebar would
+                // show it twice — once under the entry it left and once as itself. The page
+                // is still served by PaymentController and still listed in its PAGES; the
+                // menu is the only thing that moved.
+                ['route' => 'admin.payments.settlements', 'label' => 'Settlement', 'icon' => 'briefcase', 'can' => 'fees.view',
+                    'matches' => ['admin.payments.settlements']],
 
                 ['route' => 'admin.fees.scholarships.*', 'label' => 'Scholarships', 'icon' => 'rosette', 'can' => 'fees.manage'],
             ],

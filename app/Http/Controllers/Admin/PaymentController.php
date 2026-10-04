@@ -208,12 +208,16 @@ class PaymentController extends Controller
     }
 
     /**
-     * The Pages section of the menu, less the register that is already built.
+     * The collection screens this controller serves.
      *
-     * The school's own fees site has every one of these working; here the menu holds
-     * the office's order and each unbuilt page says what will be on it, which is what
-     * keeps a complete menu from being a list of pages that error. Defined next to the
-     * method that reads it.
+     * Not the same thing as the Payments submenu. Settlement is on this list and no
+     * longer under Payments on the sidebar — the page is unchanged and still answers
+     * at its own address; only where the menu puts it has moved. Which pages hang off
+     * Payments is the sidebar's business, and that lives in AdminMenu.
+     *
+     * The school's own fees site has every one of these working; here each unbuilt page
+     * says what will be on it, which is what keeps a complete menu from being a list of
+     * pages that error. Defined next to the method that reads it.
      *
      * @var array<int,array{key:string,label:string,icon:string,permission:string}>
      */
