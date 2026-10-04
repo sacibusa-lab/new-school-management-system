@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\Fee;
 use App\Models\FeeCategory;
 use App\Models\FeeStructure;
 use App\Models\FeeStructureItem;
@@ -14,6 +15,7 @@ use App\Models\Term;
 use App\Services\Fees\InvoiceGenerationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class FeeController extends Controller
@@ -23,23 +25,77 @@ class FeeController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /* The section's landing page */
+    /* The catalogue of fees the school charges */
     /* ------------------------------------------------------------------ */
 
     /**
-     * Blank for now.
+     * Everything the school charges, and how often it comes round.
      *
-     * Deliberately not the structures list, which is what this entry used to open on.
-     * The structures page is where a bill is priced and it is still there at its own
-     * address; blanking it would have taken the priced bills off the screen along with
-     * the landing page, and what was asked for was for the Fees entry to open on nothing
-     * while the fee screens are rebuilt — not for the screens behind it to stop working.
+     * Not the same list as the fee structures, which price a term for a year group.
+     * This is the catalogue those are built from: a fee is a thing that can be billed,
+     * and a structure is the decision to bill it.
      */
     public function index(): View
     {
         $this->authorize('fees.manage');
 
-        return view('admin.fees.index');
+        return view('admin.fees.index', [
+            'fees' => Fee::query()->with('academicSession')->orderBy('title')->get(),
+            'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
+            'cycles' => Fee::CYCLES,
+            'terms' => Fee::TERMS,
+        ]);
+    }
+
+    /**
+     * A new fee, from the modal on the catalogue page.
+     *
+     * Created active, and there is nowhere in the modal to say otherwise: switching a
+     * fee off is a decision about a fee that exists, made on its own page, not something
+     * to be got wrong in the moment a title is first typed in.
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $this->authorize('fees.manage');
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:150'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'cycle' => ['required', Rule::in(array_keys(Fee::CYCLES))],
+            'academic_session_id' => ['nullable', 'integer', 'exists:academic_sessions,id'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            // Unchecked boxes are not submitted at all, so these have to be optional.
+            'first_term_active' => ['sometimes', 'boolean'],
+            'second_term_active' => ['sometimes', 'boolean'],
+            'third_term_active' => ['sometimes', 'boolean'],
+        ]);
+
+        $fee = Fee::create([
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'cycle' => $validated['cycle'],
+            'academic_session_id' => $validated['academic_session_id'] ?? null,
+            'amount' => $validated['amount'],
+            'first_term_active' => $request->boolean('first_term_active'),
+            'second_term_active' => $request->boolean('second_term_active'),
+            'third_term_active' => $request->boolean('third_term_active'),
+            'is_active' => true,
+        ]);
+
+        return redirect()
+            ->route('admin.fees.index')
+            ->with('status', $fee->title.' is on the fee list.');
+    }
+
+    /**
+     * Not built yet: the fee's own page, where it will be edited, priced per term and
+     * switched off. It is a page rather than nothing so the row has somewhere to lead.
+     */
+    public function edit(Fee $fee): View
+    {
+        $this->authorize('fees.manage');
+
+        return view('admin.fees.edit', ['fee' => $fee]);
     }
 
     /* ------------------------------------------------------------------ */

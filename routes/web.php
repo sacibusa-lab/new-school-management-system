@@ -381,10 +381,16 @@ Route::middleware('auth')
         });
 
         /* ---------------- Fees ---------------- */
-        // The section's landing page, blank while the fee screens are rebuilt. Listed
-        // before the rest because it is the bare path, the one the sidebar points at.
-        // The categories and structures below it still answer at their own addresses.
+        // The catalogue of what the school charges. Listed before the rest because it is
+        // the bare path, the one the sidebar points at. The categories and structures
+        // below it predate it and still answer at their own addresses.
         Route::get('fees', [FeeController::class, 'index'])->name('fees.index');
+        Route::post('fees', [FeeController::class, 'store'])->name('fees.store');
+
+        // A fee's own page. It cannot be read as one of the literal paths below, because
+        // the last segment is the literal "edit" and theirs are "categories" and
+        // "structures".
+        Route::get('fees/{fee}/edit', [FeeController::class, 'edit'])->name('fees.edit');
 
         Route::get('fees/categories', [FeeController::class, 'categories'])->name('fees.categories.index');
         Route::post('fees/categories', [FeeController::class, 'storeCategory'])->name('fees.categories.store');
