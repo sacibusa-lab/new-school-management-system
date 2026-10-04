@@ -39,13 +39,25 @@ class Payment extends Model
 
     public function methodLabel(): string
     {
-        return match ($this->method) {
+        return self::labelFor($this->method);
+    }
+
+    /**
+     * The human name for a method, without needing a payment to ask.
+     *
+     * Kept here rather than in whichever screen needs it so a method is spelled the same
+     * way on a receipt, in the day book and in the breakdown on the dashboard.
+     */
+    public static function labelFor(?string $method): string
+    {
+        return match ($method) {
             'cash' => 'Cash',
             'bank_transfer' => 'Bank transfer',
             'card' => 'Card',
             'gateway' => 'Online payment',
             'cheque' => 'Cheque',
-            default => ucfirst(str_replace('_', ' ', (string) $this->method)),
+            null, '' => 'Not recorded',
+            default => ucfirst(str_replace('_', ' ', $method)),
         };
     }
 }

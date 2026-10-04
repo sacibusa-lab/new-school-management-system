@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\Payment;
 use App\Models\SchoolLevel;
 use App\Models\Section;
 use App\Models\Setting;
@@ -15,6 +18,9 @@ use App\Services\Payment\VirtualAccountService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -30,9 +36,63 @@ class FeesPaymentsController extends Controller
     /** Lines to a page. A form class or two at a time, as the register does it. */
     private const PER_PAGE = 25;
 
+    /**
+     * How the money is doing.
+     *
+     * Two questions, and the page is built around the difference between them. The
+     * headline is the session so far — billed, collected, outstanding — which is the
+     * position rather than the news. Everything below it is the news: what came in
+     * today, where the gaps are class by class, how the money arrives, and what the
+     * parents are actually paying for.
+     *
+     * It is not a second copy of the fees section on the main dashboard. That one is a
+     * school-wide overview where the fees get four cards; this is the collection desk's
+     * own front page, and it goes a level deeper than four cards can.
+     */
     public function dashboard(): View
     {
-        return $this->placeholder('dashboard');
+        $this->authorize('fees.view');
+
+        $session = AcademicSession::current();
+
+        $billed = (float) $this->billsFor(Invoice::query(), $session)->sum('total');
+        $collected = (float) $this->billsFor(Invoice::query(), $session)->sum('amount_paid');
+
+        return view('admin.fees-payments.dashboard', [
+            'session' => $session,
+
+            // The position, which is the session so far.
+            'totals' => [
+                'billed' => $billed,
+                'collected' => $collected,
+                'outstanding' => round(max($billed - $collected, 0), 2),
+                'rate' => $billed > 0 ? round(($collected / $billed) * 100, 1) : 0.0,
+                'bills' => $this->billsFor(Invoice::query(), $session)->count(),
+                'unpaid' => $this->billsFor(Invoice::query(), $session)->whereIn('status', [
+                    InvoiceStatus::Unpaid->value,
+                    InvoiceStatus::Partial->value,
+                    InvoiceStatus::Overdue->value,
+                ])->count(),
+            ],
+
+            // The news.
+            'today' => $this->todayTotals($session),
+            'perClass' => $this->perClassTotals($session),
+            'methods' => $this->methodTotals($session),
+            'monthly' => $this->monthlyTotals(),
+            'categories' => $this->categoryTotals($session),
+
+            'recent' => Payment::query()
+                ->with(['student', 'invoice'])
+                ->where('status', PaymentStatus::Successful->value)
+                ->latest('paid_at')
+                ->limit(10)
+                ->get(),
+
+            // Not a fee figure, but a collection rate means nothing without knowing how
+            // many families are behind it.
+            'roll' => Student::query()->where('status', StudentStatus::Active->value)->count(),
+        ]);
     }
 
     /**
@@ -135,26 +195,217 @@ class FeesPaymentsController extends Controller
             ->where('status', '!=', InvoiceStatus::Cancelled->value);
     }
 
+    /* ------------------------------------------------------------------ */
+    /* The figures behind the dashboard */
+    /* ------------------------------------------------------------------ */
+
     /**
-     * Looked up rather than trusted from the URL, so the label and the permission
-     * come from this file and never from the browser.
+     * Money in today, and bills raised today.
+     *
+     * Scoped to the session's own bills, like every other figure on the page. A payment
+     * taken today against last session's bill is not this session's collection, and
+     * adding the two together is how a cash book stops agreeing with the accounts.
+     *
+     * @return array<string,float|int>
      */
-    protected function placeholder(string $key): View
+    protected function todayTotals(?AcademicSession $session): array
     {
-        $page = collect(self::PAGES)->firstWhere('key', $key);
+        $today = Carbon::today();
 
-        abort_if($page === null, 404);
+        $received = $this->sessionPayments($session)->whereDate('paid_at', $today);
+        $raised = $this->billsFor(Invoice::query(), $session)->whereDate('issued_at', $today);
 
-        $this->authorize($page['permission']);
+        return [
+            'collected' => (float) (clone $received)->sum('amount'),
+            'payments' => (clone $received)->count(),
+            'raised' => (float) (clone $raised)->sum('total'),
+            'bills' => (clone $raised)->count(),
+            'week' => (float) $this->sessionPayments($session)
+                ->where('paid_at', '>=', $today->copy()->startOfWeek())
+                ->sum('amount'),
+        ];
+    }
 
-        return view('admin.fees-payments.'.$key, ['page' => $page]);
+    /**
+     * The payments that count as this session's money.
+     *
+     * A payment is this session's if it settled one of this session's bills. A receipt
+     * with no bill behind it — an overpayment held as a credit — is left out on
+     * purpose: it is money the school is holding, not income against anything yet.
+     *
+     * @return Builder<Payment>
+     */
+    protected function sessionPayments(?AcademicSession $session): Builder
+    {
+        return Payment::query()
+            ->where('status', PaymentStatus::Successful->value)
+            ->whereHas('invoice', fn (Builder $invoice) => $this->billsFor($invoice, $session));
+    }
+
+    /**
+     * What each class has been billed, has paid, and still owes.
+     *
+     * Sorted by what is outstanding rather than by name, because a list of twenty-three
+     * classes in alphabetical order is a list nobody acts on. Grouped in the database
+     * rather than counted class by class: twenty-three classes would otherwise be
+     * forty-six reads.
+     *
+     * @return Collection<int,array<string,mixed>>
+     */
+    protected function perClassTotals(?AcademicSession $session): Collection
+    {
+        // Qualified throughout: `students` carries a `status` of its own, so an
+        // unqualified one becomes ambiguous the moment the two tables are joined.
+        $rows = Invoice::query()
+            ->when($session, fn (Builder $q) => $q->where('invoices.academic_session_id', $session->id))
+            ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+            ->join('students', 'students.id', '=', 'invoices.student_id')
+            ->leftJoin('school_classes', 'school_classes.id', '=', 'students.school_class_id')
+            ->groupBy('school_classes.id', 'school_classes.name')
+            ->get([
+                DB::raw('school_classes.name as class_name'),
+                DB::raw('count(distinct invoices.student_id) as children'),
+                DB::raw('coalesce(sum(invoices.total), 0) as billed'),
+                DB::raw('coalesce(sum(invoices.amount_paid), 0) as collected'),
+            ]);
+
+        return $rows
+            ->map(fn ($row): array => $this->withOutstanding([
+                'name' => $row->class_name ?? 'No class yet',
+                'children' => (int) $row->children,
+                'billed' => (float) $row->billed,
+                'collected' => (float) $row->collected,
+            ]))
+            ->sortByDesc('outstanding')
+            ->values();
+    }
+
+    /**
+     * How the money arrived.
+     *
+     * The gateway against a hand-written receipt is the figure the office is actually
+     * curious about: it is the difference between a parent paying from home at midnight
+     * and a parent queueing at the bursary window.
+     *
+     * @return Collection<int,array<string,mixed>>
+     */
+    protected function methodTotals(?AcademicSession $session): Collection
+    {
+        $rows = $this->sessionPayments($session)
+            ->groupBy('method')
+            ->get([
+                DB::raw('method'),
+                DB::raw('sum(amount) as total'),
+                DB::raw('count(*) as payments'),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        $sum = (float) $rows->sum('total');
+
+        return $rows->map(fn ($row): array => [
+            'label' => Payment::labelFor($row->method),
+            'total' => (float) $row->total,
+            'payments' => (int) $row->payments,
+            'share' => $sum > 0 ? round(((float) $row->total / $sum) * 100, 1) : 0.0,
+        ]);
+    }
+
+    /**
+     * The last twelve months of money received.
+     *
+     * Not scoped to the session, unlike everything above it, and deliberately: money
+     * arrives in the shape of the school year. A September spike means nothing until it
+     * is seen against the quiet months either side of it, and a chart that can only see
+     * one session can never show that shape.
+     *
+     * @return Collection<int,array{key:string,label:string,total:float}>
+     */
+    protected function monthlyTotals(): Collection
+    {
+        $start = Carbon::today()->startOfMonth()->subMonths(11);
+
+        $sums = Payment::query()
+            ->where('status', PaymentStatus::Successful->value)
+            ->where('paid_at', '>=', $start)
+            ->groupBy('ym')
+            ->get([
+                DB::raw("date_format(paid_at, '%Y-%m') as ym"),
+                DB::raw('sum(amount) as total'),
+            ])
+            ->pluck('total', 'ym');
+
+        // Filled in month by month rather than taken as it comes. A month nothing came
+        // in is a real column a real height of zero; dropping it would close the gap and
+        // draw a trend that says the opposite of what happened.
+        return collect(range(0, 11))->map(function (int $back) use ($start, $sums): array {
+            $month = $start->copy()->addMonths($back);
+
+            return [
+                'key' => $month->format('Y-m'),
+                'label' => $month->format('M'),
+                'total' => (float) ($sums[$month->format('Y-m')] ?? 0),
+            ];
+        });
+    }
+
+    /**
+     * What the fees were actually for, billed and collected per category.
+     *
+     * This is what tells the office whether the shortfall sits in tuition, which is
+     * serious, or in a levy half the school has not been asked for yet, which is not.
+     *
+     * @return Collection<int,array<string,mixed>>
+     */
+    protected function categoryTotals(?AcademicSession $session): Collection
+    {
+        $rows = InvoiceItem::query()
+            ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+            ->leftJoin('fee_categories', 'fee_categories.id', '=', 'invoice_items.fee_category_id')
+            ->when($session, fn (Builder $q) => $q->where('invoices.academic_session_id', $session->id))
+            ->where('invoices.status', '!=', InvoiceStatus::Cancelled->value)
+            ->groupBy('fee_categories.id', 'fee_categories.name')
+            ->get([
+                DB::raw('fee_categories.name as category'),
+                DB::raw('coalesce(sum(invoice_items.amount), 0) as billed'),
+                DB::raw('coalesce(sum(invoice_items.amount_paid), 0) as collected'),
+            ]);
+
+        return $rows
+            ->map(fn ($row): array => $this->withOutstanding([
+                // A line item with no category is not an error — a bursar can add an
+                // ad-hoc charge — so it gets a name rather than a blank.
+                'name' => $row->category ?? 'Uncategorised',
+                'billed' => (float) $row->billed,
+                'collected' => (float) $row->collected,
+            ]))
+            ->sortByDesc('billed')
+            ->values();
+    }
+
+    /**
+     * Fill in what is still owed on a row, and how far along it is. Kept in one place so
+     * a class, a fee category and anything added later are read the same way.
+     *
+     * @param  array<string,mixed>  $row
+     * @return array<string,mixed>
+     */
+    protected function withOutstanding(array $row): array
+    {
+        $billed = (float) $row['billed'];
+        $collected = (float) $row['collected'];
+
+        return $row + [
+            'outstanding' => round(max($billed - $collected, 0), 2),
+            'rate' => $billed > 0 ? round(($collected / $billed) * 100, 1) : 0.0,
+        ];
     }
 
     /**
      * The pages this section owns, for the test that keeps the menu and them in step.
      *
-     * The dashboard is still one of the screens that says what will be on it and is
-     * drawn by placeholder() below. The students hub was too, and is not any more.
+     * Both are real screens now. Neither is still one of the pages that says what will
+     * be on it.
      *
      * @var array<int,array{key:string,label:string,icon:string,permission:string}>
      */
