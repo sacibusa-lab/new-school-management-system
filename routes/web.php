@@ -391,6 +391,8 @@ Route::middleware('auth')
         // the last segment is the literal "edit" and theirs are "categories" and
         // "structures".
         Route::get('fees/{fee}/edit', [FeeController::class, 'edit'])->name('fees.edit');
+        Route::put('fees/{fee}', [FeeController::class, 'update'])->name('fees.update');
+        Route::post('fees/{fee}/toggle', [FeeController::class, 'toggle'])->name('fees.toggle');
 
         Route::get('fees/categories', [FeeController::class, 'categories'])->name('fees.categories.index');
         Route::post('fees/categories', [FeeController::class, 'storeCategory'])->name('fees.categories.store');

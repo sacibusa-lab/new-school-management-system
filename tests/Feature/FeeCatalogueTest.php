@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\FeeController;
 use App\Models\AcademicSession;
 use App\Models\Fee;
 use App\Models\Setting;
@@ -191,17 +192,147 @@ class FeeCatalogueTest extends TestCase
             ->assertSee('All three terms');
     }
 
-    public function test_the_page_for_a_fee_opens(): void
+    public function test_a_fee_has_five_tabs_and_opens_on_details(): void
     {
         $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 85000]);
 
-        $this->actingAs($this->admin)
+        $html = $this->actingAs($this->admin)
             ->get(route('admin.fees.edit', $fee))
             ->assertOk()
             ->assertSee('Tuition Fee')
             ->assertSee($this->currency.'85,000.00')
-            // Said plainly, so nobody goes looking for the field that was never built.
-            ->assertSee('Editing this fee');
+            ->getContent();
+
+        foreach (FeeController::TABS as $tab) {
+            $this->assertStringContainsString($tab['label'], $html, "The {$tab['label']} tab is missing.");
+            $this->assertStringContainsString(
+                route('admin.fees.edit', ['fee' => $fee, 'tab' => $tab['key']]),
+                $html,
+                "The {$tab['label']} tab does not link to itself.",
+            );
+        }
+
+        // Details is where you land, and the only tab with a form on it.
+        $this->assertStringContainsString('Save changes', $html);
+    }
+
+    /**
+     * An unknown tab is somebody's stale bookmark, not an error worth a stack trace.
+     */
+    public function test_an_unknown_tab_falls_back_to_details(): void
+    {
+        $fee = Fee::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'nonsense']))
+            ->assertOk()
+            ->assertSee('Save changes');
+    }
+
+    public function test_the_details_tab_saves_the_fee(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'cycle' => 'termly', 'amount' => 85000]);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.fees.update', $fee), [
+                'title' => 'Tuition (Senior)',
+                'description' => 'Per term, per child',
+                'cycle' => 'annually',
+                'academic_session_id' => $this->session->id,
+                'amount' => 120000,
+                'first_term_active' => '1',
+                'second_term_active' => '1',
+            ])
+            ->assertRedirect(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'details']))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status');
+
+        $fee->refresh();
+
+        $this->assertSame('Tuition (Senior)', $fee->title);
+        $this->assertSame('annually', $fee->cycle);
+        $this->assertSame($this->session->id, $fee->academic_session_id);
+        $this->assertSame('120000.00', $fee->amount);
+        $this->assertTrue($fee->second_term_active);
+        $this->assertFalse($fee->third_term_active);
+    }
+
+    /**
+     * A form that saved the title must not be able to switch the fee on as a side effect
+     * of something nobody was looking at. The standing is changed in Settings.
+     */
+    public function test_saving_the_details_does_not_change_the_standing(): void
+    {
+        $fee = Fee::factory()->inactive()->create(['title' => 'Old Levy']);
+
+        $this->actingAs($this->admin)
+            ->put(route('admin.fees.update', $fee), [
+                'title' => 'Old Levy',
+                'cycle' => 'termly',
+                'amount' => 5000,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertFalse($fee->fresh()->is_active);
+    }
+
+    public function test_the_settings_tab_switches_a_fee_on_and_off(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee']);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.toggle', $fee))
+            ->assertRedirect(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'settings']))
+            ->assertSessionHas('status');
+
+        $this->assertFalse($fee->fresh()->is_active);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.toggle', $fee))
+            ->assertSessionHas('status');
+
+        // Switched back on, and still there: off is not deleted.
+        $this->assertTrue($fee->fresh()->is_active);
+    }
+
+    /**
+     * The three tabs whose tables do not exist yet have to say so, rather than looking
+     * like a page that loaded wrong.
+     */
+    public function test_the_tabs_that_are_not_built_say_so(): void
+    {
+        $fee = Fee::factory()->create();
+
+        foreach ([
+            'splits' => 'Nothing records a split yet',
+            'class-amounts' => 'Nothing records an amount per class yet',
+            'transactions' => 'recorded against a bill and not against the catalogue',
+        ] as $tab => $phrase) {
+            $this->actingAs($this->admin)
+                ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => $tab]))
+                ->assertOk()
+                ->assertSee($phrase);
+        }
+    }
+
+    public function test_somebody_outside_the_fee_desk_cannot_change_a_fee(): void
+    {
+        $teacher = User::factory()->create();
+        $teacher->assignRole('Teacher');
+
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 85000]);
+
+        $this->actingAs($teacher)->get(route('admin.fees.edit', $fee))->assertForbidden();
+
+        $this->actingAs($teacher)
+            ->put(route('admin.fees.update', $fee), ['title' => 'Changed', 'cycle' => 'termly', 'amount' => 1])
+            ->assertForbidden();
+
+        $this->actingAs($teacher)->post(route('admin.fees.toggle', $fee))->assertForbidden();
+
+        $fee->refresh();
+        $this->assertSame('Tuition Fee', $fee->title);
+        $this->assertTrue($fee->is_active);
     }
 
     public function test_somebody_outside_the_fee_desk_cannot_open_the_catalogue(): void
