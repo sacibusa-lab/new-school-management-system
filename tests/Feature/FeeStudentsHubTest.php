@@ -105,7 +105,7 @@ class FeeStudentsHubTest extends TestCase
         $senior = $this->student($this->seniorClass, 'SAC/2026/1002', 'Chidi');
 
         $html = $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub', ['class' => $this->level->id]))
+            ->get(route('admin.fees-payments.students-hub', ['class' => $this->level->id.':0']))
             ->assertOk()
             ->assertSee($junior->full_name)
             ->assertDontSee($senior->full_name)
@@ -116,8 +116,14 @@ class FeeStudentsHubTest extends TestCase
         $this->assertStringContainsString('1 child match', $html);
     }
 
-    /** A section on its own is that arm of every year, not of one. */
-    public function test_a_section_narrows_the_roll_across_year_groups(): void
+    /**
+     * A class is a year group and a section together, so the filter asks for both at once.
+     *
+     * SS1A shares its letter with JSS1A. An arm chosen under JSS1 is a choice about JSS1,
+     * so SS1A is not in the answer — the opposite of what this filter did while the section
+     * was a control of its own, and the reason it is not one now.
+     */
+    public function test_an_arm_narrows_the_roll_to_that_class_alone(): void
     {
         $sectionA = Section::query()->where('name', 'A')->sole();
 
@@ -126,11 +132,34 @@ class FeeStudentsHubTest extends TestCase
         $senior = $this->student($this->seniorClass, 'SAC/2026/1003', 'Chidi');
 
         $this->actingAs($this->admin)
-            ->get(route('admin.fees-payments.students-hub', ['section' => $sectionA->id]))
+            ->get(route('admin.fees-payments.students-hub', [
+                'class' => $this->level->id.':'.$sectionA->id,
+            ]))
             ->assertOk()
             ->assertSee($junior->full_name)
-            ->assertSee($senior->full_name)
-            ->assertDontSee($other->full_name);
+            ->assertDontSee($other->full_name)
+            ->assertDontSee($senior->full_name);
+    }
+
+    /**
+     * The list is drawn under the year group, and every year group is offered whole as well
+     * as arm by arm: "all of JSS1" is a question the office asks, and a list of arms cannot
+     * express it.
+     */
+    public function test_the_class_filter_is_grouped_by_year_group(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.fees-payments.students-hub'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('<optgroup label="JSS1">', $html);
+        $this->assertStringContainsString('<optgroup label="SS1">', $html);
+        $this->assertStringContainsString('All of JSS1', $html);
+
+        // The five options JSS1 offers are the year group whole and its two arms, and
+        // nothing belonging to SS1 is filed under the JSS1 heading.
+        $this->assertSame(3, substr_count($html, '<option value="'.$this->level->id.':'));
     }
 
     public function test_a_child_can_be_found_by_name_or_by_admission_number(): void

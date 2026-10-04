@@ -27,9 +27,15 @@
 @endif
 
 {{-- ================= Whose money ================= --}}
-{{-- Twelve columns shared out by what each field holds rather than split four ways. A
-     section is one letter and a standing is one word; the search box takes a name or an
-     admission number. Four equal quarters gave the section the room the search needed. --}}
+{{-- Twelve columns shared out by what each field holds rather than split four ways. The
+     class list carries a year group and a letter, a standing is one word, and the search
+     box takes a name or an admission number. Four equal quarters gave the class list the
+     room the search needed.
+
+     One class control, not a year group and a section beside it. Those were the two halves
+     of one answer — a class is JSS1A, neither JSS1 nor A — so they asked the office to say
+     it in two goes with a filter between them. The list is grouped by year group now, which
+     is the shape the school is already in. --}}
 <form method="GET" class="card-pad mt-6">
     {{-- `items-end` keeps the controls on a single line, and it holds only while no field
          carries a hint. A hint makes its cell taller, and a taller cell that is bottom
@@ -37,17 +43,11 @@
          the roll" 22px above the other three. That note belongs in the empty state
          below, which already explains the active-roll default. --}}
     <div class="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
-        <x-field name="class" label="Year group" type="select"
-                 class="lg:col-span-3"
-                 placeholder-option="Every year group"
-                 :value="$filters['class'] ?: null"
-                 :options="$levels->pluck('name', 'id')->all()" />
-
-        <x-field name="section" label="Section" type="select"
-                 class="lg:col-span-2"
-                 placeholder-option="Every section"
-                 :value="$filters['section'] ?: null"
-                 :options="$sections->pluck('name', 'id')->all()" />
+        <x-field name="class" label="Class" type="select"
+                 class="lg:col-span-4"
+                 placeholder-option="Every class"
+                 :value="$filters['picked']"
+                 :options="$classOptions" />
 
         <x-field name="status" label="On the roll" type="select"
                  class="lg:col-span-3"
@@ -56,7 +56,7 @@
                  :options="$statuses" />
 
         <x-field name="q" label="Search" type="text"
-                 class="lg:col-span-4"
+                 class="lg:col-span-5"
                  :value="$filters['q']"
                  placeholder="Name or admission number" />
     </div>

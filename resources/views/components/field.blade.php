@@ -41,9 +41,31 @@
             @endif
 
             @foreach ($options ?? [] as $optionValue => $optionLabel)
-                <option value="{{ $optionValue }}" @selected((string) old($name, $value) === (string) $optionValue)>
-                    {{ $optionLabel }}
-                </option>
+                @if (is_array($optionLabel))
+                    {{--
+                        A section of the list rather than an answer: the classes of one
+                        year group, drawn under the year group's name. The array key is
+                        the heading, so a caller hands over
+                        ['JSS1' => ['3:0' => 'All of JSS1', '3:5' => 'A']].
+
+                        Nested like this rather than as a flat list with the year group
+                        spelled into every label, because the year group is a heading and
+                        repeating it on six lines makes six things to read where there is
+                        one. A browser cannot search inside an optgroup, which costs
+                        nothing here: the school has six year groups.
+                    --}}
+                    <optgroup label="{{ $optionValue }}">
+                        @foreach ($optionLabel as $groupedValue => $groupedLabel)
+                            <option value="{{ $groupedValue }}" @selected((string) old($name, $value) === (string) $groupedValue)>
+                                {{ $groupedLabel }}
+                            </option>
+                        @endforeach
+                    </optgroup>
+                @else
+                    <option value="{{ $optionValue }}" @selected((string) old($name, $value) === (string) $optionValue)>
+                        {{ $optionLabel }}
+                    </option>
+                @endif
             @endforeach
         </select>
 

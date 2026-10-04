@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\SchoolLevel;
+use App\Models\SchoolClass;
 use App\Models\Section;
 use App\Models\Setting;
 use App\Models\Student;
@@ -121,9 +121,19 @@ class FeesPaymentsController extends Controller
 
         $session = AcademicSession::current();
 
+        // One control, one answer. The office picks a class from a list grouped by
+        // year group, so the choice already carries the year group with it and both
+        // are asked for in one parameter: `level:section`, 0 meaning "all of them" on
+        // either side — see classOptions() for what the list offers.
+        [$level, $section] = array_pad(explode(':', (string) $request->string('class'), 2), 2, '0');
+
         $filters = [
-            'class' => $request->integer('class'),
-            'section' => $request->integer('section'),
+            'class' => (int) $level,
+            'section' => (int) $section,
+            // What the control shows as chosen, written the way its own options are
+            // written so that it recognises itself. A value typed into the address bar
+            // that no option matches simply selects nothing, and still filters.
+            'picked' => (int) $level.':'.(int) $section,
             // The roll opens on the children who are on it. An empty value is the
             // office asking for everybody, which is a thing they are allowed to want.
             'status' => $request->has('status')
@@ -134,14 +144,64 @@ class FeesPaymentsController extends Controller
 
         return view('admin.fees-payments.students-hub', [
             'students' => $this->register($filters, $session),
-            'levels' => SchoolLevel::query()->active()->orderBy('order')->orderBy('name')->get(),
-            'sections' => Section::query()->orderBy('order')->orderBy('name')->get(),
+            'classOptions' => $this->classOptions(),
             'statuses' => StudentStatus::options(),
             'filters' => $filters,
             'currency' => Setting::get('currency_symbol', '₦'),
             'session' => $session,
             'paystackReady' => app(VirtualAccountService::class)->isConfigured(),
         ]);
+    }
+
+    /**
+     * The classes the filter offers, grouped by the year group they belong to.
+     *
+     * A class is a year group and a section together — JSS1A, neither JSS1 nor A — so the
+     * list is built from the classes the school actually runs rather than from every
+     * pairing of the two, and a year group with three arms offers three.
+     *
+     * Each answer is written `level:section`, which is the one thing the filter parses.
+     * The first entry under every heading is the year group on its own, section 0: "all of
+     * JSS1" is a question the office asks across the counter, and a list of arms cannot
+     * express it. The arms are named by their letter alone, because the heading above them
+     * has already said which year group they belong to.
+     *
+     * @return array<string,array<string,string>>
+     */
+    protected function classOptions(): array
+    {
+        $classes = SchoolClass::query()
+            ->whereHas('level', fn ($level) => $level->active())
+            ->with(['level', 'section'])
+            ->get()
+            // Sorted here rather than in SQL: the order of a class is the order of two
+            // other tables, and one read of a few dozen rows is cheaper to read than the
+            // four joins it would take to ask the database for the same thing.
+            ->sortBy(fn (SchoolClass $class) => sprintf(
+                '%03d-%03d-%s',
+                $class->level?->order ?? 999,
+                $class->section?->order ?? 999,
+                $class->name,
+            ));
+
+        $options = [];
+
+        foreach ($classes as $class) {
+            $level = $class->level;
+            $section = $class->section;
+
+            if (! $level) {
+                continue;
+            }
+
+            $options[$level->name] ??= [$level->id.':0' => 'All of '.$level->name];
+
+            if ($section) {
+                $options[$level->name][$level->id.':'.$section->id] = $section->name;
+            }
+        }
+
+        return $options;
     }
 
     /**
