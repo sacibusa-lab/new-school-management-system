@@ -48,7 +48,10 @@ class SettingLayout
         // somebody else's name on them — see PAGES for the page they share.
         'api_paystack' => 'Paystack — fees collection',
         'api_termii' => 'Termii — text messages',
-        'api_deepseek' => 'DeepSeek — reading scoresheets',
+        // Not a company's name, because there is no one company: the school may hold
+        // its key with Gemini, OpenAI or DeepSeek, and the card lets it say which. A
+        // heading naming one of the three contradicts the field underneath it.
+        'api_deepseek' => 'AI — reading scoresheets',
         'general' => 'General',
     ];
 
@@ -177,9 +180,61 @@ class SettingLayout
         'admission_letter_note',
     ];
 
+    /**
+     * What a group is called when it is spoken about in a sentence.
+     *
+     * The heading says "Paystack — fees collection", which is right across the top of a
+     * card and wrong in the middle of "… settings saved." The API page saves one card at
+     * a time now, so the page has to be able to say which one it was.
+     *
+     * A group not named here has no brief, and the message falls back to the plain one.
+     */
+    public const BRIEF = [
+        'api_paystack' => 'Paystack',
+        'api_termii' => 'Termii',
+        'api_deepseek' => 'AI reader',
+    ];
+
+    /**
+     * The choices a field offers, where the field is a list rather than a box.
+     *
+     * A text box for a value the app recognises three spellings of is a box that can be
+     * filled in wrongly, and one of these answers wrongly in a way nobody notices: a
+     * provider it does not know is read as the AI being switched off, so a typo surfaces
+     * when a scoresheet refuses to load rather than when it is typed. The bank that
+     * issues virtual account numbers is the same argument, and its list is Paystack's
+     * rather than this file's — see PaystackProvider::getVirtualAccountBanks.
+     *
+     * An empty key is offered where blank is an answer rather than an omission.
+     */
+    public const OPTIONS = [
+        'ai_provider' => [
+            '' => 'Switched off — every sheet is typed in by hand',
+            'gemini' => 'Google Gemini',
+            'openai' => 'OpenAI',
+            'deepseek' => 'DeepSeek (text only — cannot read a photograph)',
+        ],
+    ];
+
     public static function headingFor(string $group): string
     {
         return self::GROUPS[$group] ?? ucfirst($group);
+    }
+
+    /** The short name for a group, or null where it has none. */
+    public static function briefName(string $group): ?string
+    {
+        return self::BRIEF[$group] ?? null;
+    }
+
+    /**
+     * The choices a field offers, keyed by setting key.
+     *
+     * @return array<string,string>
+     */
+    public static function options(string $key): array
+    {
+        return self::OPTIONS[$key] ?? [];
     }
 
     /** The page a group is set up on. Anything not declared belongs to the general one. */

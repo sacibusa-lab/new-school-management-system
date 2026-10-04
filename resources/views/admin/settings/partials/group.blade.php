@@ -5,12 +5,33 @@
     // The card is shared because the settings are split across two pages — the
     // general one and the admissions one — and a field drawn twice is a field that
     // will eventually be drawn two different ways.
+    //
+    // `$ownForm` makes one card save itself rather than wait for a Save at the foot
+    // of the page. Only the API page asks for it: those three cards are three
+    // unrelated accounts, and one shared form meant that correcting a Termii sender
+    // ID also submitted the Paystack key.
+    //
+    // `$choices` is a field's list of choices, where the list is not this file's to
+    // know — the banks Paystack will issue a virtual account number through. A field
+    // absent from it falls back to SettingLayout::OPTIONS.
+    $ownForm = $ownForm ?? false;
+    $choices = $choices ?? [];
 @endphp
 
 <div class="card-pad">
     <h2 class="text-base font-semibold text-ink">
         {{ $group['label'] }}
     </h2>
+
+    @if ($ownForm)
+        <form method="POST" action="{{ route('admin.settings.update') }}">
+            @csrf
+            @method('PUT')
+
+            {{-- Says which card was saved, so the message at the top of the page can
+                 name it rather than saying "Settings saved." three times over. --}}
+            <input type="hidden" name="_group" value="{{ $group['key'] }}">
+    @endif
 
     <div class="mt-6 grid gap-5 sm:grid-cols-2">
         @foreach ($group['items'] as $setting)
@@ -119,6 +140,20 @@
                         $oldKey = 'settings.' . $setting->key . '.value';
                         $inputName = 'settings[' . $setting->key . '][value]';
                         $inputId = 'setting_' . $setting->key;
+
+                        // The choices this field offers, where it offers any. The page may
+                        // hand over a list this file has no business knowing — the banks
+                        // Paystack will issue a number through — so it wins over the one
+                        // declared in SettingLayout.
+                        $options = $choices[$setting->key] ?? \App\Support\SettingLayout::options($setting->key);
+
+                        // A value the list does not offer is still listed. Paystack answers
+                        // with the banks enabled on THIS account, so a school set up on a
+                        // bank outside the short fallback list would otherwise open the
+                        // page and find its own setting apparently changed.
+                        if ($options !== [] && filled($displayValue) && ! array_key_exists($displayValue, $options)) {
+                            $options[$displayValue] = $displayValue;
+                        }
                     @endphp
 
                     <label for="{{ $inputId }}" class="label">
@@ -130,6 +165,23 @@
                                   name="{{ $inputName }}"
                                   rows="3"
                                   class="input @error($oldKey) input-error @enderror">{{ old($oldKey, $displayValue) }}</textarea>
+                    @elseif ($options !== [])
+                        {{--
+                            A list, where the answer has to be one of a known few. Typed into
+                            a box, a provider the app has never heard of reads as the AI being
+                            switched off — so a misspelling is found when a scoresheet refuses
+                            to load, not when it is typed.
+                        --}}
+                        <select id="{{ $inputId }}"
+                                name="{{ $inputName }}"
+                                class="input @error($oldKey) input-error @enderror">
+                            @foreach ($options as $optionValue => $optionLabel)
+                                <option value="{{ $optionValue }}"
+                                        @selected((string) old($oldKey, $displayValue) === (string) $optionValue)>
+                                    {{ $optionLabel }}
+                                </option>
+                            @endforeach
+                        </select>
                     @else
                         <input id="{{ $inputId }}"
                                type="{{ $setting->type === 'int' ? 'number' : 'text' }}"
@@ -153,10 +205,11 @@
                             'ca_max_total' => 'Continuous assessment marks out of this total.',
                             'exam_max_total' => 'Examination marks out of this total.',
                             'paystack_public_key' => 'Safe to publish — it is the key the payment page opens with.',
+                            'paystack_dva_bank' => 'The bank a child\'s virtual account number is issued through, and so the name a parent sees beside it. Only some banks will open one, and Paystack is the one that decides which.',
                             'termii_sender_id' => 'The name a parent sees the message come from. Eleven characters at most, and Termii has to have approved it.',
                             'termii_channel' => 'generic, dnd or whatsapp. Leave it as generic unless Termii has told you otherwise.',
-                            'ai_provider' => 'gemini, openai or deepseek — whichever the school holds a key with. Anything else is read as AI marking being switched off.',
-                            'ai_model' => 'Leave empty for the provider\'s default. It has to be a model that can READ a photograph of a sheet; a text-only one will refuse the upload.',
+                            'ai_provider' => 'Whichever company the school holds a key with. Switched off means every sheet is typed in by hand.',
+                            'ai_model' => 'Leave empty for the provider\'s default. It has to be a model that can READ a photograph of a sheet, and only some are: Gemini\'s flash models and OpenAI\'s gpt-4.1-mini can, DeepSeek\'s own models cannot.',
                             default => null,
                         };
                     @endphp
@@ -168,4 +221,14 @@
             </div>
         @endforeach
     </div>
+
+    @if ($ownForm)
+            {{-- The button belongs to the card, so it says Save and not Save Paystack:
+                 the heading directly above it already names the account. --}}
+            <div class="mt-6 flex items-center gap-3 border-t border-line pt-5">
+                <button type="submit" class="btn-primary">Save</button>
+                <p class="text-xs text-muted">Changes take effect immediately.</p>
+            </div>
+        </form>
+    @endif
 </div>

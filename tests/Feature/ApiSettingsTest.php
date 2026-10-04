@@ -51,8 +51,135 @@ class ApiSettingsTest extends TestCase
         $this->assertSame([
             'Paystack — fees collection',
             'Termii — text messages',
-            'DeepSeek — reading scoresheets',
+            'AI — reading scoresheets',
         ], array_values(array_filter(array_map('trim', $matches[1]))));
+    }
+
+    /**
+     * One card, one Save.
+     *
+     * Three unrelated accounts used to share the form at the foot of the page, so
+     * correcting a Termii sender ID also submitted the Paystack key and the AI key — and
+     * a submitted empty box is a key the school has deleted without meaning to.
+     */
+    public function test_each_card_saves_itself(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.settings.api'))->assertOk()->getContent();
+
+        $this->assertSame(3, substr_count($html, '<form method="POST" action="'.route('admin.settings.update').'"'));
+
+        // And each says which card it is, so the message can name what was saved.
+        foreach (['api_paystack', 'api_termii', 'api_deepseek'] as $group) {
+            $this->assertStringContainsString('name="_group" value="'.$group.'"', $html);
+        }
+    }
+
+    public function test_saving_one_card_leaves_the_other_two_alone(): void
+    {
+        $this->settings([
+            'paystack_secret_key' => 'sk-the-paystack-one',
+            'ai_api_key' => 'the-ai-one',
+        ]);
+
+        $this->actingAs($this->admin)->put(route('admin.settings.update'), [
+            '_group' => 'api_termii',
+            'settings' => [
+                'termii_sender_id' => ['value' => 'NEWSENDER'],
+            ],
+        ])->assertRedirect()->assertSessionHas('status', 'Termii settings saved.');
+
+        $this->assertSame('NEWSENDER', Setting::get('termii_sender_id'));
+
+        // The point of the exercise: the two keys the form never carried are as they were.
+        $this->assertSame('sk-the-paystack-one', Setting::get('paystack_secret_key'));
+        $this->assertSame('the-ai-one', Setting::get('ai_api_key'));
+    }
+
+    /**
+     * The provider used to be seeded with the four characters `null`, which reached the
+     * page and read as a fault rather than as a choice nobody had made yet.
+     */
+    public function test_an_unchosen_provider_reads_as_switched_off_rather_than_the_word_null(): void
+    {
+        $this->assertSame('', Setting::get('ai_provider'));
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.settings.api'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('value="null"', $html);
+        $this->assertStringContainsString('Switched off', $html);
+    }
+
+    /**
+     * A provider the app recognises three spellings of is a list, not a box: typed in
+     * wrongly it reads as the AI being switched off, so the mistake surfaces when a
+     * scoresheet refuses to load rather than when it is typed.
+     */
+    public function test_the_provider_is_a_list_of_the_ones_the_reader_knows(): void
+    {
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.settings.api'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<select [^>]*name="settings\[ai_provider\]\[value\]"[^>]*>.*?<\/select>/s',
+            $html,
+            'The provider is not drawn as a list.',
+        );
+
+        foreach (['', 'gemini', 'openai', 'deepseek'] as $value) {
+            $this->assertStringContainsString('<option value="'.$value.'"', $html, "{$value} is not offered as a provider.");
+        }
+    }
+
+    /**
+     * Which bank issues a virtual account number is Paystack's answer, not ours and not
+     * something the office can be trusted to spell: only some banks will open one, and a
+     * name typed into a box is every account number the hub tries refused.
+     */
+    public function test_the_bank_behind_virtual_account_numbers_is_a_list_read_from_paystack(): void
+    {
+        Http::fake([
+            'api.paystack.co/dedicated_account/available_providers' => Http::response([
+                'status' => true,
+                'data' => [
+                    ['provider_slug' => 'wema-bank', 'bank_name' => 'Wema Bank'],
+                    ['provider_slug' => 'titan-paystack', 'bank_name' => 'Paystack-Titan'],
+                ],
+            ]),
+        ]);
+
+        Setting::put('paystack_secret_key', 'sk-the-paystack-one');
+        Setting::flush();
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.settings.api'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<select [^>]*name="settings\[paystack_dva_bank\]\[value\]"[^>]*>.*?<\/select>/s',
+            $html,
+            'The bank is not drawn as a list.',
+        );
+
+        $this->assertStringContainsString('<option value="wema-bank"', $html);
+        $this->assertStringContainsString('Paystack-Titan', $html);
+    }
+
+    /**
+     * Without a key there is nobody to ask, so the short list Paystack publishes stands in
+     * — and the value the school already has is offered whatever it is, because a school
+     * set up on a bank outside that list must not open the page to find its own setting
+     * apparently changed.
+     */
+    public function test_the_bank_list_still_offers_a_bank_it_does_not_know_about(): void
+    {
+        $this->settings(['paystack_dva_bank' => 'some-other-bank']);
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.settings.api'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<option value="some-other-bank"', $html);
+        $this->assertStringContainsString('<option value="wema-bank"', $html);
     }
 
     /**

@@ -123,7 +123,7 @@ class SettingsLayoutTest extends TestCase
         $this->assertSame([
             'Paystack — fees collection',
             'Termii — text messages',
-            'DeepSeek — reading scoresheets',
+            'AI — reading scoresheets',
         ], $this->headingsOn('admin.settings.api'));
 
         $general = $this->headingsOn('admin.settings.index');
@@ -136,7 +136,7 @@ class SettingsLayoutTest extends TestCase
         // homes is a setting that will sooner or later have two values.
         $this->assertNotContains('Paystack — fees collection', $general);
         $this->assertNotContains('Termii — text messages', $general);
-        $this->assertNotContains('DeepSeek — reading scoresheets', $general);
+        $this->assertNotContains('AI — reading scoresheets', $general);
     }
 
     public function test_the_general_page_no_longer_carries_the_api_keys(): void

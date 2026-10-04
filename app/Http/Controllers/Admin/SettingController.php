@@ -10,6 +10,7 @@ use App\Models\Term;
 use App\Services\Academics\AcademicCalendarService;
 use App\Services\Branding\BrandingService;
 use App\Services\NumberSequenceService;
+use App\Services\Payment\PaystackProvider;
 use App\Support\SettingLayout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,13 +83,18 @@ class SettingController extends Controller
     /**
      * The school's accounts with other people, on a page of their own.
      *
-     * Paystack to collect fees, Termii to send a text message, DeepSeek to read a
-     * scoresheet that has been photographed. Three cards, one page, and the same
-     * form and the same route that saves every other setting: a setting is a
-     * setting, and which page it was drawn on makes no difference to how it is
-     * written. Which groups are drawn here is SettingLayout's to say.
+     * Paystack to collect fees, Termii to send a text message, an AI provider to read a
+     * scoresheet that has been photographed. Three cards, one page, and the same form and
+     * the same route that saves every other setting: a setting is a setting, and which
+     * page it was drawn on makes no difference to how it is written. Which groups are
+     * drawn here is SettingLayout's to say.
+     *
+     * Each card posts on its own, which is the one way this page is not like the others.
+     * They are three unrelated accounts: a form that carried all of them would submit the
+     * Paystack key every time somebody corrected a Termii sender ID, and the office would
+     * be one browser autofill away from writing a key back to a field it had emptied.
      */
-    public function api(NumberSequenceService $sequences): View
+    public function api(NumberSequenceService $sequences, PaystackProvider $paystack): View
     {
         $this->authorize('settings.manage');
 
@@ -97,6 +103,13 @@ class SettingController extends Controller
                 Setting::query()->orderBy('key')->get()->groupBy('group'),
                 'api',
             ),
+            // The bank that issues a virtual account number is not a name to be typed:
+            // only some of them will open a dedicated account, and Paystack is the one
+            // that knows which. Read from them where a key allows it, and from the short
+            // list they publish where it does not.
+            'choices' => [
+                'paystack_dva_bank' => $paystack->getVirtualAccountBanks(),
+            ],
             // The numbering fields' hints are drawn by the same shared partial, so
             // it is handed the previews even though none of these groups has one.
             'previews' => [
@@ -114,6 +127,9 @@ class SettingController extends Controller
 
         $validated = $request->validate([
             'settings' => ['required', 'array'],
+            // Which card this came from, where the form was one card rather than a whole
+            // page. It is used for one thing: saying which of them was saved.
+            '_group' => ['nullable', 'string', 'max:40'],
             'settings.*.value' => ['nullable', 'string', 'max:2000'],
             'settings.*.file' => ['nullable', 'file', 'mimes:'.BrandingService::EXTENSIONS, 'max:'.BrandingService::MAX_KB],
             'settings.*.remove' => ['nullable', 'boolean'],
@@ -171,7 +187,11 @@ class SettingController extends Controller
 
         Setting::flush();
 
-        return back()->with('status', 'Settings saved.');
+        // "Settings saved." on a page where three unrelated accounts are saved one at a
+        // time does not say which. The card names itself where it knows how to.
+        $brief = SettingLayout::briefName($validated['_group'] ?? '');
+
+        return back()->with('status', $brief ? "{$brief} settings saved." : 'Settings saved.');
     }
 
     /**

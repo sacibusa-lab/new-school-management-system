@@ -68,11 +68,14 @@ class SettingsSeeder extends Seeder
             // being touched.
             ['key' => 'paystack_public_key', 'value' => '', 'group' => 'api_paystack', 'label' => 'Public key'],
             ['key' => 'paystack_secret_key', 'value' => '', 'group' => 'api_paystack', 'type' => 'secret', 'label' => 'Secret key'],
-            ['key' => 'paystack_dva_bank', 'value' => 'wema-bank', 'group' => 'api_paystack', 'label' => 'Bank that issues account numbers'],
+            ['key' => 'paystack_dva_bank', 'value' => 'wema-bank', 'group' => 'api_paystack', 'label' => 'Bank for virtual account numbers'],
             ['key' => 'termii_api_key', 'value' => '', 'group' => 'api_termii', 'type' => 'secret', 'label' => 'API key'],
             ['key' => 'termii_sender_id', 'value' => 'SACISCH', 'group' => 'api_termii', 'label' => 'Sender ID'],
             ['key' => 'termii_channel', 'value' => 'generic', 'group' => 'api_termii', 'label' => 'Channel'],
-            ['key' => 'ai_provider', 'value' => 'null', 'group' => 'api_deepseek', 'label' => 'Provider'],
+            // Empty, not the word `null`: this row used to be seeded with the four
+            // characters, which reached the page and read as a fault. See
+            // clear_the_placeholder_ai_provider for the value already out there.
+            ['key' => 'ai_provider', 'value' => '', 'group' => 'api_deepseek', 'label' => 'Provider'],
             ['key' => 'ai_api_key', 'value' => '', 'group' => 'api_deepseek', 'type' => 'secret', 'label' => 'API key'],
             ['key' => 'ai_model', 'value' => '', 'group' => 'api_deepseek', 'label' => 'Model'],
 

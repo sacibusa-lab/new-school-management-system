@@ -79,7 +79,10 @@ class AiVisionScoresheetExtractor implements ScoresheetExtractor
 
     protected function provider(): ?string
     {
-        $provider = strtolower(trim((string) $this->setting('ai_provider', 'provider', 'null')));
+        // Blank is the honest default: this used to fall back to the four characters
+        // `null`, which is not a provider either, and which the settings page then
+        // printed in the box labelled Provider.
+        $provider = strtolower(trim((string) $this->setting('ai_provider', 'provider', '')));
 
         return in_array($provider, ['gemini', 'openai', 'deepseek'], true) ? $provider : null;
     }

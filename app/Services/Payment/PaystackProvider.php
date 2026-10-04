@@ -25,6 +25,19 @@ class PaystackProvider implements PaymentGatewayInterface
 
     protected string $secretKey;
 
+    /**
+     * The banks Paystack is known to issue virtual account numbers through.
+     *
+     * A stand-in for the list read in getVirtualAccountBanks, used only while the school
+     * has not given us a key to ask with. It is deliberately not a list of Nigerian
+     * banks: only some of them will open a dedicated account for a child.
+     */
+    protected const VIRTUAL_ACCOUNT_BANKS = [
+        'wema-bank' => 'Wema Bank',
+        'titan-paystack' => 'Paystack-Titan',
+        '9psb' => '9 Payment Service Bank',
+    ];
+
     public function __construct()
     {
         $this->secretKey = (string) (Setting::get('paystack_secret_key') ?: config('services.paystack.secret_key', ''));
@@ -155,6 +168,52 @@ class PaystackProvider implements PaymentGatewayInterface
 
             return [];
         }
+    }
+
+    /**
+     * The banks Paystack will issue a virtual account number through, as slug => name.
+     *
+     * A different question from getBanks above, which is every bank in the country and is
+     * what the school picks its own account from. Only some of those banks will open a
+     * dedicated account for a child, and Paystack is the one that knows which — hence the
+     * separate endpoint. Letting the office type a bank name into a box instead is how
+     * every number the hub tries to open comes back refused.
+     *
+     * @return array<string,string>
+     */
+    public function getVirtualAccountBanks(): array
+    {
+        if (! $this->isConfigured()) {
+            return self::VIRTUAL_ACCOUNT_BANKS;
+        }
+
+        $providers = cache()->remember('paystack_dva_providers', 86400, function (): array {
+            try {
+                // Five seconds, not the thirty this would otherwise wait: the list is read
+                // while a page is being drawn, and a settings page that hangs is a settings
+                // page the office reports as broken.
+                $response = Http::withToken($this->secretKey)
+                    ->timeout(5)
+                    ->get("{$this->baseUrl}/dedicated_account/available_providers");
+
+                return $response->successful() ? ($response->json()['data'] ?? []) : [];
+            } catch (\Exception $e) {
+                // Paystack being unreachable must not take the settings page with it, so
+                // this falls back to the banks below rather than throwing.
+                Log::warning('Paystack Virtual Account Providers Unavailable', ['error' => $e->getMessage()]);
+
+                return [];
+            }
+        });
+
+        $banks = collect($providers)
+            ->filter(fn (array $provider) => filled($provider['provider_slug'] ?? null))
+            ->mapWithKeys(fn (array $provider) => [
+                $provider['provider_slug'] => $provider['bank_name'] ?? $provider['provider_slug'],
+            ])
+            ->all();
+
+        return $banks === [] ? self::VIRTUAL_ACCOUNT_BANKS : $banks;
     }
 
     public function resolveAccountNumber(string $accountNumber, string $bankCode): array
