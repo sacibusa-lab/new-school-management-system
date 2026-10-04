@@ -174,18 +174,34 @@ class AdminMenu
                     'matches' => ['admin.fees-payments.students-hub']],
 
                 // What is billed, and what it is made of. The entry's own page is the
-                // structures — that is where a bill is priced, and it is the fee site's
-                // own /fees screen — so the two pages beneath it are the other two.
+                // bare /fees path, which is blank for now: the fee screens are being
+                // rebuilt, and until they are the office asked for this entry to open
+                // on nothing.
                 //
-                // A child has to be a plain route name: the sidebar links to it with
-                // route(), which a `*` would send looking for a route that does not
-                // exist. Only the parent's `matches` takes a wildcard.
-                ['route' => 'admin.fees.structures.*', 'label' => 'Fees', 'icon' => 'tag', 'can' => 'fees.manage',
-                    'matches' => ['admin.fees.categories.*', 'admin.fees.structures.*', 'admin.invoices.*'],
-                    'children' => [
-                        ['route' => 'admin.fees.categories.index', 'label' => 'Fee categories', 'icon' => 'tag'],
-                        ['route' => 'admin.invoices.index', 'label' => 'Invoices', 'icon' => 'receipt'],
-                    ]],
+                // Fee categories and Invoices were the two pages beneath it and have
+                // come off the menu, so there is no `children` here any more. Neither
+                // page is gone — both still answer at their own address, and the
+                // invoice register is still what the dashboard, the receipts and a
+                // child's own page link to. They are off the sidebar because the fees
+                // screens are being rebuilt, not because they have stopped working.
+                //
+                // `matches` is spelled out rather than left as `admin.fees.*`, because
+                // that would also light this entry up on the Scholarships page, which
+                // is its own entry and has nothing to do with the fee desk's list.
+                //
+                // `owns` keeps the invoices pages ending their trail here. They are
+                // this entry's pages but not under its url, and `route` alone cannot
+                // say so. A child has to be a plain route name in any case: the sidebar
+                // links to it with route(), which a `*` would send looking for a route
+                // that does not exist. Only `matches` and `owns` take wildcards.
+                ['route' => 'admin.fees.*', 'label' => 'Fees', 'icon' => 'tag', 'can' => 'fees.manage',
+                    'matches' => [
+                        'admin.fees.index',
+                        'admin.fees.categories.*',
+                        'admin.fees.structures.*',
+                        'admin.invoices.*',
+                    ],
+                    'owns' => ['admin.invoices.*']],
 
                 // The money coming in: the entry's own page is the register — the day book
                 // the bursar works in — and the three beneath it are the rest of the
@@ -314,18 +330,20 @@ class AdminMenu
         }
 
         $owner = null;
+        $ownerDepth = 0;
 
         foreach (self::entries() as $candidate) {
-            $namespace = self::namespace($candidate['entry']);
+            $depth = self::ownershipDepth($candidate['entry'], $routeName);
 
-            if ($routeName !== $namespace && ! str_starts_with($routeName, $namespace.'.')) {
+            if ($depth === null) {
                 continue;
             }
 
             // Deepest namespace wins: child pages under Academic belong to
             // Academic as well, and it is the page itself we want to end the trail.
-            if ($owner === null || strlen($namespace) > strlen(self::namespace($owner['entry']))) {
+            if ($owner === null || $depth > $ownerDepth) {
                 $owner = $candidate;
+                $ownerDepth = $depth;
             }
         }
 
@@ -358,6 +376,32 @@ class AdminMenu
         }
 
         return $trail;
+    }
+
+    /**
+     * How deeply an entry owns a route, or null if it does not own it at all.
+     *
+     * An entry owns everything under its own namespace, and anything else it names in
+     * `owns`. That second list is for a page that belongs to an entry without sitting
+     * under its url — the invoice register is the Fees entry's page, but it answers at
+     * admin.invoices rather than admin.fees, and `route` alone cannot say so.
+     *
+     * The depth returned is the length of the longest namespace claimed, which is what
+     * lets the deepest claim win when two entries both cover a page.
+     */
+    protected static function ownershipDepth(array $entry, string $routeName): ?int
+    {
+        $depth = null;
+
+        foreach (array_merge([self::namespace($entry)], (array) ($entry['owns'] ?? [])) as $prefix) {
+            $prefix = str_replace('.*', '', (string) $prefix);
+
+            if ($routeName === $prefix || str_starts_with($routeName, $prefix.'.')) {
+                $depth = max((int) $depth, strlen($prefix));
+            }
+        }
+
+        return $depth;
     }
 
     /**

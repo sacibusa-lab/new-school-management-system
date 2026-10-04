@@ -117,7 +117,7 @@ class PaymentScreensTest extends TestCase
         foreach ([
             route('admin.fees-payments.dashboard'),
             route('admin.fees-payments.students-hub'),
-            route('admin.fees.structures.index'),
+            route('admin.fees.index'),
             route('admin.payments.overview'),
             route('admin.fees.scholarships.index'),
         ] as $href) {

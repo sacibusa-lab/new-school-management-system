@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\FeeCategory;
@@ -19,11 +20,30 @@ class FeeController extends Controller
 {
     public function __construct(
         private readonly InvoiceGenerationService $invoices,
-    ) {
+    ) {}
+
+    /* ------------------------------------------------------------------ */
+    /* The section's landing page */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Blank for now.
+     *
+     * Deliberately not the structures list, which is what this entry used to open on.
+     * The structures page is where a bill is priced and it is still there at its own
+     * address; blanking it would have taken the priced bills off the screen along with
+     * the landing page, and what was asked for was for the Fees entry to open on nothing
+     * while the fee screens are rebuilt — not for the screens behind it to stop working.
+     */
+    public function index(): View
+    {
+        $this->authorize('fees.manage');
+
+        return view('admin.fees.index');
     }
 
     /* ------------------------------------------------------------------ */
-    /* Categories                                                          */
+    /* Categories */
     /* ------------------------------------------------------------------ */
 
     public function categories(): View
@@ -78,7 +98,7 @@ class FeeController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /* Structures                                                          */
+    /* Structures */
     /* ------------------------------------------------------------------ */
 
     public function structures(): View
@@ -202,7 +222,7 @@ class FeeController extends Controller
         $students = Student::query()
             ->where('academic_session_id', $structure->academic_session_id)
             ->when($structure->level_id, fn ($q) => $q->where('level_id', $structure->level_id))
-            ->where('status', \App\Enums\StudentStatus::Active->value)
+            ->where('status', StudentStatus::Active->value)
             ->get();
 
         if ($students->isEmpty()) {

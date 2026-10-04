@@ -381,6 +381,11 @@ Route::middleware('auth')
         });
 
         /* ---------------- Fees ---------------- */
+        // The section's landing page, blank while the fee screens are rebuilt. Listed
+        // before the rest because it is the bare path, the one the sidebar points at.
+        // The categories and structures below it still answer at their own addresses.
+        Route::get('fees', [FeeController::class, 'index'])->name('fees.index');
+
         Route::get('fees/categories', [FeeController::class, 'categories'])->name('fees.categories.index');
         Route::post('fees/categories', [FeeController::class, 'storeCategory'])->name('fees.categories.store');
         Route::put('fees/categories/{category}', [FeeController::class, 'updateCategory'])->name('fees.categories.update');
