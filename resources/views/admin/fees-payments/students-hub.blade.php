@@ -27,25 +27,36 @@
 @endif
 
 {{-- ================= Whose money ================= --}}
+{{-- Twelve columns shared out by what each field holds rather than split four ways. A
+     section is one letter and a standing is one word; the search box takes a name or an
+     admission number. Four equal quarters gave the section the room the search needed. --}}
 <form method="GET" class="card-pad mt-6">
-    <div class="grid items-end gap-4 lg:grid-cols-4">
+    {{-- `items-end` keeps the controls on a single line, and it holds only while no field
+         carries a hint. A hint makes its cell taller, and a taller cell that is bottom
+         aligned lifts its own label and control above the rest — which is what put "On
+         the roll" 22px above the other three. That note belongs in the empty state
+         below, which already explains the active-roll default. --}}
+    <div class="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
         <x-field name="class" label="Year group" type="select"
+                 class="lg:col-span-3"
                  placeholder-option="Every year group"
                  :value="$filters['class'] ?: null"
                  :options="$levels->pluck('name', 'id')->all()" />
 
         <x-field name="section" label="Section" type="select"
+                 class="lg:col-span-2"
                  placeholder-option="Every section"
                  :value="$filters['section'] ?: null"
                  :options="$sections->pluck('name', 'id')->all()" />
 
         <x-field name="status" label="On the roll" type="select"
+                 class="lg:col-span-3"
                  placeholder-option="Any standing"
                  :value="$filters['status']"
-                 :options="$statuses"
-                 hint="Opens on the active roll." />
+                 :options="$statuses" />
 
         <x-field name="q" label="Search" type="text"
+                 class="lg:col-span-4"
                  :value="$filters['q']"
                  placeholder="Name or admission number" />
     </div>
