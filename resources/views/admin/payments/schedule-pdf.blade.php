@@ -2,17 +2,25 @@
     /**
      * The payment slips on paper.
      *
-     * Deliberately the same card as an admit card: the school's crest on the right behind a
-     * hairline, the child on the left in a navy tile with gold initials, the eyebrow above
-     * the name, and the details as small uppercase labels over their values. One school, one
-     * set of brand items — a slip that looked like a different school's paperwork would be
-     * the odd one out in the same envelope.
+     * The pattern is the one the fee desk has printed for years: the crest at the head of
+     * every slip, the school's name under it, the term the slip is for, then a boxed block
+     * with the child on the left and the account their money goes into on the right, the
+     * charges in a bordered Session / Term / Fee Detail / Amount table, and the figure still
+     * owed centred underneath behind a rule. A parent recognises it before they read it.
      *
-     * The colours are the app's own tokens, copied rather than imported: DomPDF renders raw
-     * HTML with almost no CSS support and no Tailwind, so this view cannot use the `.card`
-     * class or `<x-brand-mark />` that the admit card is built from. Slate-900 for ink,
-     * slate-400 for the labels, brand-900 and gold-300 for the monogram — the same values,
-     * written out. Change one, look at the other.
+     * So the head is repeated on every slip rather than printed once at the top of the sheet:
+     * a slip is cut off and goes home on its own, and half of a letterhead is no letterhead.
+     *
+     * This is the one place in the app that cannot use the app's own card: DomPDF renders raw
+     * HTML with almost no CSS support and no Tailwind, so `.card` and `<x-brand-mark />` are
+     * not available to it and the rules below are written out by hand. Change a token in
+     * `app.css` and it will not follow — the same is true of every other printed item.
+     *
+     * The numbers below are tuned rather than chosen: six slips have to fit on one A4 page,
+     * and they only do from these settings downwards. DomPDF lays text out about a sixth
+     * taller than a browser does, so a version measured in a browser and trusted on that
+     * count is how a six-slip sheet quietly becomes a two-page one. Measured the hard way --
+     * hiding one part at a time and counting pages. Seven slips take two pages, six do not.
      *
      * DejaVu Sans because the naira sign is missing from DomPDF's default Helvetica and
      * would print as a box — the same reason the admission letter uses it.
@@ -28,120 +36,109 @@
     <title>Payment slips</title>
 
     <style>
-        @page { margin: 9mm 8mm; }
+        /* Tighter than the admission letter's margins: the sheet is cut up, and every
+           millimetre of paper is a millimetre the slips can use. 3mm is what the fee desk's
+           own slips have always printed at. */
+        @page { margin: 3mm 6mm; }
 
         body {
             font-family: 'DejaVu Sans', sans-serif;
             font-size: 7pt;
-            color: #0f172a;
+            color: #111827;
             margin: 0;
         }
 
-        /* ============ The sheet's own heading, as the admit cards have ============ */
-        .sheet-head { text-align: center; margin-bottom: 3mm; }
-        .sheet-head h1 { margin: 0; font-size: 13pt; font-weight: bold; }
-        .sheet-head .event { margin: 0.6mm 0 0; font-size: 9pt; font-weight: bold; }
-        .sheet-head .meta { margin: 0.6mm 0 0; font-size: 6.6pt; color: #64748b; }
-
-        table.sheet { width: 100%; border-collapse: separate; border-spacing: 2.5mm 2.5mm; }
+        table.sheet { width: 100%; border-collapse: separate; border-spacing: 1.3mm 1.3mm; }
         td.column { width: 50%; vertical-align: top; }
 
-        /* ============ The card ============ */
+        /* ============ The slip ============ */
         .slip {
-            border: 0.5pt solid #e2e8f0;
-            border-radius: 2mm;
-            padding: 3mm;
+            border: 0.6pt solid #d1d5db;
+            border-radius: 1.5mm;
+            padding: 2mm 2.5mm;
+            text-align: center;
             page-break-inside: avoid;
         }
 
-        table.top { width: 100%; border-collapse: collapse; }
-
-        /* The child, left: navy tile with their initials in gold — the same treatment a
-           student photograph gets on an admit card when there is no photograph. */
-        td.tile { width: 14mm; vertical-align: top; }
-        .initials {
-            width: 13mm;
-            height: 15mm;
-            line-height: 15mm;
-            border-radius: 2.5mm;
-            background: #1e2c66;
-            color: #ecc45c;
-            font-size: 13pt;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        td.who { vertical-align: top; padding-left: 3mm; }
-        .eyebrow {
-            margin: 0;
-            font-size: 5.8pt;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.6pt;
-            color: #94a3b8;
-        }
-        .name { margin: 0.6mm 0 0; font-size: 10.5pt; font-weight: bold; }
-        .number { margin: 0; font-family: 'DejaVu Sans Mono', monospace; font-size: 6.2pt; color: #64748b; }
-
-        /* Label over value, two pairs to a row — the admit card's form, not a sentence. */
-        table.facts { width: 100%; border-collapse: collapse; margin-top: 2mm; }
-        table.facts td { vertical-align: top; padding: 0 2mm 1.4mm 0; width: 50%; }
-        .k {
-            font-size: 5.6pt;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.4pt;
-            color: #94a3b8;
-        }
-        .v { font-size: 6.8pt; color: #475569; }
-
-        /* The school's crest, right, behind a hairline — `<x-brand-mark size="xl" />`. */
-        td.mark { width: 17mm; vertical-align: middle; text-align: center; border-left: 0.5pt solid #e2e8f0; }
+        /* ============ The head, printed on every slip ============ */
+        /* Both of these are the same 9mm, and the crest is capped at the same height where it
+           is loaded, so no school's crest can make the slips taller than six to a page. */
         .monogram {
-            width: 13mm;
-            height: 13mm;
-            line-height: 13mm;
-            border-radius: 2.5mm;
+            width: 9mm;
+            height: 9mm;
+            line-height: 9mm;
+            margin: 0 auto;
+            border-radius: 50%;
             background: #1e2c66;
             color: #ecc45c;
-            font-size: 11pt;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        .school { margin: 0.8mm 0 0; font-size: 11.5pt; font-weight: bold; }
+        .event { margin: 1mm 0 0; font-size: 10pt; font-weight: bold; }
+        .when { margin: 0.6mm 0 0; font-size: 7pt; color: #4b5563; }
+
+        /* ============ Who it is for, and where the money goes ============ */
+        table.who {
+            width: 100%;
+            border: 0.6pt solid #d1d5db;
+            border-collapse: collapse;
+            margin-top: 2mm;
+            text-align: left;
+        }
+
+        table.who td { vertical-align: middle; padding: 0.9mm; }
+        td.avatar { width: 14mm; text-align: center; }
+        td.facts { width: 38%; }
+        td.facts p { margin: 0; font-size: 6.3pt; line-height: 1.4; }
+        .k { font-weight: bold; }
+
+        .avatar-mark {
+            width: 10mm;
+            height: 10mm;
+            line-height: 10mm;
+            border-radius: 50%;
+            background: #f1f5f9;
+            border: 0.6pt solid #cbd5e1;
+            color: #475569;
+            font-size: 10pt;
             font-weight: bold;
             text-align: center;
         }
 
         /* ============ What is charged ============ */
-        table.fees { width: 100%; border-collapse: collapse; margin-top: 3mm; }
-        table.fees th {
-            padding: 0 1.5mm 1.2mm 0;
-            border-bottom: 0.5pt solid #e2e8f0;
-            font-size: 5.6pt;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.4pt;
-            color: #94a3b8;
+        table.fees {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2mm;
             text-align: left;
         }
+
+        table.fees th,
         table.fees td {
-            padding: 1.3mm 1.5mm 1.3mm 0;
-            border-bottom: 0.25pt solid #f1f5f9;
+            border: 0.6pt solid #d1d5db;
+            padding: 1mm 1.5mm;
             font-size: 6.8pt;
-            color: #475569;
         }
-        table.fees td.detail { color: #0f172a; }
-        table.fees td.amount, table.fees th.amount { text-align: right; padding-right: 0; }
+
+        table.fees th { background: #f3f4f6; font-weight: bold; }
+        table.fees td.amount, table.fees th.amount { text-align: right; white-space: nowrap; }
+
+        /* A minus reads green — money coming down — and an earlier year's debt reads red,
+           the same way round as every other screen in the app. */
         table.fees tr.arrears td { color: #b91c1c; }
         table.fees tr.taken-off td { color: #047857; }
 
         .due {
-            margin: 3mm 0 0;
-            padding-top: 2mm;
-            border-top: 0.5pt solid #e2e8f0;
-            text-align: center;
-            font-size: 10pt;
+            margin: 1.2mm 0 0;
+            font-size: 10.5pt;
             font-weight: bold;
+            text-decoration: underline;
         }
 
-        .sheet-foot { margin-top: 3.5mm; text-align: center; font-size: 6.6pt; color: #64748b; }
+        /* The credit line, printed on every slip rather than once at the foot of the sheet. */
+        .credit { margin-top: 0.5mm; text-align: center; font-size: 6pt; color: #6b7280; }
     </style>
 </head>
 
@@ -151,78 +148,62 @@
         phone and all. It is not passed in here, and a `school` key of our own would be
         overwritten by it anyway, which is what once turned this header into a stdClass.
     --}}
-    <div class="sheet-head">
-        <h1>{{ $school->name }}</h1>
-        <p class="event">{{ $heading }}</p>
-        <p class="meta">
-            {{ $session }} · {{ $term }} · {{ $label }} ·
-            {{ $sheet['slips']->count() }} @if ($sheet['slips']->count() === 1) slip @else slips @endif
-        </p>
-    </div>
-
     @foreach ($sheet['slips']->chunk(2) as $row)
         <table class="sheet">
             <tr>
                 @foreach ($row as $slip)
                     <td class="column">
                         <div class="slip">
-                            <table class="top">
+                            {{--
+                                The crest, or the same navy-and-gold letters the sidebar shows
+                                when no crest has been uploaded. Inlined rather than linked:
+                                DomPDF does not fetch images over HTTP, so an `<img>` pointing
+                                at the site prints as a broken icon.
+                            --}}
+                            @if ($logo)
+                                <img src="{{ $logo['data'] }}"
+                                     @if ($logo['width']) width="{{ $logo['width'] }}" @endif
+                                     @if ($logo['height']) height="{{ $logo['height'] }}" @endif
+                                     alt="">
+                            @else
+                                <div class="monogram">{{ $schoolMonogram }}</div>
+                            @endif
+
+                            <p class="school">{{ $school->name }}</p>
+                            <p class="event">{{ $heading }}</p>
+                            <p class="when">
+                                @if ($session && $term)
+                                    {{ $session }} - {{ $term }}
+                                @elseif ($session)
+                                    {{ $session }}
+                                @elseif ($term)
+                                    {{ $term }}
+                                @else
+                                    School fees
+                                @endif
+                            </p>
+
+                            <table class="who">
                                 <tr>
-                                    <td class="tile">
-                                        <div class="initials">{{ $slip['initials'] }}</div>
+                                    <td class="avatar">
+                                        <div class="avatar-mark">{{ $slip['initials'] }}</div>
                                     </td>
 
-                                    <td class="who">
-                                        <p class="eyebrow">Payment slip</p>
-                                        <p class="name">{{ $slip['name'] }}</p>
-                                        <p class="number">{{ $slip['number'] }}</p>
-
-                                        <table class="facts">
-                                            <tr>
-                                                <td>
-                                                    <div class="k">Class</div>
-                                                    <div class="v">{{ $slip['class'] ?: '—' }}</div>
-                                                </td>
-                                                <td>
-                                                    <div class="k">Session</div>
-                                                    <div class="v">{{ $session ?: '—' }}</div>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>
-                                                    <div class="k">Term</div>
-                                                    <div class="v">{{ $term ?: '—' }}</div>
-                                                </td>
-                                                <td>
-                                                    <div class="k">Account No</div>
-                                                    <div class="v">{{ $slip['account'] ?: 'Not issued yet' }}</div>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td>
-                                                    <div class="k">Bank</div>
-                                                    <div class="v">{{ $slip['bank'] ?: '—' }}</div>
-                                                </td>
-                                                <td>
-                                                    <div class="k">Account Name</div>
-                                                    <div class="v">{{ $slip['account_name'] ?: '—' }}</div>
-                                                </td>
-                                            </tr>
-                                        </table>
+                                    <td class="facts">
+                                        <p><span class="k">Name:</span> {{ $slip['name'] }}</p>
+                                        <p><span class="k">Reg No:</span> {{ $slip['number'] ?: 'Not issued yet' }}</p>
+                                        <p><span class="k">Class:</span> {{ $slip['class'] ?: '—' }}</p>
                                     </td>
 
-                                    <td class="mark">
-                                        @if ($logo)
-                                            <img src="{{ $logo['data'] }}"
-                                                 @if ($logo['width']) width="{{ $logo['width'] }}" @endif
-                                                 @if ($logo['height']) height="{{ $logo['height'] }}" @endif
-                                                 alt="">
-                                        @else
-                                            {{-- `<x-brand-mark />` falls back to the school's
-                                                 monogram when no crest has been uploaded, and
-                                                 so does this: navy tile, gold letters. --}}
-                                            <div class="monogram">{{ $schoolMonogram }}</div>
-                                        @endif
+                                    {{--
+                                        The account the fees go into, which is the part of the
+                                        slip a parent actually uses: it is what makes a transfer
+                                        land on the right child's bill.
+                                    --}}
+                                    <td class="facts">
+                                        <p><span class="k">Account No:</span> {{ $slip['account'] ?: 'Not issued yet' }}</p>
+                                        <p><span class="k">Account Name:</span> {{ $slip['account_name'] ?: '—' }}</p>
+                                        <p><span class="k">Bank Name:</span> {{ $slip['bank'] ?: '—' }}</p>
                                     </td>
                                 </tr>
                             </table>
@@ -239,43 +220,48 @@
                                 <tbody>
                                     @foreach ($slip['lines'] as $line)
                                         <tr>
-                                            <td>{{ $session }}</td>
-                                            <td>{{ $term }}</td>
-                                            <td class="detail">{{ $line['title'] }}</td>
+                                            <td>{{ $session ?: '—' }}</td>
+                                            <td>{{ $term ?: '—' }}</td>
+                                            <td>{{ $line['title'] }}</td>
                                             <td class="amount">{{ $currency }}{{ number_format($line['amount'], 2) }}</td>
                                         </tr>
                                     @endforeach
 
-                                    {{-- What the office added or took off, against the term it
-                                         was decided in. A minus reads green: money coming down. --}}
+                                    {{--
+                                        What the office added or took off, against the term it
+                                        was decided in, so a figure the parent does not remember
+                                        agreeing to can be traced to the term it belongs to.
+                                    --}}
                                     @foreach ($slip['adjustments'] as $line)
                                         <tr class="{{ $line['amount'] < 0 ? 'taken-off' : 'arrears' }}">
-                                            <td>{{ $session }}</td>
-                                            <td>{{ $term }}</td>
-                                            <td class="detail">{{ $line['title'] }}</td>
+                                            <td>{{ $session ?: '—' }}</td>
+                                            <td>{{ $term ?: '—' }}</td>
+                                            <td>{{ $line['title'] }}</td>
                                             <td class="amount">
                                                 {{ $line['amount'] < 0 ? '-' : '+' }}{{ $currency }}{{ number_format(abs($line['amount']), 2) }}
                                             </td>
                                         </tr>
                                     @endforeach
 
-                                    {{-- An earlier year, still unsettled. Its own session in the
-                                         Session column, so nobody has to read the year out of a
-                                         description. --}}
+                                    {{--
+                                        An earlier year, still unsettled. Its own session in the
+                                        Session column, so nobody has to read the year out of a
+                                        description.
+                                    --}}
                                     @foreach ($slip['arrears'] as $line)
                                         <tr class="arrears">
-                                            <td>{{ $line['session'] ?? '' }}</td>
+                                            <td>{{ $line['session'] ?? '—' }}</td>
                                             <td>—</td>
-                                            <td class="detail">{{ $line['title'] }}</td>
+                                            <td>{{ $line['title'] }}</td>
                                             <td class="amount">{{ $currency }}{{ number_format($line['amount'], 2) }}</td>
                                         </tr>
                                     @endforeach
 
                                     @if ($slip['discount'] > 0)
                                         <tr class="taken-off">
-                                            <td>{{ $session }}</td>
-                                            <td>{{ $term }}</td>
-                                            <td class="detail">Discount</td>
+                                            <td>{{ $session ?: '—' }}</td>
+                                            <td>{{ $term ?: '—' }}</td>
+                                            <td>Discount</td>
                                             <td class="amount">-{{ $currency }}{{ number_format($slip['discount'], 2) }}</td>
                                         </tr>
                                     @endif
@@ -283,6 +269,10 @@
                             </table>
 
                             <p class="due">Amount Due : {{ $currency }}{{ number_format($slip['due'], 2) }}</p>
+
+                            @if ($credit)
+                                <p class="credit">{{ $credit }}</p>
+                            @endif
                         </div>
                     </td>
                 @endforeach
@@ -293,9 +283,5 @@
             </tr>
         </table>
     @endforeach
-
-    <p class="sheet-foot">
-        Pay into the account on the slip. Keep it as the record of what has been charged.
-    </p>
 </body>
 </html>

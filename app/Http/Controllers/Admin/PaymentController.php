@@ -552,12 +552,16 @@ class PaymentController extends Controller
             'term' => $filters['term']?->name,
             'heading' => $heading,
             // DomPDF does not fetch images over HTTP, so the crest travels inline or not at
-            // all — the same reason the admission letter inlines its signature.
-            'logo' => $branding->logoForPdf(),
-            // The tile a slip shows when no crest has been uploaded: the same letters the
-            // sidebar and the admit cards show, from the same rule.
+            // all — the same reason the admission letter inlines its signature. Sized for
+            // the head of a slip, and capped at that height: a square crest would otherwise
+            // make every slip on the sheet taller and push the sixth onto a second page.
+            'logo' => $branding->logoForPdf(16, 9),
+            // What a slip shows when no crest has been uploaded: the same letters the sidebar
+            // and the admit cards show, from the same rule.
             'schoolMonogram' => BrandingService::monogram(),
-            'label' => $subset === 'all' ? 'Every child' : self::STANDINGS[$subset],
+            // On every slip rather than once at the foot of the sheet: a slip is cut off and
+            // sent home on its own, so a credit on the sheet alone would never reach anybody.
+            'credit' => config('saci.credit'),
         ])->setPaper('a4');
 
         return $pdf->download($this->scheduleFilename($filters, $subset, 'pdf'));

@@ -18,6 +18,12 @@ return [
     'tagline' => env('SCHOOL_TAGLINE', 'Knowledge, Character, Service'),
 
     /*
+     * Printed along the bottom of every payment slip, as the fee desk's slips have always
+     * carried it. Leave it empty and nothing is printed.
+     */
+    'credit' => env('BRAND_CREDIT', 'Powered by SACI ICT'),
+
+    /*
     |----------------------------------------------------------------------
     | AI scoresheet extraction
     |----------------------------------------------------------------------

@@ -203,6 +203,10 @@
                 'slip' => $slip,
                 'currency' => $currency,
                 'standings' => $statuses,
+                // The two columns every printed row is labelled with, so the slip on screen
+                // carries the same Session / Term headings the one on paper does.
+                'session' => $filters['session']?->name,
+                'term' => $filters['term']?->name,
             ])
         @endforeach
     </div>
