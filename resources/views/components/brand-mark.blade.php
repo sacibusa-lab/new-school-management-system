@@ -6,11 +6,9 @@
     $name = \App\Models\Setting::get('school_name', config('saci.school_name'));
     $logo = \App\Models\Setting::get('school_logo');
 
-    $initials = collect(preg_split('/\s+/', (string) $name))
-        ->filter()
-        ->take(2)
-        ->map(fn ($word) => strtoupper(substr($word, 0, 1)))
-        ->implode('');
+    // One rule, in one place — see BrandingService::monogram(). The same letters come out on
+    // the sidebar, on an admit card and on a printed payment slip.
+    $initials = \App\Services\Branding\BrandingService::monogram($name);
 
     $dimensions = match ($size) {
         'sm' => 'h-9 w-9 text-sm rounded-xl',

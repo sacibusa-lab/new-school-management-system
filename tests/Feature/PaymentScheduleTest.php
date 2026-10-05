@@ -21,6 +21,7 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -340,6 +341,29 @@ class PaymentScheduleTest extends TestCase
 
         // DomPDF throws on a broken view, so a clean 200 is the assertion: the file either
         // built or it did not, and there is no half-built PDF worth reading.
+        $this->actingAs($this->admin)
+            ->get(route('admin.payments.schedule.pdf'))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_the_printed_slip_draws_the_crest_when_the_school_has_one(): void
+    {
+        Fee::factory()->create(['amount' => 62000]);
+
+        $this->student();
+
+        // A real one-pixel PNG on the public disk, because the slip inlines whatever is set
+        // rather than linking to it: DomPDF does not fetch images over HTTP, so an <img>
+        // pointing at the site prints as a broken icon.
+        Storage::fake('public');
+        Storage::disk('public')->put('branding/crest.png', base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+        ));
+
+        Setting::put('school_logo', 'branding/crest.png');
+        Setting::flush();
+
         $this->actingAs($this->admin)
             ->get(route('admin.payments.schedule.pdf'))
             ->assertOk()

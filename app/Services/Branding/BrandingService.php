@@ -48,7 +48,7 @@ class BrandingService
         ActivityLog::record(
             'settings.branding.uploaded',
             $setting,
-            ($setting->label ?? $setting->key) . ' replaced',
+            ($setting->label ?? $setting->key).' replaced',
             ['module' => 'settings', 'path' => $path],
         );
 
@@ -70,7 +70,7 @@ class BrandingService
         ActivityLog::record(
             'settings.branding.removed',
             $setting,
-            ($setting->label ?? $setting->key) . ' removed',
+            ($setting->label ?? $setting->key).' removed',
             ['module' => 'settings'],
         );
 
@@ -89,7 +89,7 @@ class BrandingService
             return;
         }
 
-        if (! str_starts_with($path, $this->directory() . '/')) {
+        if (! str_starts_with($path, $this->directory().'/')) {
             return;
         }
 
@@ -100,9 +100,89 @@ class BrandingService
         }
     }
 
+    /**
+     * The two letters a tile shows when there is no picture to show.
+     *
+     * A school's monogram and a child's are the same rule — the first letter of the first two
+     * words — so they are the same method. Used by the brand mark in the sidebar and on the
+     * admit cards, by the admit card's photograph fallback, and by the printed payment slip:
+     * one rule means a school called St Augustine's College cannot come out as SA in the
+     * sidebar and St on a slip.
+     */
+    public static function monogram(?string $name = null): string
+    {
+        $name ??= (string) Setting::get('school_name', config('saci.school_name'));
+
+        $initials = collect(preg_split('/\s+/', $name) ?: [])
+            ->filter()
+            ->take(2)
+            ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
+            ->implode('');
+
+        return $initials !== '' ? $initials : 'SA';
+    }
+
     /** The public URL of a stored branding image, or null when there is none. */
     public function url(?string $path): ?string
     {
-        return $path ? asset('storage/' . $path) : null;
+        return $path ? asset('storage/'.$path) : null;
+    }
+
+    /**
+     * A stored image as the PDF renderer can draw it.
+     *
+     * A data URI, because DomPDF does not fetch images over HTTP: an `<img>` pointing at the
+     * site comes out as a broken icon. Public because the admission letter needs the same
+     * thing for its signature and letterhead — one place that knows how to inline an upload.
+     */
+    public function dataUri(?string $path): ?string
+    {
+        if (! $path || ! Storage::disk('public')->exists($path)) {
+            return null;
+        }
+
+        $disk = Storage::disk('public');
+
+        return 'data:'.($disk->mimeType($path) ?: 'image/png').';base64,'
+            .base64_encode((string) $disk->get($path));
+    }
+
+    /**
+     * The school's crest, sized for the head of a payment slip.
+     *
+     * The proportions come from the image itself rather than from the box it is asked to fit:
+     * given only a width, DomPDF will happily stretch a crest into a banner. A picture whose
+     * dimensions PHP will not read — an SVG — is handed over unstyled and left to DomPDF.
+     *
+     * @return array{data:string,width:?string,height:?string}|null
+     */
+    public function logoForPdf(float $maxWidthMm = 20.0, float $maxHeightMm = 20.0): ?array
+    {
+        $path = Setting::get('school_logo');
+        $data = $this->dataUri($path);
+
+        if ($data === null || ! $path) {
+            return null;
+        }
+
+        $size = @getimagesize(Storage::disk('public')->path($path));
+
+        if (! $size || $size[0] < 1 || $size[1] < 1) {
+            return ['data' => $data, 'width' => null, 'height' => null];
+        }
+
+        $width = $maxWidthMm;
+        $height = $width * ($size[1] / $size[0]);
+
+        if ($height > $maxHeightMm) {
+            $width *= $maxHeightMm / $height;
+            $height = $maxHeightMm;
+        }
+
+        return [
+            'data' => $data,
+            'width' => round($width, 1).'mm',
+            'height' => round($height, 1).'mm',
+        ];
     }
 }

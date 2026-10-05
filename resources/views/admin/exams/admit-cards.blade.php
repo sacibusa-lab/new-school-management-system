@@ -65,7 +65,7 @@
                              class="h-24 w-20 shrink-0 rounded-lg object-cover ring-1 ring-slate-200">
                     @else
                         <span class="inline-flex h-24 w-20 shrink-0 items-center justify-center rounded-lg bg-brand-900 font-display text-lg font-semibold text-gold-300">
-                            {{ $candidate->initials }}
+                            {{ \App\Services\Branding\BrandingService::monogram($candidate->full_name) }}
                         </span>
                     @endif
 

@@ -15,6 +15,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\StudentAdjustment;
 use App\Models\Term;
+use App\Services\Branding\BrandingService;
 use App\Services\Fees\InvoiceGenerationService;
 use App\Services\NumberSequenceService;
 use App\Services\Sms\SmsNotifier;
@@ -528,12 +529,19 @@ class PaymentController extends Controller
      * class at a time and cuts them up, so they have to sit several to a sheet and not be
      * split across two of them.
      */
-    public function downloadSchedule(Request $request): Response
+    public function downloadSchedule(Request $request, BrandingService $branding): Response
     {
         $this->authorize('fees.view');
 
         $filters = $this->scheduleFilters($request);
         $subset = $this->subset($request);
+
+        // What the slip is a bill for, in the office's own words: the fee the sheet was
+        // narrowed to, or the term when it is every one of them. "FIRST TERM FEE" is what
+        // the printed slip is headed, and a sheet of them is read at a glance.
+        $heading = $filters['fee'] !== 0
+            ? (Fee::query()->find($filters['fee'])?->title ?? 'School fees')
+            : mb_strtoupper((string) ($filters['term']?->name ?? 'School')).' FEE';
 
         // `$school` is not passed: AppServiceProvider shares the branding object with every
         // view, and a `school` key of our own would be overwritten by it. Its `currency` is
@@ -542,7 +550,13 @@ class PaymentController extends Controller
             'sheet' => $this->scheduleSheet($filters, $subset),
             'session' => $filters['session']?->name,
             'term' => $filters['term']?->name,
-            'standings' => self::STANDINGS,
+            'heading' => $heading,
+            // DomPDF does not fetch images over HTTP, so the crest travels inline or not at
+            // all — the same reason the admission letter inlines its signature.
+            'logo' => $branding->logoForPdf(),
+            // The tile a slip shows when no crest has been uploaded: the same letters the
+            // sidebar and the admit cards show, from the same rule.
+            'schoolMonogram' => BrandingService::monogram(),
             'label' => $subset === 'all' ? 'Every child' : self::STANDINGS[$subset],
         ])->setPaper('a4');
 
@@ -649,7 +663,11 @@ class PaymentController extends Controller
                 'class' => $child->schoolClass?->name,
                 'arm' => $child->schoolClass?->section?->name,
                 'level' => $level?->name,
+                // The letters on the navy tile, from the same rule the sidebar and the admit
+                // cards use — see BrandingService::monogram().
+                'initials' => BrandingService::monogram($child->full_name),
                 'account' => $child->virtualAccount?->account_number,
+                'account_name' => $child->virtualAccount?->account_name,
                 'bank' => $child->virtualAccount?->bank_name,
                 'lines' => $lines,
                 'adjustments' => $changed,
@@ -730,7 +748,10 @@ class PaymentController extends Controller
 
         foreach ($rows as $row) {
             $arrears[(int) $row->student_id][] = [
-                'title' => 'Brought forward — '.$row->session_name,
+                // The year is its own field rather than part of the title, because the printed
+                // slip has a Session column to put it in and the screen has a sentence.
+                'title' => 'Brought forward',
+                'session' => $row->session_name,
                 'amount' => round((float) $row->outstanding, 2),
             ];
         }

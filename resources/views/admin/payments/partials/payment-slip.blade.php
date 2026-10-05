@@ -31,9 +31,16 @@
                x-model="selected"
                aria-label="Choose {{ $slip['name'] }}">
 
+        {{-- The child's initials on the navy tile, the way an admit card shows a candidate.
+             Screen, sheet and card all carry the same mark, from the same rule. --}}
+        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-900 font-display text-xs font-semibold text-gold-300">
+            {{ $slip['initials'] }}
+        </span>
+
         <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold text-ink">{{ $slip['name'] }}</p>
-            <p class="mt-0.5 text-xs text-muted">
+            <p class="text-[10px] font-semibold uppercase tracking-widest text-muted">Payment slip</p>
+            <p class="mt-0.5 truncate text-sm font-semibold text-ink">{{ $slip['name'] }}</p>
+            <p class="mt-0.5 font-mono text-xs text-muted">
                 {{ $slip['number'] }}@if ($slip['class']) · {{ $slip['class'] }}@endif
             </p>
         </div>
@@ -88,7 +95,9 @@
                  see which year the money was for. --}}
             @foreach ($slip['arrears'] as $line)
                 <tr>
-                    <td class="py-1.5 pr-2 text-rose-700 dark:text-rose-300">{{ $line['title'] }}</td>
+                    <td class="py-1.5 pr-2 text-rose-700 dark:text-rose-300">
+                        {{ $line['title'] }}@if (! empty($line['session'])) — {{ $line['session'] }}@endif
+                    </td>
                     <td class="w-24 py-1.5 text-right font-medium text-rose-700 dark:text-rose-300">
                         {{ $currency.number_format($line['amount'], 2) }}
                     </td>
