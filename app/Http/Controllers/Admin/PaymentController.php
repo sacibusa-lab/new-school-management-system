@@ -19,6 +19,7 @@ use App\Services\Branding\BrandingService;
 use App\Services\Fees\InvoiceGenerationService;
 use App\Services\NumberSequenceService;
 use App\Services\Sms\SmsNotifier;
+use App\Services\Students\StudentPortraitService;
 use App\Support\ClassOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -529,12 +530,26 @@ class PaymentController extends Controller
      * class at a time and cuts them up, so they have to sit several to a sheet and not be
      * split across two of them.
      */
-    public function downloadSchedule(Request $request, BrandingService $branding): Response
-    {
+    public function downloadSchedule(
+        Request $request,
+        BrandingService $branding,
+        StudentPortraitService $portraits,
+    ): Response {
         $this->authorize('fees.view');
 
         $filters = $this->scheduleFilters($request);
         $subset = $this->subset($request);
+
+        $sheet = $this->scheduleSheet($filters, $subset);
+
+        // The photographs travel inside the file for the same reason the crest does: DomPDF
+        // does not fetch an image over HTTP. They are cropped round here rather than in the
+        // view because the slip's slot is round and DomPDF will not clip a picture to a
+        // border radius — it draws the ring and leaves the face square inside it.
+        $sheet['slips'] = $sheet['slips']->map(fn (array $slip): array => [
+            ...$slip,
+            'photo' => $portraits->circled($slip['photo_path'] ?? null),
+        ]);
 
         // What the slip is a bill for, in the office's own words: the fee the sheet was
         // narrowed to, or the term when it is every one of them. "FIRST TERM FEE" is what
@@ -547,7 +562,7 @@ class PaymentController extends Controller
         // view, and a `school` key of our own would be overwritten by it. Its `currency` is
         // used for the same reason — one place to change the symbol.
         $pdf = Pdf::loadView('admin.payments.schedule-pdf', [
-            'sheet' => $this->scheduleSheet($filters, $subset),
+            'sheet' => $sheet,
             'session' => $filters['session']?->name,
             'term' => $filters['term']?->name,
             'heading' => $heading,
@@ -670,6 +685,10 @@ class PaymentController extends Controller
                 // The letters on the navy tile, from the same rule the sidebar and the admit
                 // cards use — see BrandingService::monogram().
                 'initials' => BrandingService::monogram($child->full_name),
+                // The face for the round slot, if the child has one. Only the path travels:
+                // the bytes are read for the printed sheet alone, so a page of two hundred
+                // children does not carry two hundred photographs in its markup.
+                'photo_path' => $child->photo_path,
                 'account' => $child->virtualAccount?->account_number,
                 'account_name' => $child->virtualAccount?->account_name,
                 'bank' => $child->virtualAccount?->bank_name,

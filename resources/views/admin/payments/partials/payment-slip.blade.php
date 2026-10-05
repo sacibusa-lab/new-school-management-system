@@ -54,9 +54,18 @@
         parent reading out a query on the phone can be followed line for line.
     --}}
     <div class="mt-3 flex items-start gap-3 rounded-lg border border-line p-3">
-        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-soft">
-            {{ $slip['initials'] }}
-        </span>
+        {{-- The same round slot as the printed slip carries, which is where a child's face
+             goes. The browser crops the photograph here; on paper the crop is done in PHP,
+             because nothing in DomPDF will. --}}
+        @if ($slip['photo_path'])
+            <img src="{{ asset('storage/'.$slip['photo_path']) }}"
+                 alt=""
+                 class="h-9 w-9 shrink-0 rounded-full object-cover">
+        @else
+            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-soft">
+                {{ $slip['initials'] }}
+            </span>
+        @endif
 
         <dl class="min-w-0 flex-1 space-y-1 text-xs">
             <div class="flex gap-1">

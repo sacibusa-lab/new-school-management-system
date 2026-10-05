@@ -89,10 +89,32 @@
         }
 
         table.who td { vertical-align: middle; padding: 0.9mm; }
-        td.avatar { width: 14mm; text-align: center; }
-        td.facts { width: 38%; }
-        td.facts p { margin: 0; font-size: 6.3pt; line-height: 1.4; }
+        td.avatar { width: 13%; text-align: center; }
+        td.facts { width: 31%; }
+        td.facts.account-details { width: 56%; }
+        td.facts p { margin: 0; font-size: 5.5pt; line-height: 1.5; white-space: nowrap; }
         .k { font-weight: bold; }
+
+        /*
+            The child's three lines are short — "Reg No: SAC/2026/001" is 18.6mm — and are
+            held on one line each, which is the break that mattered: they were breaking
+            because the column was too narrow for them, not because they were too long.
+
+            The bank's own name for the account is the one line that can genuinely outgrow
+            the box: "SACIBUSA/" and then a child's full name runs to 45mm and beyond. It
+            gets the width to stay whole — 49.3mm at 5.5pt, measured with DomPDF's own font
+            metrics — but is allowed to wrap rather than run past the border, because the
+            bank can hand back something longer than any width this box can offer.
+
+            The two columns are sized to what each has to hold rather than split down the
+            middle: an even split gives each about 38mm, and the account line would break
+            every single time.
+        */
+        td.facts.account-details p { white-space: normal; }
+
+        /* The photograph arrives already cropped to a circle, so it needs neither a border nor
+           a radius of its own: the transparency in the PNG is what makes it round. */
+        .avatar-photo { width: 10mm; height: 10mm; }
 
         .avatar-mark {
             width: 10mm;
@@ -162,13 +184,13 @@
                             --}}
                             @if ($logo)
                                 <img src="{{ $logo['data'] }}"
-                                     @if ($logo['width']) width="{{ $logo['width'] }}" @endif
-                                     @if ($logo['height']) height="{{ $logo['height'] }}" @endif
-                                     alt="">
+                                    width="48"
+                                    height="48"
+                                    alt="School Logo"
+                                    style="object-fit: contain;">
                             @else
                                 <div class="monogram">{{ $schoolMonogram }}</div>
                             @endif
-
                             <p class="school">{{ $school->name }}</p>
                             <p class="event">{{ $heading }}</p>
                             <p class="when">
@@ -185,8 +207,16 @@
 
                             <table class="who">
                                 <tr>
+                                    {{-- The child's face where there is one, and their initials
+                                         where there is not. The photograph was cropped to a
+                                         circle before it was handed over: DomPDF draws a
+                                         rounded border but will not clip a picture to it. --}}
                                     <td class="avatar">
-                                        <div class="avatar-mark">{{ $slip['initials'] }}</div>
+                                        @if (! empty($slip['photo']))
+                                            <img class="avatar-photo" src="{{ $slip['photo'] }}" alt="">
+                                        @else
+                                            <div class="avatar-mark">{{ $slip['initials'] }}</div>
+                                        @endif
                                     </td>
 
                                     <td class="facts">
@@ -200,7 +230,7 @@
                                         slip a parent actually uses: it is what makes a transfer
                                         land on the right child's bill.
                                     --}}
-                                    <td class="facts">
+                                    <td class="facts account-details">
                                         <p><span class="k">Account No:</span> {{ $slip['account'] ?: 'Not issued yet' }}</p>
                                         <p><span class="k">Account Name:</span> {{ $slip['account_name'] ?: '—' }}</p>
                                         <p><span class="k">Bank Name:</span> {{ $slip['bank'] ?: '—' }}</p>
