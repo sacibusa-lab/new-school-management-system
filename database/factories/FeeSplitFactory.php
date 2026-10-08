@@ -4,16 +4,16 @@ namespace Database\Factories;
 
 use App\Models\BankAccount;
 use App\Models\Fee;
-use App\Models\FeeBeneficiary;
+use App\Models\FeeSplit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<FeeBeneficiary>
+ * @extends Factory<FeeSplit>
  */
-class FeeBeneficiaryFactory extends Factory
+class FeeSplitFactory extends Factory
 {
     /**
-     * A share of a fee, paying into one of the school's own accounts.
+     * One account's share of a fee.
      *
      * @return array<string, mixed>
      */
@@ -23,6 +23,7 @@ class FeeBeneficiaryFactory extends Factory
             'fee_id' => Fee::factory(),
             'bank_account_id' => BankAccount::factory(),
             'amount' => $this->faker->numberBetween(1, 50) * 1000,
+            'position' => 0,
         ];
     }
 }

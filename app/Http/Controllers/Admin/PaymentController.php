@@ -7,6 +7,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
+use App\Models\Disbursement;
 use App\Models\Fee;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -17,11 +18,13 @@ use App\Models\StudentAdjustment;
 use App\Models\Term;
 use App\Services\Branding\BrandingService;
 use App\Services\Fees\InvoiceGenerationService;
+use App\Services\Fees\SettlementService;
 use App\Services\NumberSequenceService;
 use App\Services\Sms\SmsNotifier;
 use App\Services\Students\StudentPortraitService;
 use App\Support\ClassOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1028,10 +1031,259 @@ class PaymentController extends Controller
 
     /**
      * What Paystack has actually paid out to the school's bank, and when.
+     *
+     * Read a session at a time and, inside it, the way the year is: term, then month, then
+     * the day the money came in. The question the office brings here is "what do we have to
+     * transfer, and where", which is a question about a day's collection — so the days are
+     * the leaves and the totals above them are only there to check the days against.
+     *
+     * The figures are worked out from the payments rather than read from a payout ledger,
+     * because a ledger of money that has already moved is a second copy of the truth.
      */
-    public function settlements(): View
+    public function settlements(Request $request, SettlementService $settlements): View
     {
-        return $this->placeholder('settlements');
+        $this->authorize('fees.view');
+
+        $session = AcademicSession::query()->find((int) $request->query('session'))
+            ?? AcademicSession::current();
+
+        // A school that has not set a session yet has collected nothing to divide, and the
+        // page has to say that rather than fail.
+        $settled = $session === null
+            ? [
+                'totals' => ['collections' => 0.0, 'accounts' => [], 'it' => 0.0, 'unallocated' => 0.0],
+                'accounts' => collect(),
+                'terms' => [],
+            ]
+            : $settlements->forSession($session);
+
+        return view('admin.payments.settlements', [
+            'page' => collect(self::PAGES)->firstWhere('key', 'settlements'),
+            'session' => $session,
+            'sessions' => AcademicSession::query()->orderByDesc('starts_on')->orderByDesc('id')->get(),
+            'totals' => $settled['totals'],
+            'settlementAccounts' => $settled['accounts'],
+            'terms' => $settled['terms'],
+            'currency' => Setting::get('currency_symbol', '₦'),
+        ]);
+    }
+
+    /**
+     * Mark one payment's money as moved.
+     *
+     * What the page works out is where the money should go; whether it has gone is something
+     * only the office can say, because the transfer happens at a bank where nothing here can
+     * see it. So this records a statement of fact rather than a figure, which is why it is a
+     * separate action from the arithmetic beside it.
+     *
+     * Settled on the payment rather than on the day: one transfer of a day's collection can
+     * be made while another is held over, and a day marked done when part of it has not moved
+     * would be worse than no record at all.
+     */
+    public function settlePayment(Request $request, Payment $payment): JsonResponse|RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $this->assertSettleable($payment);
+
+        $payment->forceFill([
+            'settled_at' => now(),
+            'settled_by' => $request->user()->id,
+        ])->save();
+
+        return $this->settlementResponse($request, 'Payment marked settled.', [
+            'settled' => true,
+            'by' => $request->user()->name,
+        ]);
+    }
+
+    /** Undo that, for a payment ticked off that had not actually been transferred. */
+    public function unsettlePayment(Request $request, Payment $payment): JsonResponse|RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $payment->forceFill(['settled_at' => null, 'settled_by' => null])->save();
+
+        return $this->settlementResponse($request, 'Payment left unsettled.', [
+            'settled' => false,
+            'by' => null,
+        ]);
+    }
+
+    /**
+     * Mark a whole day's collection settled.
+     *
+     * A day is usually transferred in one sitting, so the office would otherwise tick a
+     * hundred rows one at a time. It acts on the payments that are still outstanding, so
+     * pressing it twice cannot re-stamp what was already done.
+     */
+    public function settleDay(Request $request): JsonResponse|RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $validated = $this->validateSettlementDay($request);
+
+        $count = $this->paymentsOn($validated['date'], (int) $validated['session'])
+            ->whereNull('settled_at')
+            ->update(['settled_at' => now(), 'settled_by' => $request->user()->id]);
+
+        return $this->settlementResponse($request, $this->daySentence($count), [
+            'settled' => true,
+            'count' => $count,
+            'by' => $request->user()->name,
+        ]);
+    }
+
+    /** Put a whole day back to unsettled, for when it was marked done too early. */
+    public function unsettleDay(Request $request): JsonResponse|RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $validated = $this->validateSettlementDay($request);
+
+        $count = $this->paymentsOn($validated['date'], (int) $validated['session'])
+            ->whereNotNull('settled_at')
+            ->update(['settled_at' => null, 'settled_by' => null]);
+
+        return $this->settlementResponse($request, $this->daySentence($count, false), [
+            'settled' => false,
+            'count' => $count,
+            'by' => null,
+        ]);
+    }
+
+    /**
+     * Say that a day's transfers have been made.
+     *
+     * The last step of the money's journey and the only one that is not a figure: the page
+     * says what to transfer and to which account, and this records that somebody did it.
+     *
+     * Refused while any payment of the day is unsettled. Paying a day out half-collected
+     * would mean the transfer had to be worked out again afterwards, and the page would be
+     * showing an instruction for money the gateway has not finished with.
+     */
+    public function disburseDay(Request $request): JsonResponse|RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $validated = $this->validateSettlementDay($request);
+        $session = (int) $validated['session'];
+
+        $outstanding = $this->paymentsOn($validated['date'], $session)
+            ->whereNull('settled_at')
+            ->count();
+
+        if ($outstanding > 0) {
+            $message = $outstanding === 1
+                ? 'One payment on that day has not been settled yet.'
+                : $outstanding.' payments on that day have not been settled yet.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return back()->withErrors(['disbursement' => $message]);
+        }
+
+        // `updateOrCreate` rather than `create`: the button cannot be pressed twice in one
+        // request, but two requests can arrive together, and the unique key is what stops
+        // the day being recorded as paid out twice.
+        Disbursement::updateOrCreate(
+            ['academic_session_id' => $session, 'collected_on' => $validated['date']],
+            ['disbursed_at' => now(), 'disbursed_by' => $request->user()->id],
+        );
+
+        return $this->settlementResponse($request, 'That day is marked paid out.', [
+            'disbursed' => true,
+            'by' => $request->user()->name,
+        ]);
+    }
+
+    /** Undo that, for a day paid out before its money was ready. */
+    public function undisburseDay(Request $request): JsonResponse|RedirectResponse
+    {
+        $this->authorize('payments.record');
+
+        $validated = $this->validateSettlementDay($request);
+
+        Disbursement::query()
+            ->where('academic_session_id', (int) $validated['session'])
+            ->whereDate('collected_on', $validated['date'])
+            ->delete();
+
+        return $this->settlementResponse($request, 'That day is waiting to be paid out again.', [
+            'disbursed' => false,
+            'by' => null,
+        ]);
+    }
+
+    /**
+     * The successful payments collected on one day of one session.
+     *
+     * Which session a payment belongs to is the session of the bill it settled, not the day
+     * it arrived — a parent clearing last year's balance in October is still last year's
+     * money.
+     *
+     * @return Builder<Payment>
+     */
+    protected function paymentsOn(string $date, int $sessionId): Builder
+    {
+        return Payment::query()
+            ->where('status', PaymentStatus::Successful->value)
+            ->whereDate('paid_at', $date)
+            ->whereHas('invoice', fn ($query) => $query->where('academic_session_id', $sessionId));
+    }
+
+    /**
+     * @return array{session:string,date:string}
+     */
+    protected function validateSettlementDay(Request $request): array
+    {
+        return $request->validate([
+            'session' => ['required', 'integer', 'exists:academic_sessions,id'],
+            'date' => ['required', 'date'],
+        ]);
+    }
+
+    /**
+     * Only money that actually arrived can be moved. A failed or reversed payment is not a
+     * smaller payment, it is not a payment.
+     */
+    protected function assertSettleable(Payment $payment): void
+    {
+        abort_unless($payment->status === PaymentStatus::Successful, 404);
+    }
+
+    /**
+     * Answer the way it was asked.
+     *
+     * The page settles a row without reloading, so it asks for JSON; a browser with scripting
+     * off posts the form and is given the page back with a sentence on it.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    protected function settlementResponse(Request $request, string $message, array $payload = []): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json($payload + ['message' => $message]);
+        }
+
+        return back()->with('status', $message);
+    }
+
+    protected function daySentence(int $count, bool $settled = true): string
+    {
+        if ($count === 0) {
+            return $settled
+                ? 'Every payment on that day was already settled.'
+                : 'No settled payments on that day.';
+        }
+
+        $payments = Str::plural('payment', $count);
+
+        return $settled
+            ? "{$count} {$payments} marked settled."
+            : "{$count} {$payments} left unsettled.";
     }
 
     /**

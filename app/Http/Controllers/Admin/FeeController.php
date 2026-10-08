@@ -103,7 +103,7 @@ class FeeController extends Controller
         $this->authorize('fees.manage');
 
         return view('admin.fees.edit', [
-            'fee' => $fee->load(['academicSession', 'beneficiaries.bankAccount', 'overrides.level']),
+            'fee' => $fee->load(['academicSession', 'splits.bankAccount', 'overrides.level']),
             'tab' => $this->tabFrom($request),
             'tabs' => self::TABS,
             'sessions' => AcademicSession::query()->orderByDesc('starts_on')->get(),
@@ -111,6 +111,7 @@ class FeeController extends Controller
             'terms' => Fee::TERMS,
             'statuses' => FeeClassOverride::STATUSES,
             'bankAccounts' => BankAccount::query()->active()->get(),
+            'defaultItMaintenanceFee' => Fee::DEFAULT_IT_MAINTENANCE_FEE,
             'levels' => SchoolLevel::query()->active()->orderBy('order')->orderBy('name')->get(),
         ]);
     }
@@ -160,31 +161,38 @@ class FeeController extends Controller
      * A split may add up to less than the fee — the remainder pays into the main account —
      * but never to more. That is checked here and not only in the form, because it is a rule
      * about the money, and a rule about the money cannot live somewhere a request can skip.
+     *
+     * The IT maintenance fee is saved on the same form because it is the same decision: how
+     * one payment of this fee is divided. It is kept back per transaction before the splits
+     * are paid, so it comes off the top rather than out of any one account.
      */
-    public function saveBeneficiaries(Request $request, Fee $fee): RedirectResponse
+    public function saveSplits(Request $request, Fee $fee): RedirectResponse
     {
         $this->authorize('fees.manage');
 
         $validated = $request->validate([
             // Optional rather than required: removing every split is a real thing to want,
             // and it means the fee pays wholly into the main account.
-            'beneficiaries' => ['nullable', 'array'],
+            'splits' => ['nullable', 'array'],
             // Distinct, because two rows for one account would be two transfers to it.
-            'beneficiaries.*.bank_account_id' => ['required', 'integer', 'distinct', 'exists:bank_accounts,id'],
-            'beneficiaries.*.amount' => ['required', 'numeric', 'min:0'],
+            'splits.*.bank_account_id' => ['required', 'integer', 'distinct', 'exists:bank_accounts,id'],
+            'splits.*.amount' => ['required', 'numeric', 'min:0'],
+            // Empty means the platform's default, which is why it is nullable rather than
+            // defaulted here: the default can change without rewriting every fee.
+            'it_maintenance_fee' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
         ], [
-            'beneficiaries.*.bank_account_id.distinct' => 'The same account is listed twice.',
-            'beneficiaries.*.bank_account_id.exists' => 'One of those accounts no longer exists.',
+            'splits.*.bank_account_id.distinct' => 'The same account is listed twice.',
+            'splits.*.bank_account_id.exists' => 'One of those accounts no longer exists.',
         ]);
 
-        $rows = $validated['beneficiaries'] ?? [];
+        $rows = $validated['splits'] ?? [];
         $total = round(array_sum(array_map(fn (array $row): float => (float) $row['amount'], $rows)), 2);
 
         if ($total > (float) $fee->amount) {
             $currency = Setting::get('currency_symbol', '₦');
 
             throw ValidationException::withMessages([
-                'beneficiaries' => sprintf(
+                'splits' => sprintf(
                     'Those splits add up to %s%s, which is more than the fee of %s%s.',
                     $currency, number_format($total, 2),
                     $currency, number_format((float) $fee->amount, 2),
@@ -192,10 +200,12 @@ class FeeController extends Controller
             ]);
         }
 
-        $fee->beneficiaries()->delete();
+        $fee->update(['it_maintenance_fee' => $validated['it_maintenance_fee'] ?? null]);
 
-        foreach ($rows as $row) {
-            $fee->beneficiaries()->create($row);
+        $fee->splits()->delete();
+
+        foreach (array_values($rows) as $position => $row) {
+            $fee->splits()->create($row + ['position' => $position]);
         }
 
         return redirect()
@@ -418,11 +428,12 @@ class FeeController extends Controller
     {
         $this->authorize('fees.manage');
 
-        $structure->load(['academicSession', 'term', 'level', 'items.category']);
+        $structure->load(['academicSession', 'term', 'level', 'items.category', 'items.fee']);
 
         return view('admin.fees.structure-show', [
             'structure' => $structure,
             'categories' => FeeCategory::query()->active()->get(),
+            'fees' => Fee::query()->active()->orderBy('title')->get(),
             'studentCount' => Student::query()
                 ->when($structure->level_id, fn ($q) => $q->where('level_id', $structure->level_id))
                 ->where('academic_session_id', $structure->academic_session_id)
@@ -456,6 +467,9 @@ class FeeController extends Controller
 
         $validated = $request->validate([
             'fee_category_id' => ['required', 'exists:fee_categories,id'],
+            // Optional: a line that names no fee is still a price the school charges, it
+            // just has nothing to divide the money by.
+            'fee_id' => ['nullable', 'exists:fees,id'],
             'description' => ['nullable', 'string', 'max:160'],
             'amount' => ['required', 'numeric', 'min:0', 'max:99999999'],
             'is_compulsory' => ['nullable', 'boolean'],
@@ -464,6 +478,7 @@ class FeeController extends Controller
         $structure->items()->updateOrCreate(
             ['fee_category_id' => $validated['fee_category_id']],
             [
+                'fee_id' => $validated['fee_id'] ?? null,
                 'description' => $validated['description'] ?? null,
                 'amount' => $validated['amount'],
                 'is_compulsory' => $request->boolean('is_compulsory', true),

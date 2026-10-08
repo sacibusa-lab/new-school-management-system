@@ -396,7 +396,7 @@ Route::middleware('auth')
 
         // The two tabs that divide a fee up: between the school's own accounts, and
         // differently for a year group.
-        Route::post('fees/{fee}/beneficiaries', [FeeController::class, 'saveBeneficiaries'])->name('fees.beneficiaries');
+        Route::post('fees/{fee}/splits', [FeeController::class, 'saveSplits'])->name('fees.splits');
         Route::post('fees/{fee}/overrides', [FeeController::class, 'saveOverrides'])->name('fees.overrides');
 
         Route::get('fees/categories', [FeeController::class, 'categories'])->name('fees.categories.index');
@@ -454,6 +454,27 @@ Route::middleware('auth')
         Route::post('payments/schedule/adjust', [PaymentController::class, 'adjustSchedule'])->name('payments.schedule.adjust');
         Route::post('payments/schedule/record', [PaymentController::class, 'recordSchedule'])->name('payments.schedule.record');
         Route::get('payments/settlements', [PaymentController::class, 'settlements'])->name('payments.settlements');
+
+        // What the office says it has moved. The settlement page works out where a day's
+        // money should go; only a person can say the transfer was made, so these record a
+        // statement rather than derive a figure. A day is transferred in one sitting
+        // usually, so it settles as a whole as well as a payment at a time.
+        //
+        // `whereNumber` keeps the literal "day" out of the payment parameter without relying
+        // on the order these are declared in.
+        Route::post('payments/settlements/day/settle', [PaymentController::class, 'settleDay'])->name('payments.settlements.day.settle');
+        Route::post('payments/settlements/day/unsettle', [PaymentController::class, 'unsettleDay'])->name('payments.settlements.day.unsettle');
+
+        Route::post('payments/settlements/{payment}/settle', [PaymentController::class, 'settlePayment'])
+            ->whereNumber('payment')->name('payments.settlements.settle');
+        Route::post('payments/settlements/{payment}/unsettle', [PaymentController::class, 'unsettlePayment'])
+            ->whereNumber('payment')->name('payments.settlements.unsettle');
+
+        // The last step: the transfers have been made. A day at a time, because the
+        // transfers are made a day at a time.
+        Route::post('payments/settlements/day/disburse', [PaymentController::class, 'disburseDay'])->name('payments.settlements.day.disburse');
+        Route::post('payments/settlements/day/undisburse', [PaymentController::class, 'undisburseDay'])->name('payments.settlements.day.undisburse');
+
         Route::get('payments/reports', [PaymentController::class, 'reports'])->name('payments.reports');
 
         // The account number a child's fees are paid into. Paystack issues it; the

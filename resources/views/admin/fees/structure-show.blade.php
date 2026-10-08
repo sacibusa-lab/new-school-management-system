@@ -99,6 +99,12 @@
                             <tr class="transition-colors hover:bg-surface-3/60">
                                 <td class="border-r border-line p-3 align-middle font-medium text-ink">
                                     {{ $item->category?->name ?? 'Removed category' }}
+
+                                    @if ($item->fee)
+                                        <span class="mt-0.5 block text-xs font-normal text-muted">
+                                            {{ $item->fee->title }}
+                                        </span>
+                                    @endif
                                 </td>
 
                                 <td class="border-r border-line p-3 align-middle text-muted">
@@ -175,6 +181,11 @@
 
                     <x-field name="amount" label="Amount" type="number" required step="0.01" min="0"
                              hint="In {{ \App\Models\Setting::get('currency', 'NGN') }}, to two decimal places." />
+
+                    <x-field name="fee_id" label="Fee" type="select"
+                             placeholder-option="No fee — nothing is divided"
+                             :options="$fees->pluck('title', 'id')->all()"
+                             hint="Which fee this line is for. The fee's splits decide where the money paid against it goes." />
 
                     <div class="sm:col-span-2">
                         <x-field name="description" label="Description"

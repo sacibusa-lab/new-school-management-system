@@ -41,8 +41,18 @@ class Fee extends Model
         3 => ['active' => 'third_term_active', 'amount' => 'third_term_amount', 'label' => 'Third term', 'short' => 'Third'],
     ];
 
+    /**
+     * What the platform keeps back from a transaction when a fee says nothing of its own.
+     *
+     * A flat per-transaction charge rather than a share: the platform's cost of moving the
+     * money does not grow with the size of the fee, so a percentage would take more for
+     * doing the same work.
+     */
+    public const DEFAULT_IT_MAINTENANCE_FEE = 100.00;
+
     protected $fillable = [
         'title', 'description', 'revenue_code', 'cycle', 'academic_session_id', 'amount',
+        'it_maintenance_fee',
         'first_term_amount', 'second_term_amount', 'third_term_amount',
         'first_term_active', 'second_term_active', 'third_term_active', 'is_active',
     ];
@@ -51,6 +61,7 @@ class Fee extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'it_maintenance_fee' => 'decimal:2',
             'first_term_amount' => 'decimal:2',
             'second_term_amount' => 'decimal:2',
             'third_term_amount' => 'decimal:2',
@@ -71,12 +82,13 @@ class Fee extends Model
     }
 
     /**
-     * Who this fee is divided between. Empty means the whole of it pays into the school's
-     * main account, which is the ordinary case rather than a fee nobody has finished.
+     * Who this fee is divided between, in the order the office set them out. Empty means
+     * the whole of it pays into the school's main account, which is the ordinary case
+     * rather than a fee nobody has finished.
      */
-    public function beneficiaries(): HasMany
+    public function splits(): HasMany
     {
-        return $this->hasMany(FeeBeneficiary::class);
+        return $this->hasMany(FeeSplit::class)->orderBy('position');
     }
 
     /** What a year group is charged instead of the default amount. */
@@ -155,13 +167,25 @@ class Fee extends Model
      */
     public function splitTotal(): float
     {
-        return round((float) $this->beneficiaries->sum('amount'), 2);
+        return round((float) $this->splits->sum('amount'), 2);
     }
 
     /** What is left of the fee after the splits, which pays into the main account. */
     public function unsplitAmount(): float
     {
         return round(max((float) $this->amount - $this->splitTotal(), 0), 2);
+    }
+
+    /**
+     * What the platform keeps back from each transaction before the rest is divided.
+     *
+     * An empty column means the default rather than nothing: a fee that never said
+     * otherwise is still maintained by the platform, and a school that has not thought
+     * about it is not thereby opting out of paying for it.
+     */
+    public function itMaintenanceFee(): float
+    {
+        return round((float) ($this->it_maintenance_fee ?? self::DEFAULT_IT_MAINTENANCE_FEE), 2);
     }
 
     /**

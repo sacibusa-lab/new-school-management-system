@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InvoiceItem extends Model
 {
-    protected $fillable = ['invoice_id', 'fee_category_id', 'description', 'amount', 'amount_paid', 'is_compulsory'];
+    protected $fillable = ['invoice_id', 'fee_category_id', 'fee_id', 'description', 'amount', 'amount_paid', 'is_compulsory'];
 
     protected function casts(): array
     {
@@ -26,6 +26,15 @@ class InvoiceItem extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(FeeCategory::class, 'fee_category_id');
+    }
+
+    /**
+     * The fee this line was raised for, copied from the structure when the invoice was
+     * made. It is the fee whose splits divide the money paid against this line.
+     */
+    public function fee(): BelongsTo
+    {
+        return $this->belongsTo(Fee::class);
     }
 
     public function balance(): float

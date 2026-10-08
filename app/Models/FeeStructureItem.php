@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FeeStructureItem extends Model
 {
-    protected $fillable = ['fee_structure_id', 'fee_category_id', 'description', 'amount', 'is_compulsory'];
+    protected $fillable = ['fee_structure_id', 'fee_category_id', 'fee_id', 'description', 'amount', 'is_compulsory'];
 
     protected function casts(): array
     {
@@ -25,6 +25,15 @@ class FeeStructureItem extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(FeeCategory::class, 'fee_category_id');
+    }
+
+    /**
+     * The fee this line is a price for, and so the one whose splits decide where the money
+     * paid against it goes. Null means nothing has been divided for this line.
+     */
+    public function fee(): BelongsTo
+    {
+        return $this->belongsTo(Fee::class);
     }
 
     public function label(): string

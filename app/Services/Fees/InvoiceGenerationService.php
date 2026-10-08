@@ -83,6 +83,10 @@ class InvoiceGenerationService
             foreach ($structure->items as $item) {
                 $invoice->items()->create([
                     'fee_category_id' => $item->fee_category_id,
+                    // Copied rather than looked up at payment time: the fee a line belongs
+                    // to is a fact about the day it was billed, and editing the structure
+                    // afterwards must not re-divide money already collected.
+                    'fee_id' => $item->fee_id,
                     'description' => $item->label(),
                     'amount' => $item->amount,
                     'is_compulsory' => $item->is_compulsory,

@@ -15,8 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * has to be checked against the fee rather than trusted — a split that adds up to more than the
  * fee is paying out money the school never collected.
  *
- * Read by the settlements page, which adds these up per account for a session, a term and a
- * month. Nothing else in the app spends them.
+ * Written and read by the Internal ledger splits tab on a fee's own page; the settlements
+ * page will add them up per account for a session, a term and a month.
  */
 class FeeSplit extends Model
 {

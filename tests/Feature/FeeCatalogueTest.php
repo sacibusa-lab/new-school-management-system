@@ -6,7 +6,7 @@ use App\Http\Controllers\Admin\FeeController;
 use App\Models\AcademicSession;
 use App\Models\BankAccount;
 use App\Models\Fee;
-use App\Models\FeeBeneficiary;
+use App\Models\FeeSplit;
 use App\Models\SchoolLevel;
 use App\Models\Setting;
 use App\Models\User;
@@ -325,8 +325,8 @@ class FeeCatalogueTest extends TestCase
         $ptaAccount = BankAccount::factory()->create(['account_number' => '2222222222']);
 
         $this->actingAs($this->admin)
-            ->post(route('admin.fees.beneficiaries', $fee), [
-                'beneficiaries' => [
+            ->post(route('admin.fees.splits', $fee), [
+                'splits' => [
                     ['bank_account_id' => $feesAccount->id, 'amount' => 60000],
                     ['bank_account_id' => $ptaAccount->id, 'amount' => 25000],
                 ],
@@ -335,10 +335,16 @@ class FeeCatalogueTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertSessionHas('status');
 
-        $this->assertSame(2, $fee->beneficiaries()->count());
+        $this->assertSame(2, $fee->splits()->count());
+
+        // The order the office set them out is the order they are read back in.
+        $this->assertSame(
+            [$feesAccount->id, $ptaAccount->id],
+            $fee->splits()->pluck('bank_account_id')->all(),
+        );
 
         // 85,000 of 100,000 promised away, so 15,000 still pays into the main account.
-        $split = $fee->load('beneficiaries');
+        $split = $fee->load('splits');
         $this->assertSame(85000.0, $split->splitTotal());
         $this->assertSame(15000.0, $split->unsplitAmount());
 
@@ -364,16 +370,16 @@ class FeeCatalogueTest extends TestCase
         $second = BankAccount::factory()->create();
 
         $this->actingAs($this->admin)
-            ->post(route('admin.fees.beneficiaries', $fee), [
-                'beneficiaries' => [
+            ->post(route('admin.fees.splits', $fee), [
+                'splits' => [
                     ['bank_account_id' => $first->id, 'amount' => 80000],
                     ['bank_account_id' => $second->id, 'amount' => 40000],
                 ],
             ])
-            ->assertSessionHasErrors('beneficiaries');
+            ->assertSessionHasErrors('splits');
 
         // Nothing saved: a split that does not add up is not half-saved.
-        $this->assertSame(0, $fee->beneficiaries()->count());
+        $this->assertSame(0, $fee->splits()->count());
     }
 
     /**
@@ -386,15 +392,15 @@ class FeeCatalogueTest extends TestCase
         $account = BankAccount::factory()->create();
 
         $this->actingAs($this->admin)
-            ->post(route('admin.fees.beneficiaries', $fee), [
-                'beneficiaries' => [
+            ->post(route('admin.fees.splits', $fee), [
+                'splits' => [
                     ['bank_account_id' => $account->id, 'amount' => 30000],
                     ['bank_account_id' => $account->id, 'amount' => 30000],
                 ],
             ])
-            ->assertSessionHasErrors('beneficiaries.0.bank_account_id');
+            ->assertSessionHasErrors('splits.0.bank_account_id');
 
-        $this->assertSame(0, $fee->beneficiaries()->count());
+        $this->assertSame(0, $fee->splits()->count());
     }
 
     /**
@@ -404,14 +410,81 @@ class FeeCatalogueTest extends TestCase
     public function test_every_split_can_be_removed(): void
     {
         $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 100000]);
-        FeeBeneficiary::factory()->create(['fee_id' => $fee->id, 'amount' => 40000]);
+        FeeSplit::factory()->create(['fee_id' => $fee->id, 'amount' => 40000]);
 
         $this->actingAs($this->admin)
-            ->post(route('admin.fees.beneficiaries', $fee), [])
+            ->post(route('admin.fees.splits', $fee), [])
             ->assertSessionHasNoErrors()
             ->assertSessionHas('status');
 
-        $this->assertSame(0, $fee->beneficiaries()->count());
+        $this->assertSame(0, $fee->splits()->count());
+    }
+
+    /**
+     * A share pointed at an account that has since been removed stays on the page: money
+     * that was going somewhere has to be looked at rather than silently vanish.
+     */
+    public function test_a_split_whose_account_is_gone_is_still_shown(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 100000]);
+        FeeSplit::factory()->create(['fee_id' => $fee->id, 'bank_account_id' => null, 'amount' => 40000]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'splits']))
+            ->assertOk()
+            ->assertSee('Account no longer held')
+            ->assertSee($this->currency.'40,000.00');
+    }
+
+    /**
+     * The platform's charge is part of the same decision as the splits — how one payment of
+     * this fee is divided — so it is saved from the same form. A fee nobody has priced it
+     * for is not thereby paying nothing, which is why the fallback is asserted too.
+     */
+    public function test_the_it_maintenance_fee_is_saved_with_the_splits(): void
+    {
+        $fee = Fee::factory()->create(['title' => 'Tuition Fee', 'amount' => 100000]);
+
+        $this->assertSame(100.0, $fee->itMaintenanceFee());
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.splits', $fee), [
+                'it_maintenance_fee' => 250,
+                'splits' => [
+                    ['bank_account_id' => BankAccount::factory()->create()->id, 'amount' => 40000],
+                ],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status');
+
+        $this->assertSame(250.0, $fee->fresh()->itMaintenanceFee());
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.fees.edit', ['fee' => $fee, 'tab' => 'splits']))
+            ->assertOk()
+            ->assertSee('IT Maintenance Fee')
+            ->assertSee($this->currency.'250.00');
+    }
+
+    /** Emptying it is how a fee goes back to following the platform's default. */
+    public function test_an_empty_it_maintenance_fee_falls_back_to_the_default(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 100000, 'it_maintenance_fee' => 250]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.splits', $fee), ['it_maintenance_fee' => ''])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(100.0, $fee->fresh()->itMaintenanceFee());
+    }
+
+    public function test_the_it_maintenance_fee_cannot_be_negative(): void
+    {
+        $fee = Fee::factory()->create(['amount' => 100000]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.fees.splits', $fee), ['it_maintenance_fee' => -5])
+            ->assertSessionHasErrors('it_maintenance_fee');
     }
 
     /* ------------------------------------------------------------------ */

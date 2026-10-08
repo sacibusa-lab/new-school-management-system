@@ -157,13 +157,33 @@
                     </button>
                 </div>
 
-                @error('beneficiaries')
+                @error('splits')
                     <p class="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-900 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-950/40 dark:text-rose-100">
                         {{ $message }}
                     </p>
                 @enderror
 
-                @if ($fee->beneficiaries->isEmpty())
+                @error('it_maintenance_fee')
+                    <p class="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-900 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-950/40 dark:text-rose-100">
+                        {{ $message }}
+                    </p>
+                @enderror
+
+                {{-- Kept back before anything is divided, so it is shown before the accounts
+                     rather than as one of them: it is not a destination, it is what the
+                     platform charges for moving the money. --}}
+                <div class="mt-5 flex items-center gap-3 rounded-xl bg-surface-2 p-4 ring-1 ring-line">
+                    <span class="text-xl" aria-hidden="true">🛡️</span>
+
+                    <div>
+                        <p class="text-sm font-semibold text-ink">IT Maintenance Fee</p>
+                        <p class="text-xs text-muted">
+                            {{ $school->currency }}{{ number_format($fee->itMaintenanceFee(), 2) }} per transaction
+                        </p>
+                    </div>
+                </div>
+
+                @if ($fee->splits->isEmpty())
                     <p class="mt-5 rounded-xl bg-surface-2 p-6 text-center text-sm text-muted ring-1 ring-line">
                         No splits. All {{ $school->currency }}{{ number_format((float) $fee->amount, 2) }}
                         of this fee pays into the main account.
@@ -179,7 +199,7 @@
                             </thead>
 
                             <tbody class="divide-y divide-line">
-                                @foreach ($fee->beneficiaries as $split)
+                                @foreach ($fee->splits as $split)
                                     <tr>
                                         <td class="p-3">
                                             {{-- The bank's name for the account, because the caption the
@@ -238,10 +258,10 @@
                             </button>
                         </div>
 
-                        <form method="POST" action="{{ route('admin.fees.beneficiaries', $fee) }}"
+                        <form method="POST" action="{{ route('admin.fees.splits', $fee) }}"
                               x-data="{
                                   fee: {{ (float) $fee->amount }},
-                                  rows: @js($fee->beneficiaries->map(fn ($split) => ['bank_account_id' => (string) $split->bank_account_id, 'amount' => (string) $split->amount])->values()),
+                                  rows: @js($fee->splits->map(fn ($split) => ['bank_account_id' => (string) $split->bank_account_id, 'amount' => (string) $split->amount])->values()),
                                   accounts: @js($bankAccounts->map(fn ($account) => ['id' => $account->id, 'label' => $account->bank_name.' — '.$account->account_number])->values()),
                                   add() {
                                       const used = this.rows.map(row => String(row.bank_account_id));
@@ -264,10 +284,26 @@
                             @csrf
 
                             <div class="space-y-3 p-5 sm:p-6">
+                                <div>
+                                    <label for="it_maintenance_fee" class="label">
+                                        IT Maintenance Fee ({{ $school->currency }})
+                                    </label>
+
+                                    <input type="number" step="0.01" min="0" id="it_maintenance_fee"
+                                           name="it_maintenance_fee"
+                                           value="{{ old('it_maintenance_fee', $fee->itMaintenanceFee()) }}"
+                                           class="input">
+
+                                    <p class="hint">
+                                        Per-transaction fee deducted for platform maintenance. Leave empty
+                                        for the default ({{ $school->currency }}{{ number_format($defaultItMaintenanceFee, 0) }}).
+                                    </p>
+                                </div>
+
                                 <template x-for="(row, index) in rows" :key="index">
                                     <div class="flex flex-wrap items-center gap-3">
                                         <div class="min-w-0 flex-1">
-                                            <select :name="`beneficiaries[${index}][bank_account_id]`"
+                                            <select :name="`splits[${index}][bank_account_id]`"
                                                     x-model="row.bank_account_id" class="input">
                                                 <template x-for="account in accounts" :key="account.id">
                                                     <option :value="String(account.id)"
@@ -279,7 +315,7 @@
 
                                         <div class="w-40 shrink-0">
                                             <input type="number" step="0.01" min="0" placeholder="Amount"
-                                                   :name="`beneficiaries[${index}][amount]`"
+                                                   :name="`splits[${index}][amount]`"
                                                    x-model="row.amount" class="input">
                                         </div>
 
